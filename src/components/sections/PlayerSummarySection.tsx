@@ -12,11 +12,6 @@ interface Point {
   text: string;
 }
 
-function avg(vals: number[]) {
-  const v = vals.filter((x) => x > 0);
-  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
-}
-
 function rankDesc(pid: string, values: { pid: string; val: number }[]) {
   return [...values].sort((a, b) => b.val - a.val).findIndex((v) => v.pid === pid) + 1;
 }
@@ -29,13 +24,12 @@ function ordinal(n: number) {
 }
 
 function buildInsight(pid: string, data: DashboardData): Point[] {
-  const { skillRatings, shotAccuracy, errors, kitchenArrival, thirdShot, shotQuality, returnDepth, hero } = data;
+  const { skillRatings, errors, kitchenArrival, thirdShot, shotQuality, returnDepth, hero } = data;
   const n = data.players.length;
   const points: Point[] = [];
 
   const h = hero.find((r) => r.pid === pid);
   const sr = skillRatings.find((r) => r.pid === pid);
-  const sa = shotAccuracy.find((r) => r.pid === pid);
   const er = errors.find((r) => r.pid === pid);
   const ka = kitchenArrival.find((r) => r.pid === pid);
   const ts = thirdShot.find((r) => r.pid === pid);

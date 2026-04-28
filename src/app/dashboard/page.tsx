@@ -7,7 +7,6 @@ import { getNights } from '@/lib/nightStore';
 import { parseMultipleNights } from '@/lib/parser';
 import { DashboardData, SessionInfo } from '@/types/dashboard';
 import { Night } from '@/types/nights';
-import { NightFilter } from '@/components/NightFilter';
 import { GameFilter } from '@/components/GameFilter';
 import { PlayerFilter } from '@/components/PlayerFilter';
 import { HeroSection } from '@/components/sections/HeroSection';
@@ -87,15 +86,6 @@ export default function DashboardPage() {
     setData(withSessions);
     setDashboardData(withSessions);
   }, []);
-
-  function handleNightChange(ids: string[]) {
-    setSelectedNightIds(ids);
-    const activeNights = nights.filter((n) => ids.includes(n.id));
-    const tempData = parseMultipleNights(activeNights);
-    const allKeys = new Set(tempData.sessions.map((s) => s.key));
-    setSelectedGameKeys(allKeys);
-    reparse(ids, allKeys, nights);
-  }
 
   function handleGameChange(keys: Set<string>) {
     setSelectedGameKeys(keys);
