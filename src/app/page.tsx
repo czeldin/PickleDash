@@ -101,7 +101,7 @@ export default function HomePage() {
   function viewNight(night: Night) {
     const data = parseMultipleNights([night]);
     setDashboardData(data);
-    router.push('/dashboard');
+    router.push(`/dashboard?night=${night.id}`);
   }
 
   return (

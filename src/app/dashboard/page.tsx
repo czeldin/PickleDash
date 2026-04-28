@@ -52,17 +52,38 @@ export default function DashboardPage() {
   const [availableSessions, setAvailableSessions] = useState<SessionInfo[]>([]);
 
   useEffect(() => {
-    const cached = getDashboardData();
-    if (!cached) { router.replace('/'); return; }
-    setData(cached);
-    setAvailableSessions(cached.sessions);
-    setSelectedGameKeys(new Set(cached.sessions.map((s) => s.key)));
-    setSelectedPids(new Set(cached.players.map((p) => p.pid)));
-    // Recover the night metadata for the title
-    import('@/lib/nightStore').then(({ getNights }) => {
-      const nights = getNights();
-      if (nights.length > 0) setNight(nights[0]);
-    });
+    const nightId = new URLSearchParams(window.location.search).get('night');
+
+    const loadNight = (n: Night) => {
+      const allData = parseMultipleNights([n]);
+      setNight(n);
+      setData(allData);
+      setAvailableSessions(allData.sessions);
+      setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
+      setSelectedPids(new Set(allData.players.map((p) => p.pid)));
+      setDashboardData(allData);
+    };
+
+    if (nightId) {
+      // Load directly from localStorage by night ID — enables shareable URLs
+      import('@/lib/nightStore').then(({ getNights }) => {
+        const found = getNights().find((n) => n.id === nightId);
+        if (found) { loadNight(found); }
+        else { router.replace('/'); }
+      });
+    } else {
+      // Fallback: use in-memory cached data (navigated via "View →" button)
+      const cached = getDashboardData();
+      if (!cached) { router.replace('/'); return; }
+      setData(cached);
+      setAvailableSessions(cached.sessions);
+      setSelectedGameKeys(new Set(cached.sessions.map((s) => s.key)));
+      setSelectedPids(new Set(cached.players.map((p) => p.pid)));
+      import('@/lib/nightStore').then(({ getNights }) => {
+        const nights = getNights();
+        if (nights.length > 0) setNight(nights[0]);
+      });
+    }
   }, [router]);
 
   const reparse = useCallback((gameKeys: Set<string>, currentNight: Night | null) => {
