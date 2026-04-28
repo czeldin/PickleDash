@@ -9,7 +9,9 @@ interface Props {
 
 interface Summary {
   pid: string;
-  style: string;
+  styleTag: string;     // 1-2 words shown in the badge
+  summaryText: string;  // overview: skill ratings + standout strengths
+  styleText: string;    // how they play: shot selection, aggression, errors
   superpower: string;
   improve: string;
 }
@@ -44,10 +46,7 @@ function buildSummary(pid: string, data: DashboardData): Summary {
   const ss = serveSpeed.find((r) => r.pid === pid);
   const ds = driveSpeed.find((r) => r.pid === pid);
 
-  // ── Style ────────────────────────────────────────────────────────────────
-  // Build a unique profile from multiple dimensions rather than one threshold
-
-  // Dimension 1: offensive vs defensive orientation
+  // ── Orientation ─────────────────────────────────────────────────────────
   const offenseRk = sr ? rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r.offense }))) : n;
   const defenseRk = sr ? rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r.defense }))) : n;
   const offDefGap = sr ? sr.offense - sr.defense : 0;
@@ -58,39 +57,93 @@ function buildSummary(pid: string, data: DashboardData): Summary {
   else if (defenseRk === 1) orientation = 'Defensive';
   else orientation = 'All-around';
 
-  // Dimension 2: 3rd shot style (lower thresholds for diversity)
-  let shotStyle = '';
-  if (ts) {
-    if (ts.drivePct > 52) shotStyle = 'drive-heavy';
-    else if (ts.dropPct > 58) shotStyle = 'drop-first';
-    else shotStyle = 'balanced';
-  }
+  // 3rd shot preference
+  const drivePct = ts?.drivePct ?? 50;
+  const dropPct = ts?.dropPct ?? 50;
+  const shotPreference = drivePct > 55 ? 'drive-heavy' : dropPct > 58 ? 'drop-first' : 'balanced';
 
-  // Dimension 3: quality/error personality
-  const avgErrPerGame = errors.reduce((a, b) => a + b.totalPerGame, 0) / n;
+  // Error / quality personality
+  const avgErrPerGame = errors.length ? errors.reduce((a, b) => a + b.totalPerGame, 0) / errors.length : 0;
   const errRk = er ? rankDesc(pid, errors.map((r) => ({ pid: r.pid, val: -r.totalPerGame }))) : n;
-  const exRk = sq ? rankDesc(pid, shotQuality.map((r) => ({ pid: r.pid, val: r.excellentPct }))) : n;
-  let personality = '';
-  if (er && er.totalPerGame < avgErrPerGame * 0.8) personality = 'low-error';
-  else if (sq && sq.excellentPct > 47 && sq.poorPct > 11) personality = 'high-variance';
-  else if (exRk === 1) personality = 'quality ball-striker';
-  else if (errRk === n) personality = 'error-prone';
-  else personality = 'consistent';
 
-  // Dimension 4: speed/aggression modifier
+  // Serve speed rank
   const ssRk = ss ? rankDesc(pid, serveSpeed.filter(r => r.avgMph > 0).map((r) => ({ pid: r.pid, val: r.avgMph }))) : n;
   const rdRk = rd ? rankDesc(pid, returnDepth.map((r) => ({ pid: r.pid, val: r.deepPct }))) : n;
-  let modifier = '';
-  if (ssRk === 1) modifier = 'power server';
-  else if (rdRk === 1 && rd && rd.deepPct > 50) modifier = 'aggressive returner';
 
-  // Assemble style string — pick most informative combo
-  const parts = [
-    `${orientation}${shotStyle && shotStyle !== 'balanced' ? ` · ${shotStyle}` : ''}`,
-    personality !== 'consistent' ? personality : '',
-    modifier,
-  ].filter(Boolean);
-  const style = parts.join(' · ');
+  // ── Simple 1-2 word style tag ────────────────────────────────────────────
+  let styleTag: string;
+  if (orientation === 'Offensive' && ssRk === 1) styleTag = 'Power Player';
+  else if (orientation === 'Offensive' && shotPreference === 'drive-heavy') styleTag = 'Attacker';
+  else if (orientation === 'Offensive') styleTag = 'Offensive';
+  else if (orientation === 'Defensive' && errRk === 1) styleTag = 'Lockdown';
+  else if (orientation === 'Defensive') styleTag = 'Defender';
+  else if (shotPreference === 'drive-heavy') styleTag = 'Aggressor';
+  else if (shotPreference === 'drop-first') styleTag = 'Technician';
+  else styleTag = 'All-around';
+
+  // ── Summary text ─────────────────────────────────────────────────────────
+  // Overview of skill ratings + top strengths
+  const summaryParts: string[] = [];
+
+  if (sr) {
+    const skills = ['serve', 'return', 'offense', 'defense', 'agility', 'consistency'] as const;
+    const ranked = skills
+      .map((s) => ({ skill: s, val: sr[s], rk: rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r[s] }))) }))
+      .filter((x) => x.val > 0)
+      .sort((a, b) => a.rk - b.rk);
+    const top = ranked.filter((x) => x.rk === 1);
+    const top2 = ranked.slice(0, 2);
+    const overall = ((sr.offense + sr.defense + sr.return + sr.serve + sr.agility + sr.consistency) / 6).toFixed(2);
+    summaryParts.push(`Rated ${overall} across skill categories.`);
+    if (top.length > 0) {
+      const names = top.map((x) => x.skill).join(' and ');
+      summaryParts.push(`Leads the group in ${names}.`);
+    } else {
+      const names = top2.map((x) => x.skill).join(' and ');
+      summaryParts.push(`Strongest in ${names}.`);
+    }
+  }
+
+  if (h && h.wins + h.losses >= 3) {
+    const winRate = Math.round((h.wins / (h.wins + h.losses)) * 100);
+    const winRk = rankDesc(pid, hero.map((r) => ({ pid: r.pid, val: r.wins / Math.max(r.wins + r.losses, 1) })));
+    if (winRk === 1) summaryParts.push(`Best win rate on the team at ${winRate}%.`);
+    else if (winRate >= 60) summaryParts.push(`${winRate}% win rate on the night.`);
+  }
+
+  const summaryText = summaryParts.join(' ') || 'Solid across the board with no glaring holes in the game.';
+
+  // ── Style text ───────────────────────────────────────────────────────────
+  // How they actually play: shot selection, aggression, errors, kitchen
+  const styleParts: string[] = [];
+
+  if (ts && ts.driveCount + ts.dropCount >= 5) {
+    if (drivePct >= 60) styleParts.push(`Goes to the drive ${drivePct.toFixed(0)}% of the time on 3rd shots — an aggressive, attack-first approach.`);
+    else if (dropPct >= 60) styleParts.push(`Favors the drop on ${dropPct.toFixed(0)}% of 3rd shots — patient, net-oriented style.`);
+    else styleParts.push(`Mixes drives and drops fairly evenly (${drivePct.toFixed(0)}% drives / ${dropPct.toFixed(0)}% drops).`);
+  }
+
+  if (er && er.gamesPlayed > 0) {
+    if (er.totalPerGame < avgErrPerGame * 0.75) {
+      styleParts.push(`One of the cleaner players with only ${er.totalPerGame.toFixed(1)} errors/game.`);
+    } else if (er.totalPerGame > avgErrPerGame * 1.3) {
+      styleParts.push(`Plays a higher-risk game with ${er.totalPerGame.toFixed(1)} errors/game — above the group average.`);
+    }
+    if (er.total >= 5 && er.popups / er.total > 0.22) {
+      styleParts.push(`Tends to pop the ball up under pressure (${Math.round((er.popups / er.total) * 100)}% of errors).`);
+    }
+  }
+
+  if (rd) {
+    if (rdRk === 1 && rd.deepPct > 50) styleParts.push(`Hits the deepest returns on the team (${rd.deepPct.toFixed(0)}% land deep).`);
+    else if (rd.shallowPct > 35) styleParts.push(`Returns tend to be short (${rd.shallowPct.toFixed(0)}% shallow), giving opponents an easy transition.`);
+  }
+
+  if (ss && ss.avgMph > 0 && ssRk === 1) {
+    styleParts.push(`Biggest serve in the group at ${ss.avgMph.toFixed(0)} mph avg.`);
+  }
+
+  const styleText = styleParts.join(' ') || 'Consistent all-around game with no extreme tendencies.';
 
   // ── Superpower candidates ────────────────────────────────────────────────
   interface Candidate { score: number; text: string }
@@ -259,7 +312,7 @@ function buildSummary(pid: string, data: DashboardData): Summary {
   improveCands.sort((a, b) => b.priority - a.priority);
   const improve = improveCands[0]?.text ?? 'Continue building consistency — the numbers are solid across the board.';
 
-  return { pid, style, superpower, improve };
+  return { pid, styleTag, summaryText, styleText, superpower, improve };
 }
 
 export function PlayerSummarySection({ data }: Props) {
@@ -291,9 +344,21 @@ export function PlayerSummarySection({ data }: Props) {
                     <p className="text-sm text-gray-400">{h.dupr.toFixed(2)} · {h.wins}W–{h.losses}L</p>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-full text-right leading-tight max-w-[140px]">
-                  {summary.style}
+                <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
+                  {summary.styleTag}
                 </span>
+              </div>
+
+              {/* Summary */}
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-blue-500 uppercase tracking-wide">📊 Summary</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{summary.summaryText}</p>
+              </div>
+
+              {/* Style */}
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-violet-500 uppercase tracking-wide">🎮 Style</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{summary.styleText}</p>
               </div>
 
               {/* Superpower */}
