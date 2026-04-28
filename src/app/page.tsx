@@ -16,7 +16,28 @@ export default function HomePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
 
-  useEffect(() => { setNights(getNights()); }, []);
+  useEffect(() => {
+    const existing = getNights();
+    // Auto-load the pre-bundled night if no nights are stored yet
+    if (existing.length === 0) {
+      fetch('/data/night.json')
+        .then((r) => r.json())
+        .then((raw) => {
+          const label = detectNightLabel(raw);
+          const playerNames = detectPlayerNames(raw);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sessionCount = ((raw as any)?.data?.sessions ?? []).length;
+          if (sessionCount > 0) {
+            const night: Night = { id: 'preloaded', label, raw, sessionCount, playerNames, uploadedAt: 0 };
+            addNight(night);
+          }
+          setNights(getNights());
+        })
+        .catch(() => setNights(existing));
+    } else {
+      setNights(existing);
+    }
+  }, []);
 
   function handleFile(file: File) {
     setError(null);
