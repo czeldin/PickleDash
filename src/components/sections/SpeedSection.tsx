@@ -63,7 +63,7 @@ function SpeedChart({ rows, players, title }: SpeedChartProps) {
           <BarChart
             layout="vertical"
             data={chartData}
-            margin={{ top: 0, right: 48, left: 0, bottom: 0 }}
+            margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
             barCategoryGap="30%"
             barGap={4}
           >

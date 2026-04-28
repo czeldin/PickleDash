@@ -35,8 +35,8 @@ function CustomYAxisTick({ x, y, payload, rows }: any) {
       <text x={-18} y={0} dy="0.35em" textAnchor="middle" fontSize={9} fontWeight={700} fill={row.color}>
         {row.pid.slice(0, 2).toUpperCase()}
       </text>
-      <text x={-36} y={0} dy="0.35em" textAnchor="end" fontSize={12} fontWeight={700} fill="#111827">
-        {row.label}
+      <text x={-36} y={0} dy="0.35em" textAnchor="end" fontSize={11} fontWeight={700} fill="#111827">
+        {row.label.length > 11 ? row.label.slice(0, 10) + '…' : row.label}
       </text>
     </g>
   );
@@ -85,7 +85,7 @@ export function HeroSection({ data }: Props) {
       <h2 className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2">
         Player Overview
       </h2>
-      <div className="flex gap-4 items-stretch">
+      <div className="flex flex-col md:flex-row gap-4 items-stretch">
 
         {/* Rating bar chart */}
         <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-6 min-w-0">
@@ -94,7 +94,7 @@ export function HeroSection({ data }: Props) {
             <BarChart
               layout="vertical"
               data={rows}
-              margin={{ top: 4, right: 56, bottom: 4, left: 8 }}
+              margin={{ top: 4, right: 48, bottom: 4, left: 8 }}
             >
               <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
@@ -108,7 +108,7 @@ export function HeroSection({ data }: Props) {
               <YAxis
                 type="category"
                 dataKey="label"
-                width={190}
+                width={155}
                 tick={(props) => <CustomYAxisTick {...props} rows={rows} />}
                 axisLine={false}
                 tickLine={false}
@@ -124,7 +124,7 @@ export function HeroSection({ data }: Props) {
         </div>
 
         {/* Record tile */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-56 flex-shrink-0">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-56 md:flex-shrink-0">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Record</p>
           <div className="space-y-3">
             {sorted.map((h: HeroStats) => {

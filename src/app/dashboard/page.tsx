@@ -96,26 +96,26 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-200">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <img src="/icon.png" alt="PickleDash" className="w-9 h-9 rounded-xl flex-shrink-0" />
+      <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <img src="/icon.png" alt="PickleDash" className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex-shrink-0" />
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-gray-900 leading-tight truncate">PickleDash</h1>
-              <p className="text-sm font-semibold text-slate-500 leading-tight">{pageTitle}</p>
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 leading-tight">PickleDash</h1>
+              <p className="text-xs md:text-sm font-semibold text-slate-500 leading-tight truncate max-w-[140px] md:max-w-none">{pageTitle}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <GameFilter sessions={availableSessions} selectedKeys={selectedGameKeys} onChange={handleGameChange} />
             <PlayerFilter players={data.players} selectedPids={selectedPids} onChange={setSelectedPids} />
-            <button onClick={() => router.push('/')} className="text-sm text-gray-400 hover:text-gray-700 underline ml-1">
+            <button onClick={() => router.push('/')} className="text-xs md:text-sm text-gray-400 hover:text-gray-700 underline ml-1">
               ← Nights
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+      <main className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-10 md:space-y-12">
         <HeroSection data={visibleData} />
         <HighlightsSection data={visibleData} />
         <SkillRatingsSection data={visibleData} />
