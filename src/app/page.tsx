@@ -18,7 +18,6 @@ export default function HomePage() {
 
   useEffect(() => {
     const existing = getNights();
-    // Auto-load the pre-bundled night if no nights are stored yet
     if (existing.length === 0) {
       fetch('/data/night.json')
         .then((r) => r.json())
@@ -91,7 +90,6 @@ export default function HomePage() {
 
   function saveEdit(id: string) {
     const updated = getNights().map((n) => n.id === id ? { ...n, label: editLabel.trim() || n.label } : n);
-    // Update in store by removing + re-adding in order
     import('@/lib/nightStore').then(({ clearNights, addNight: add }) => {
       clearNights();
       updated.forEach(add);
@@ -100,9 +98,8 @@ export default function HomePage() {
     setEditingId(null);
   }
 
-  function goToDashboard() {
-    if (nights.length === 0) return;
-    const data = parseMultipleNights(nights);
+  function viewNight(night: Night) {
+    const data = parseMultipleNights([night]);
     setDashboardData(data);
     router.push('/dashboard');
   }
@@ -117,11 +114,11 @@ export default function HomePage() {
             <span>PickleDash</span>
           </div>
           <p className="text-gray-500 text-base">
-            Upload one or more{' '}
+            Upload a{' '}
             <a href="https://pb.vision" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
               pb.vision
             </a>{' '}
-            session exports. Each file = one night.
+            session export to view your stats.
           </p>
         </div>
 
@@ -154,13 +151,23 @@ export default function HomePage() {
                     {night.sessionCount} {night.sessionCount === 1 ? 'game' : 'games'} · {night.playerNames.slice(0, 3).join(', ')}{night.playerNames.length > 3 ? ` +${night.playerNames.length - 3}` : ''}
                   </p>
                 </div>
-                <button
-                  onClick={() => deleteNight(night.id)}
-                  className="text-gray-300 hover:text-red-400 text-lg leading-none"
-                  title="Remove"
-                >
-                  ×
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => viewNight(night)}
+                    className="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
+                  >
+                    View →
+                  </button>
+                  {night.id !== 'preloaded' && (
+                    <button
+                      onClick={() => deleteNight(night.id)}
+                      className="text-gray-300 hover:text-red-400 text-lg leading-none"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -181,10 +188,8 @@ export default function HomePage() {
           ) : (
             <div className="space-y-2">
               <div className="text-4xl">📂</div>
-              <p className="text-gray-700 font-medium">
-                {nights.length === 0 ? 'Drop your first JSON file here' : 'Add another night'}
-              </p>
-              <p className="text-gray-400 text-xs">or click to browse · pb.vision → Sessions → Export sessions → Download File</p>
+              <p className="text-gray-700 font-medium">Upload another night</p>
+              <p className="text-gray-400 text-xs">pb.vision → Sessions → Export sessions → Download File</p>
             </div>
           )}
         </div>
@@ -193,16 +198,6 @@ export default function HomePage() {
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm text-center">{error}</div>
-        )}
-
-        {/* View dashboard */}
-        {nights.length > 0 && (
-          <button
-            onClick={goToDashboard}
-            className="w-full py-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-semibold text-base transition-colors shadow"
-          >
-            View Dashboard →
-          </button>
         )}
       </div>
     </main>
