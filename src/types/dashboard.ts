@@ -128,6 +128,21 @@ export interface ErrorRow {
   forced: number;
 }
 
+export interface AttackRow {
+  pid: string;
+  attackTotal: number;        // total sht=4 shots hit
+  attackWins: number;         // those shots where team won the rally
+  attackWinPct: number;       // attackWins / attackTotal * 100
+  attackExcellentPct: number; // avg q.ex for attacks * 100
+}
+
+export interface DinkRow {
+  pid: string;
+  dinkTotal: number;          // total dink shots (sht=1)
+  dinkPerGame: number;        // dinks per game played
+  dinkExcellentPct: number;   // avg q.ex for dinks * 100
+}
+
 export interface DashboardData {
   sessions: SessionInfo[];
   highlights: HighlightRally[];
@@ -144,4 +159,6 @@ export interface DashboardData {
   serveDepth: DepthRow[];
   returnDepth: DepthRow[];
   errors: ErrorRow[];
+  attacks: AttackRow[];
+  dinks: DinkRow[];
 }

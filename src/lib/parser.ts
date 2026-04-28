@@ -3,6 +3,7 @@ import {
   DashboardData, PlayerMeta, PLAYER_COLORS,
   HeroStats, SkillRatingsRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
+  AttackRow, DinkRow,
 } from '@/types/dashboard';
 
 interface RawShot {
@@ -65,6 +66,8 @@ interface PlayerAccum {
   sqExSum: number; sqPoSum: number; sqW: number;
   dropExSum: number; dropExW: number;
   winnerTotal: number; winnerExSum: number; winnerExW: number;
+  attackTotal: number; attackWins: number; attackExSum: number; attackExW: number;
+  dinkTotal: number; dinkExSum: number; dinkExW: number;
   sdDeep: number; sdMed: number; sdShallow: number; sdW: number;
   rdDeep: number; rdMed: number; rdShallow: number; rdW: number;
   errNet: number; errOut: number; errShort: number; errPop: number; errUf: number; errForced: number;
@@ -81,6 +84,8 @@ function makeAccum(name: string): PlayerAccum {
     sqExSum: 0, sqPoSum: 0, sqW: 0,
     dropExSum: 0, dropExW: 0,
     winnerTotal: 0, winnerExSum: 0, winnerExW: 0,
+    attackTotal: 0, attackWins: 0, attackExSum: 0, attackExW: 0,
+    dinkTotal: 0, dinkExSum: 0, dinkExW: 0,
     sdDeep: 0, sdMed: 0, sdShallow: 0, sdW: 0,
     rdDeep: 0, rdMed: 0, rdShallow: 0, rdW: 0,
     errNet: 0, errOut: 0, errShort: 0, errPop: 0, errUf: 0, errForced: 0,
@@ -148,13 +153,25 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
   if (!Array.isArray(ral)) return;
   for (const rally of ral) {
     const shots = rally.sh ?? [];
+    const wt = (rally as { sh: RawShot[]; wt?: number }).wt;
     for (let idx = 0; idx < shots.length; idx++) {
       const shot = shots[idx]; const player = pd[shot.pid]; if (!player) continue;
       const acc = getOrCreate(player.name?.trim() ?? '');
       if (idx >= 2 && shot.sht === 0 && shot.t?.length >= 2) { const spd = driveSpeedMph(shot.t[0], shot.t[1]); if (spd !== null) acc.driveSpeeds.push(spd); }
       if (shot.err) { const f = shot.err.f ?? {}; if (f.n) acc.errNet++; if (f.out) acc.errOut++; if (f.sh) acc.errShort++; if (shot.err.pop) acc.errPop++; if (shot.err.uf) acc.errUf++; if ((f.n || f.out || f.sh) && !shot.err.uf) acc.errForced++; }
-      // Drop quality: track per-shot quality for all drop shots
+      // Drop quality
       if (shot.sht === 2 && shot.q?.ex != null) { acc.dropExSum += shot.q.ex; acc.dropExW++; }
+      // Attack (speed-up / overhead): sht=4
+      if (shot.sht === 4) {
+        acc.attackTotal++;
+        if (wt != null && shot.st === wt) acc.attackWins++;
+        if (shot.q?.ex != null) { acc.attackExSum += shot.q.ex; acc.attackExW++; }
+      }
+      // Dink quality: sht=1
+      if (shot.sht === 1) {
+        acc.dinkTotal++;
+        if (shot.q?.ex != null) { acc.dinkExSum += shot.q.ex; acc.dinkExW++; }
+      }
       if (idx === 2) {
         if (shot.sht === 2) { acc.t3Drop++; acc.k3Drop[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k3Drop[0]++; }
         else if (shot.sht === 0) { acc.t3Drive++; acc.k3Drive[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k3Drive[0]++; }
@@ -164,8 +181,7 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
         else if (shot.sht === 0) { acc.t5Drive++; acc.k5Drive[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k5Drive[0]++; }
       }
     }
-    // Winner/putaway: last shot with no error where the hitter's team won the rally
-    const wt = (rally as { sh: RawShot[]; wt?: number }).wt;
+    // Clean winner: last shot, no error, hitter's team won
     if (shots.length > 0 && wt != null) {
       const last = shots[shots.length - 1];
       if (!last.err && last.st === wt) {
@@ -202,7 +218,15 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
   const serveDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.sdW || 1; return { pid: players[i].pid, deepPct: (acc.sdDeep / w) * 100, medPct: (acc.sdMed / w) * 100, shallowPct: (acc.sdShallow / w) * 100 }; });
   const returnDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.rdW || 1; return { pid: players[i].pid, deepPct: (acc.rdDeep / w) * 100, medPct: (acc.rdMed / w) * 100, shallowPct: (acc.rdShallow / w) * 100 }; });
   const errors: ErrorRow[] = accums.map((acc, i) => { const g = acc.sessionCount || 1; return { pid: players[i].pid, gamesPlayed: acc.sessionCount, total: acc.errNet + acc.errOut + acc.errShort + acc.errPop, totalPerGame: (acc.errNet + acc.errOut + acc.errShort + acc.errPop) / g, net: acc.errNet / g, out: acc.errOut / g, kitchen: acc.errShort / g, popups: acc.errPop / g, unforced: acc.errUf / g, forced: acc.errForced / g }; });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors };
+  const attacks: AttackRow[] = accums.map((acc, i) => {
+    const t = acc.attackTotal;
+    return { pid: players[i].pid, attackTotal: t, attackWins: acc.attackWins, attackWinPct: t > 0 ? (acc.attackWins / t) * 100 : 0, attackExcellentPct: acc.attackExW > 0 ? (acc.attackExSum / acc.attackExW) * 100 : 0 };
+  });
+  const dinks: DinkRow[] = accums.map((acc, i) => {
+    const g = acc.sessionCount || 1;
+    return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
+  });
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)

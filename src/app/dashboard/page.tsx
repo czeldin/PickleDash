@@ -19,6 +19,7 @@ import { ShotQualitySection } from '@/components/sections/ShotQualitySection';
 import { DepthSection } from '@/components/sections/DepthSection';
 import { ErrorSection } from '@/components/sections/ErrorSection';
 import { PlayerSummarySection } from '@/components/sections/PlayerSummarySection';
+import { AttackDinkSection } from '@/components/sections/AttackDinkSection';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
   if (pids.size === data.players.length) return data;
@@ -37,6 +38,8 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     serveDepth: data.serveDepth.filter((r) => pids.has(r.pid)),
     returnDepth: data.returnDepth.filter((r) => pids.has(r.pid)),
     errors: data.errors.filter((r) => pids.has(r.pid)),
+    attacks: data.attacks.filter((r) => pids.has(r.pid)),
+    dinks: data.dinks.filter((r) => pids.has(r.pid)),
   };
 }
 
@@ -123,6 +126,7 @@ export default function DashboardPage() {
         <ShotQualitySection data={visibleData} />
         <DepthSection data={visibleData} />
         <ErrorSection data={visibleData} />
+        <AttackDinkSection data={visibleData} />
         <PlayerSummarySection data={visibleData} />
       </main>
     </div>
