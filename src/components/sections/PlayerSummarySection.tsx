@@ -7,155 +7,224 @@ interface Props {
   data: DashboardData;
 }
 
-interface Point {
-  type: 'strength' | 'weakness' | 'neutral';
-  text: string;
+interface Summary {
+  pid: string;
+  style: string;
+  superpower: string;
+  improve: string;
+}
+
+// How far above the group mean is this player's value? Returns a margin score.
+function margin(val: number, allVals: number[]): number {
+  const nonzero = allVals.filter((v) => v > 0);
+  if (nonzero.length < 2) return 0;
+  const mean = nonzero.reduce((a, b) => a + b, 0) / nonzero.length;
+  return val - mean;
 }
 
 function rankDesc(pid: string, values: { pid: string; val: number }[]) {
   return [...values].sort((a, b) => b.val - a.val).findIndex((v) => v.pid === pid) + 1;
 }
-function rankAsc(pid: string, values: { pid: string; val: number }[]) {
-  return [...values].sort((a, b) => a.val - b.val).findIndex((v) => v.pid === pid) + 1;
-}
 
 function ordinal(n: number) {
-  return n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`;
+  return ['1st', '2nd', '3rd', '4th', '5th', '6th'][n - 1] ?? `${n}th`;
 }
 
-function buildInsight(pid: string, data: DashboardData): Point[] {
-  const { skillRatings, errors, kitchenArrival, thirdShot, shotQuality, returnDepth, hero } = data;
+function buildSummary(pid: string, data: DashboardData): Summary {
+  const { skillRatings, errors, kitchenArrival, thirdShot, shotQuality, returnDepth, serveSpeed, driveSpeed, hero } = data;
   const n = data.players.length;
-  const points: Point[] = [];
 
-  const h = hero.find((r) => r.pid === pid);
+  const h = hero.find((r) => r.pid === pid)!;
   const sr = skillRatings.find((r) => r.pid === pid);
   const er = errors.find((r) => r.pid === pid);
   const ka = kitchenArrival.find((r) => r.pid === pid);
   const ts = thirdShot.find((r) => r.pid === pid);
   const sq = shotQuality.find((r) => r.pid === pid);
   const rd = returnDepth.find((r) => r.pid === pid);
+  const ss = serveSpeed.find((r) => r.pid === pid);
+  const ds = driveSpeed.find((r) => r.pid === pid);
 
-  // 1. Win rate vs skill rank
+  // ── Style ────────────────────────────────────────────────────────────────
+  let style = 'All-around player';
+  if (ts) {
+    if (ts.drivePct > 60) style = 'Drive-first attacker';
+    else if (ts.dropPct > 65) style = 'Drop-and-transition specialist';
+    else style = 'Balanced shot-maker';
+  }
+  if (er && er.totalPerGame < (errors.reduce((a, b) => a + b.totalPerGame, 0) / n) * 0.75) {
+    style += ' · Low-error';
+  } else if (sq && sq.excellentPct > 48 && sq.poorPct > 12) {
+    style += ' · High-variance';
+  }
+
+  // ── Superpower candidates ────────────────────────────────────────────────
+  interface Candidate { score: number; text: string }
+  const candidates: Candidate[] = [];
+
+  // Skill ratings
+  if (sr) {
+    const skills = ['serve', 'return', 'offense', 'defense', 'agility', 'consistency'] as const;
+    for (const skill of skills) {
+      const allVals = skillRatings.map((r) => r[skill]);
+      const m = margin(sr[skill], allVals);
+      const rk = rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r[skill] })));
+      if (rk === 1 && m > 0.05) {
+        const descriptions: Record<string, string> = {
+          offense: `Best offensive rating on the team (${sr.offense.toFixed(2)}). They create pressure and put opponents in tough spots more than anyone else.`,
+          defense: `Top defensive rating (${sr.defense.toFixed(2)}). They get to difficult balls and keep rallies alive when others would pop it up or net it.`,
+          return: `Best return game on the team (${sr.return.toFixed(2)}). Strong returns set up the whole point — they're starting rallies on the front foot.`,
+          serve: `Sharpest serve in the group (${sr.serve.toFixed(2)}). Consistent serving under pressure gives them a reliable platform for every point.`,
+          agility: `Most agile player on the team (${sr.agility.toFixed(2)}). They cover more court and recover faster, making them hard to exploit positionally.`,
+          consistency: `Most consistent player on the team (${sr.consistency.toFixed(2)}). They rarely give away cheap points and keep opponents grinding.`,
+        };
+        candidates.push({ score: m * 12, text: descriptions[skill] });
+      }
+    }
+  }
+
+  // Shot quality
+  if (sq) {
+    const allEx = shotQuality.map((r) => r.excellentPct);
+    const m = margin(sq.excellentPct, allEx);
+    const rk = rankDesc(pid, shotQuality.map((r) => ({ pid: r.pid, val: r.excellentPct })));
+    if (rk <= 2 && m > 2) {
+      candidates.push({ score: m * 0.8, text: `${ordinal(rk)}-highest excellent shot rate (${sq.excellentPct.toFixed(0)}%). They generate quality ball-striking more consistently than almost anyone — building pressure shot by shot.` });
+    }
+  }
+
+  // Serve speed
+  if (ss && ss.avgMph > 0) {
+    const allMph = serveSpeed.filter((r) => r.avgMph > 0).map((r) => r.avgMph);
+    const m = margin(ss.avgMph, allMph);
+    const rk = rankDesc(pid, serveSpeed.map((r) => ({ pid: r.pid, val: r.avgMph })));
+    if (rk === 1 && m > 1.5) {
+      candidates.push({ score: m * 0.6, text: `Hardest server in the group at ${ss.avgMph.toFixed(0)} mph avg (top: ${ss.topMph.toFixed(0)} mph). Pace on serve forces weak returns and shortens points in their favor.` });
+    }
+  }
+
+  // Drive speed
+  if (ds && ds.avgMph > 0) {
+    const allMph = driveSpeed.filter((r) => r.avgMph > 0).map((r) => r.avgMph);
+    const m = margin(ds.avgMph, allMph);
+    const rk = rankDesc(pid, driveSpeed.map((r) => ({ pid: r.pid, val: r.avgMph })));
+    if (rk === 1 && m > 1.5) {
+      candidates.push({ score: m * 0.5, text: `Biggest ball-striker off the ground at ${ds.avgMph.toFixed(0)} mph avg. Their drives create pace that others struggle to handle.` });
+    }
+  }
+
+  // Kitchen arrival
+  if (ka && ka.third_drop_kitchen_pct > 0) {
+    const allDrop = kitchenArrival.map((r) => r.third_drop_kitchen_pct);
+    const m = margin(ka.third_drop_kitchen_pct, allDrop);
+    const rk = rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.third_drop_kitchen_pct })));
+    if (rk === 1 && m > 5) {
+      candidates.push({ score: m * 0.4, text: `Best at getting to the kitchen after a drop (${ka.third_drop_kitchen_pct.toFixed(0)}%). This is the most important transition in pickleball — they do it better than anyone on the team.` });
+    }
+  }
+
+  // Return depth
+  if (rd) {
+    const allDeep = returnDepth.map((r) => r.deepPct);
+    const m = margin(rd.deepPct, allDeep);
+    const rk = rankDesc(pid, returnDepth.map((r) => ({ pid: r.pid, val: r.deepPct })));
+    if (rk === 1 && m > 8) {
+      candidates.push({ score: m * 0.35, text: `Most aggressive returner on the team — ${rd.deepPct.toFixed(0)}% of returns land deep, pinning opponents at the baseline and buying time to take the net.` });
+    }
+  }
+
+  // Low errors
+  if (er && er.gamesPlayed > 0) {
+    const allErr = errors.map((r) => r.totalPerGame);
+    const m = margin(er.totalPerGame, allErr); // negative = fewer errors = good
+    const rk = rankDesc(pid, errors.map((r) => ({ pid: r.pid, val: -r.totalPerGame })));
+    if (rk === 1 && m < -1.5) {
+      candidates.push({ score: Math.abs(m) * 0.9, text: `Cleanest player on the team by a wide margin — only ${er.totalPerGame.toFixed(1)} errors/game. In a game where unforced mistakes decide close points, they make opponents earn every winner.` });
+    }
+  }
+
+  // Win rate above expectation
   if (h && h.wins + h.losses >= 3) {
     const winRate = h.wins / (h.wins + h.losses);
     const duprRank = rankDesc(pid, hero.map((r) => ({ pid: r.pid, val: r.dupr })));
     const winRank = rankDesc(pid, hero.map((r) => ({ pid: r.pid, val: r.wins / Math.max(r.wins + r.losses, 1) })));
-    const gap = duprRank - winRank;
-    if (gap >= 2) {
-      points.push({ type: 'strength', text: `Outperforms their rating in match results — ${ordinal(duprRank)} in skill but ${ordinal(winRank)} in win rate (${Math.round(winRate * 100)}%). They compete well under pressure.` });
-    } else if (gap <= -2) {
-      points.push({ type: 'weakness', text: `Skill ranks ${ordinal(duprRank)} but win rate ranks ${ordinal(winRank)} (${Math.round(winRate * 100)}%) — individual quality isn't converting to wins as often as expected.` });
+    if (winRank < duprRank && winRank === 1) {
+      candidates.push({ score: 6, text: `Top win rate on the team (${Math.round(winRate * 100)}%) despite not having the highest skill rating — a sign of composure, smart point construction, and clutch play.` });
     }
   }
 
-  // 2. Best and worst skill relative to own mean
-  if (sr) {
-    const skills = ['serve', 'return', 'offense', 'defense', 'agility', 'consistency'] as const;
-    const vals = skills.map((s) => ({ skill: s, val: sr[s] })).filter((x) => x.val > 0);
-    if (vals.length >= 3) {
-      vals.sort((a, b) => b.val - a.val);
-      const top = vals[0];
-      const bot = vals[vals.length - 1];
-      const topGroupRank = rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r[top.skill] })));
-      const botGroupRank = rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r[bot.skill] })));
-      const spread = top.val - bot.val;
+  candidates.sort((a, b) => b.score - a.score);
+  const superpower = candidates[0]?.text ?? 'Consistent across all areas — no obvious weak point for opponents to target.';
 
-      const topLabel = top.skill.charAt(0).toUpperCase() + top.skill.slice(1);
-      const botLabel = bot.skill.charAt(0).toUpperCase() + bot.skill.slice(1);
+  // ── Improvement candidates ───────────────────────────────────────────────
+  interface ImproveCand { priority: number; text: string }
+  const improveCands: ImproveCand[] = [];
 
-      if (topGroupRank <= 2) {
-        points.push({ type: 'strength', text: `${topLabel} is their standout skill (${top.val.toFixed(2)}), ranking ${ordinal(topGroupRank)} on the team.` });
-      } else {
-        points.push({ type: 'neutral', text: `${topLabel} is their strongest category at ${top.val.toFixed(2)}, though there's room to climb vs the group.` });
-      }
-
-      if (botGroupRank >= n - 1) {
-        points.push({ type: 'weakness', text: `${botLabel} is their weakest area (${bot.val.toFixed(2)}), ranking ${ordinal(botGroupRank)} of ${n}${spread > 0.35 ? ` — a notable ${spread.toFixed(2)} gap from their best skill` : ''}.` });
-      } else {
-        points.push({ type: 'neutral', text: `${botLabel} (${bot.val.toFixed(2)}) is the lowest-rated skill in their own profile${spread > 0.35 ? `, with a ${spread.toFixed(2)} gap from their peak` : ''}.` });
-      }
-    }
-  }
-
-  // 3. 3rd shot strategy vs kitchen efficiency
-  if (ts && ka && ts.dropCount + ts.driveCount >= 8) {
+  // 3rd shot strategy mismatch
+  if (ts && ka && ts.driveCount + ts.dropCount >= 8) {
+    const drivePct = ts.drivePct;
     const dropKitchen = ka.third_drop_kitchen_pct;
     const driveKitchen = ka.third_drive_kitchen_pct;
     const gap = dropKitchen - driveKitchen;
-    const prefersDriving = ts.drivePct > 50;
+    if (drivePct > 45 && gap > 15 && ka.third_drive_total >= 6) {
+      improveCands.push({ priority: 9, text: `3rd shot selection. They drive ${drivePct.toFixed(0)}% of the time but only reach the kitchen ${driveKitchen.toFixed(0)}% after drives vs ${dropKitchen.toFixed(0)}% after drops — a ${gap.toFixed(0)}-point gap. Committing to more drops would directly improve net position and win rate.` });
+    }
+  }
 
-    if (prefersDriving && gap > 12 && ka.third_drive_total >= 6) {
-      points.push({ type: 'weakness', text: `Drives ${ts.drivePct.toFixed(0)}% of 3rd shots but only reaches the kitchen ${driveKitchen.toFixed(0)}% of the time after drives vs ${dropKitchen.toFixed(0)}% after drops — dropping more would likely improve net presence.` });
-    } else if (!prefersDriving && dropKitchen > 50) {
-      points.push({ type: 'strength', text: `Drop-first on the 3rd shot (${ts.dropPct.toFixed(0)}%) and executes well — arrives at the kitchen ${dropKitchen.toFixed(0)}% of the time.` });
-    } else if (prefersDriving && driveKitchen > 45 && ka.third_drive_total >= 6) {
-      points.push({ type: 'strength', text: `Drives ${ts.drivePct.toFixed(0)}% of 3rd shots and transitions to the kitchen ${driveKitchen.toFixed(0)}% of the time after — an aggressive style that's working.` });
+  // Unforced errors
+  if (er && er.total >= 5 && er.unforced / er.total > 0.55) {
+    const unforcedPct = Math.round((er.unforced / er.total) * 100);
+    const errRank = rankDesc(pid, errors.map((r) => ({ pid: r.pid, val: r.totalPerGame })));
+    if (errRank <= 2) {
+      improveCands.push({ priority: 8, text: `Shot discipline. ${unforcedPct}% of their errors are unforced — they're beating themselves without being pressured. More conservative shot selection in neutral positions could cut their error count significantly.` });
     } else {
-      points.push({ type: 'neutral', text: `Splits 3rd shots ${ts.dropPct.toFixed(0)}% drops / ${ts.drivePct.toFixed(0)}% drives, reaching the kitchen ${dropKitchen.toFixed(0)}% and ${driveKitchen.toFixed(0)}% of the time respectively.` });
+      improveCands.push({ priority: 6, text: `Shot discipline. ${unforcedPct}% of errors are unforced. Slowing down in neutral rallies and choosing higher-percentage shots would reduce self-inflicted damage.` });
     }
   }
 
-  // 4. Error composition
-  if (er && er.total >= 4) {
-    const netPct = er.net / er.total;
-    const outPct = er.out / er.total;
-    const popupPct = er.popups / er.total;
-    const unforcedPct = er.unforced / er.total;
-    const errRank = rankAsc(pid, errors.map((r) => ({ pid: r.pid, val: r.totalPerGame })));
+  // Popup rate
+  if (er && er.total >= 5 && er.popups / er.total > 0.2) {
+    improveCands.push({ priority: 7, text: `Defensive positioning. ${Math.round((er.popups / er.total) * 100)}% of errors are pop-ups, handing opponents easy put-aways. Working on resetting hard-driven balls softly into the kitchen — rather than counter-driving — would reduce this significantly.` });
+  }
 
-    if (popupPct > 0.2) {
-      points.push({ type: 'weakness', text: `${Math.round(popupPct * 100)}% of errors are pop-ups — giving opponents easy put-aways from weak defensive contact in dink exchanges.` });
-    } else if (netPct > 0.5) {
-      points.push({ type: 'weakness', text: `${Math.round(netPct * 100)}% of errors go into the net — often a sign of rushed contact or poor weight transfer through the shot.` });
-    } else if (outPct > 0.4) {
-      points.push({ type: 'weakness', text: `${Math.round(outPct * 100)}% of errors sail long — may be taking too much pace from opponents or over-swinging.` });
-    } else if (unforcedPct > 0.6) {
-      points.push({ type: 'weakness', text: `${Math.round(unforcedPct * 100)}% of errors are unforced — giving away points without being pressured. More disciplined shot selection could cut the error count.` });
-    } else if (unforcedPct < 0.35 && er.totalPerGame > 2) {
-      points.push({ type: 'neutral', text: `Most errors are forced (${Math.round((1 - unforcedPct) * 100)}%) — they're being pressured into mistakes rather than beating themselves. Staying out of losing positions is the key lever.` });
-    }
-
-    if (errRank === 1) {
-      points.push({ type: 'strength', text: `Fewest errors on the team at ${er.totalPerGame.toFixed(1)}/game — rarely beats themselves.` });
-    } else if (errRank === n) {
-      points.push({ type: 'weakness', text: `Most errors on the team at ${er.totalPerGame.toFixed(1)}/game — cutting self-inflicted mistakes is the highest-leverage improvement.` });
+  // Shallow returns
+  if (rd && rd.shallowPct > 30) {
+    const rk = rankDesc(pid, returnDepth.map((r) => ({ pid: r.pid, val: r.shallowPct })));
+    if (rk <= 2) {
+      improveCands.push({ priority: 6, text: `Return depth. ${rd.shallowPct.toFixed(0)}% of returns land short, giving opponents an easy transition to the net. Hitting deeper returns — even if slower — would force opponents back and buy more time to take the kitchen.` });
     }
   }
 
-  // 5. Shot quality profile
-  if (sq && sq.excellentCount + sq.poorCount > 15) {
-    const exPct = sq.excellentPct;
-    const poorPct = sq.poorPct;
-    const exRank = rankDesc(pid, shotQuality.map((r) => ({ pid: r.pid, val: r.excellentPct })));
-    const poorRank = rankDesc(pid, shotQuality.map((r) => ({ pid: r.pid, val: r.poorPct })));
-
-    if (exRank === 1 && poorRank >= n - 1) {
-      points.push({ type: 'strength', text: `Best shot quality profile on the team: most excellent shots (${exPct.toFixed(0)}%) and among the fewest poor ones (${poorPct.toFixed(0)}%).` });
-    } else if (exPct > 45 && poorPct > 12) {
-      points.push({ type: 'neutral', text: `High-variance player: ${exPct.toFixed(0)}% excellent shots but ${poorPct.toFixed(0)}% poor — creates opportunities but also gives openings. Works well against weaker opponents, risky against stronger ones.` });
-    } else if (exRank <= 2) {
-      points.push({ type: 'strength', text: `${ordinal(exRank)}-highest excellent shot rate on the team (${exPct.toFixed(0)}%) — consistently generates quality ball-striking.` });
-    } else if (poorRank <= 2 && poorPct > 10) {
-      points.push({ type: 'weakness', text: `${ordinal(poorRank)}-highest poor shot rate (${poorPct.toFixed(0)}%) — too many low-quality balls ending up in attackable positions.` });
+  // Poor kitchen arrival overall
+  if (ka) {
+    const avgArrival = (ka.third_drop_kitchen_pct + ka.third_drive_kitchen_pct) / 2;
+    const groupAvg = kitchenArrival.reduce((a, r) => a + (r.third_drop_kitchen_pct + r.third_drive_kitchen_pct) / 2, 0) / n;
+    const rk = rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: (r.third_drop_kitchen_pct + r.third_drive_kitchen_pct) / 2 })));
+    if (rk === n && avgArrival < groupAvg - 8) {
+      improveCands.push({ priority: 7, text: `Kitchen transition. They reach the kitchen on only ${avgArrival.toFixed(0)}% of 3rd shots on average — the lowest on the team. Getting to the net more consistently after the 3rd shot is the single biggest lever in amateur pickleball.` });
     }
   }
 
-  // 6. Return depth
-  if (rd && (rd.deepPct + rd.medPct + rd.shallowPct) > 0) {
-    const deepRank = rankDesc(pid, data.returnDepth.map((r) => ({ pid: r.pid, val: r.deepPct })));
-    if (deepRank <= 2 && rd.deepPct > 50) {
-      points.push({ type: 'strength', text: `${ordinal(deepRank)}-deepest returner on the team (${rd.deepPct.toFixed(0)}% deep) — consistently pins opponents at the baseline and earns time to reach the kitchen.` });
-    } else if (rd.shallowPct > 30) {
-      points.push({ type: 'weakness', text: `${rd.shallowPct.toFixed(0)}% of returns are shallow — giving opponents an easier transition forward. Deeper returns would create more pressure from the first shot.` });
+  // Worst skill relative to own profile (only if large gap)
+  if (sr) {
+    const skills = ['serve', 'return', 'offense', 'defense', 'agility', 'consistency'] as const;
+    const vals = skills.map((s) => ({ skill: s, val: sr[s] })).filter((x) => x.val > 0);
+    if (vals.length >= 4) {
+      vals.sort((a, b) => a.val - b.val);
+      const worst = vals[0];
+      const best = vals[vals.length - 1];
+      const gap = best.val - worst.val;
+      const worstRk = rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r[worst.skill] })));
+      if (gap > 0.4 && worstRk >= n - 1) {
+        const label = worst.skill.charAt(0).toUpperCase() + worst.skill.slice(1);
+        improveCands.push({ priority: 5, text: `${label} (${worst.val.toFixed(2)}), their lowest-rated skill by ${gap.toFixed(2)} points and ranked ${ordinal(worstRk)} on the team. Closing this gap would make them a significantly more complete player.` });
+      }
     }
   }
 
-  if (points.length === 0) {
-    points.push({ type: 'neutral', text: 'Performs consistently across all categories without major outliers.' });
-  }
+  improveCands.sort((a, b) => b.priority - a.priority);
+  const improve = improveCands[0]?.text ?? 'Continue building consistency — the numbers are solid across the board.';
 
-  return points;
+  return { pid, style, superpower, improve };
 }
 
 export function PlayerSummarySection({ data }: Props) {
@@ -163,7 +232,7 @@ export function PlayerSummarySection({ data }: Props) {
   if (players.length === 0) return null;
 
   const playerMap = new Map<string, PlayerMeta>(players.map((p) => [p.pid, p]));
-  const sorted = [...data.hero].sort((a, b) => b.dupr - a.dupr);
+  const sorted = [...data.hero].filter((h) => h.dupr > 0).sort((a, b) => b.dupr - a.dupr);
 
   return (
     <section className="space-y-4">
@@ -174,29 +243,34 @@ export function PlayerSummarySection({ data }: Props) {
         {sorted.map((h: HeroStats) => {
           const player = playerMap.get(h.pid);
           if (!player) return null;
-          const points = buildInsight(h.pid, data);
+          const summary = buildSummary(h.pid, data);
 
           return (
-            <div key={h.pid} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-              <div className="flex items-center gap-3">
-                <PlayerAvatar player={player} size="lg" />
-                <div>
-                  <p className="font-bold text-gray-900">{player.name}</p>
-                  <p className="text-sm text-gray-400">{h.dupr.toFixed(2)} overall · {h.wins}W–{h.losses}L</p>
+            <div key={h.pid} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <PlayerAvatar player={player} size="lg" />
+                  <div>
+                    <p className="font-bold text-gray-900">{player.name}</p>
+                    <p className="text-sm text-gray-400">{h.dupr.toFixed(2)} · {h.wins}W–{h.losses}L</p>
+                  </div>
                 </div>
+                <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-full text-right leading-tight max-w-[140px]">
+                  {summary.style}
+                </span>
               </div>
 
-              <div className="space-y-2">
-                {points.map((p, i) => (
-                  <div key={i} className="flex gap-2 text-sm">
-                    <span className="mt-0.5 flex-shrink-0">
-                      {p.type === 'strength' ? <span className="text-emerald-500">✓</span>
-                        : p.type === 'weakness' ? <span className="text-red-400">✗</span>
-                        : <span className="text-blue-400">→</span>}
-                    </span>
-                    <span className="text-gray-700">{p.text}</span>
-                  </div>
-                ))}
+              {/* Superpower */}
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide">⚡ Superpower</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{summary.superpower}</p>
+              </div>
+
+              {/* Improve */}
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-amber-500 uppercase tracking-wide">🎯 Biggest opportunity</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{summary.improve}</p>
               </div>
             </div>
           );
