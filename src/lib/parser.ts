@@ -63,6 +63,8 @@ interface PlayerAccum {
   k3Drop: [number, number]; k3Drive: [number, number]; k5Drop: [number, number]; k5Drive: [number, number];
   t3Drop: number; t3Drive: number; t5Drop: number; t5Drive: number;
   sqExSum: number; sqPoSum: number; sqW: number;
+  dropExSum: number; dropExW: number;
+  winnerTotal: number; winnerExSum: number; winnerExW: number;
   sdDeep: number; sdMed: number; sdShallow: number; sdW: number;
   rdDeep: number; rdMed: number; rdShallow: number; rdW: number;
   errNet: number; errOut: number; errShort: number; errPop: number; errUf: number; errForced: number;
@@ -76,7 +78,10 @@ function makeAccum(name: string): PlayerAccum {
     ssFreacs: new Array(17).fill(0), ssW: 0, driveSpeeds: [],
     k3Drop: [0, 0], k3Drive: [0, 0], k5Drop: [0, 0], k5Drive: [0, 0],
     t3Drop: 0, t3Drive: 0, t5Drop: 0, t5Drive: 0,
-    sqExSum: 0, sqPoSum: 0, sqW: 0, sdDeep: 0, sdMed: 0, sdShallow: 0, sdW: 0,
+    sqExSum: 0, sqPoSum: 0, sqW: 0,
+    dropExSum: 0, dropExW: 0,
+    winnerTotal: 0, winnerExSum: 0, winnerExW: 0,
+    sdDeep: 0, sdMed: 0, sdShallow: 0, sdW: 0,
     rdDeep: 0, rdMed: 0, rdShallow: 0, rdW: 0,
     errNet: 0, errOut: 0, errShort: 0, errPop: 0, errUf: 0, errForced: 0,
     wins: 0, losses: 0,
@@ -148,6 +153,8 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
       const acc = getOrCreate(player.name?.trim() ?? '');
       if (idx >= 2 && shot.sht === 0 && shot.t?.length >= 2) { const spd = driveSpeedMph(shot.t[0], shot.t[1]); if (spd !== null) acc.driveSpeeds.push(spd); }
       if (shot.err) { const f = shot.err.f ?? {}; if (f.n) acc.errNet++; if (f.out) acc.errOut++; if (f.sh) acc.errShort++; if (shot.err.pop) acc.errPop++; if (shot.err.uf) acc.errUf++; if ((f.n || f.out || f.sh) && !shot.err.uf) acc.errForced++; }
+      // Drop quality: track per-shot quality for all drop shots
+      if (shot.sht === 2 && shot.q?.ex != null) { acc.dropExSum += shot.q.ex; acc.dropExW++; }
       if (idx === 2) {
         if (shot.sht === 2) { acc.t3Drop++; acc.k3Drop[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k3Drop[0]++; }
         else if (shot.sht === 0) { acc.t3Drive++; acc.k3Drive[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k3Drive[0]++; }
@@ -155,6 +162,18 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
       if (idx === 4) {
         if (shot.sht === 2) { acc.t5Drop++; acc.k5Drop[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k5Drop[0]++; }
         else if (shot.sht === 0) { acc.t5Drive++; acc.k5Drive[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k5Drive[0]++; }
+      }
+    }
+    // Winner/putaway: last shot with no error where the hitter's team won the rally
+    const wt = (rally as { sh: RawShot[]; wt?: number }).wt;
+    if (shots.length > 0 && wt != null) {
+      const last = shots[shots.length - 1];
+      if (!last.err && last.st === wt) {
+        const wp = pd[last.pid]; if (wp) {
+          const wacc = getOrCreate(wp.name?.trim() ?? '');
+          wacc.winnerTotal++;
+          if (last.q?.ex != null) { wacc.winnerExSum += last.q.ex; wacc.winnerExW++; }
+        }
       }
     }
   }
@@ -174,7 +193,12 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
   const kitchenArrival: KitchenArrivalRow[] = accums.map((acc, i) => ({ pid: players[i].pid, third_drop_kitchen_pct: pct(acc.k3Drop[0], acc.k3Drop[1]), third_drive_kitchen_pct: pct(acc.k3Drive[0], acc.k3Drive[1]), fifth_drop_kitchen_pct: pct(acc.k5Drop[0], acc.k5Drop[1]), fifth_drive_kitchen_pct: pct(acc.k5Drive[0], acc.k5Drive[1]), third_drop_total: acc.k3Drop[1], third_drive_total: acc.k3Drive[1], fifth_drop_total: acc.k5Drop[1], fifth_drive_total: acc.k5Drive[1] }));
   const thirdShot: ShotBreakdownRow[] = accums.map((acc, i) => { const t = acc.t3Drop + acc.t3Drive; return { pid: players[i].pid, dropCount: acc.t3Drop, driveCount: acc.t3Drive, dropPct: pct(acc.t3Drop, t), drivePct: pct(acc.t3Drive, t) }; });
   const fifthShot: ShotBreakdownRow[] = accums.map((acc, i) => { const t = acc.t5Drop + acc.t5Drive; return { pid: players[i].pid, dropCount: acc.t5Drop, driveCount: acc.t5Drive, dropPct: pct(acc.t5Drop, t), drivePct: pct(acc.t5Drive, t) }; });
-  const shotQuality: ShotQualityRow[] = accums.map((acc, i) => { const w = acc.sqW; const exF = w > 0 ? acc.sqExSum / w : 0, poF = w > 0 ? acc.sqPoSum / w : 0; return { pid: players[i].pid, excellentCount: Math.round(exF * acc.totalShots), excellentPct: exF * 100, poorCount: Math.round(poF * acc.totalShots), poorPct: poF * 100 }; });
+  const shotQuality: ShotQualityRow[] = accums.map((acc, i) => {
+    const w = acc.sqW; const exF = w > 0 ? acc.sqExSum / w : 0, poF = w > 0 ? acc.sqPoSum / w : 0;
+    const dropExcellentPct = acc.dropExW > 0 ? (acc.dropExSum / acc.dropExW) * 100 : 0;
+    const winnerExcellentPct = acc.winnerExW > 0 ? (acc.winnerExSum / acc.winnerExW) * 100 : 0;
+    return { pid: players[i].pid, excellentCount: Math.round(exF * acc.totalShots), excellentPct: exF * 100, poorCount: Math.round(poF * acc.totalShots), poorPct: poF * 100, dropExcellentPct, dropTotal: acc.dropExW, winnerTotal: acc.winnerTotal, winnerExcellentPct };
+  });
   const serveDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.sdW || 1; return { pid: players[i].pid, deepPct: (acc.sdDeep / w) * 100, medPct: (acc.sdMed / w) * 100, shallowPct: (acc.sdShallow / w) * 100 }; });
   const returnDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.rdW || 1; return { pid: players[i].pid, deepPct: (acc.rdDeep / w) * 100, medPct: (acc.rdMed / w) * 100, shallowPct: (acc.rdShallow / w) * 100 }; });
   const errors: ErrorRow[] = accums.map((acc, i) => { const g = acc.sessionCount || 1; return { pid: players[i].pid, gamesPlayed: acc.sessionCount, total: acc.errNet + acc.errOut + acc.errShort + acc.errPop, totalPerGame: (acc.errNet + acc.errOut + acc.errShort + acc.errPop) / g, net: acc.errNet / g, out: acc.errOut / g, kitchen: acc.errShort / g, popups: acc.errPop / g, unforced: acc.errUf / g, forced: acc.errForced / g }; });

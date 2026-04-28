@@ -47,20 +47,25 @@ function buildSummary(pid: string, data: DashboardData): Summary {
   const ds = driveSpeed.find((r) => r.pid === pid);
 
   // ── Orientation ─────────────────────────────────────────────────────────
+  // Use a larger gap threshold (0.20) so a slight rating difference doesn't force a label
   const offenseRk = sr ? rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r.offense }))) : n;
   const defenseRk = sr ? rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r.defense }))) : n;
   const offDefGap = sr ? sr.offense - sr.defense : 0;
   let orientation = '';
-  if (offDefGap > 0.12 && offenseRk <= Math.ceil(n / 2)) orientation = 'Offensive';
-  else if (offDefGap < -0.12 && defenseRk <= Math.ceil(n / 2)) orientation = 'Defensive';
-  else if (offenseRk === 1) orientation = 'Offensive';
-  else if (defenseRk === 1) orientation = 'Defensive';
+  if (offDefGap > 0.20 && offenseRk <= Math.ceil(n / 2)) orientation = 'Offensive';
+  else if (offDefGap < -0.20 && defenseRk <= Math.ceil(n / 2)) orientation = 'Defensive';
+  else if (offenseRk === 1 && offDefGap > 0.08) orientation = 'Offensive';
+  else if (defenseRk === 1 && offDefGap < -0.08) orientation = 'Defensive';
   else orientation = 'All-around';
 
-  // 3rd shot preference
+  // 3rd shot preference — require a clear majority (62%) before calling drive-heavy
   const drivePct = ts?.drivePct ?? 50;
   const dropPct = ts?.dropPct ?? 50;
-  const shotPreference = drivePct > 55 ? 'drive-heavy' : dropPct > 58 ? 'drop-first' : 'balanced';
+
+  // Behavioral drop signal: highly ranked at drop kitchen arrival = drop-focused regardless of raw %
+  const dropKitchenRk = ka ? rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.third_drop_kitchen_pct }))) : n;
+  const behaviorallyDropFocused = dropPct >= 55 || (dropKitchenRk <= 2 && dropPct >= 40);
+  const behaviorallyDriveFocused = drivePct >= 62;
 
   // Error / quality personality
   const avgErrPerGame = errors.length ? errors.reduce((a, b) => a + b.totalPerGame, 0) / errors.length : 0;
@@ -71,14 +76,16 @@ function buildSummary(pid: string, data: DashboardData): Summary {
   const rdRk = rd ? rankDesc(pid, returnDepth.map((r) => ({ pid: r.pid, val: r.deepPct }))) : n;
 
   // ── Simple 1-2 word style tag ────────────────────────────────────────────
+  // Behavioral signals (actual shot patterns) take priority over skill rating orientation
   let styleTag: string;
-  if (orientation === 'Offensive' && ssRk === 1) styleTag = 'Power Player';
-  else if (orientation === 'Offensive' && shotPreference === 'drive-heavy') styleTag = 'Attacker';
+  if (behaviorallyDriveFocused && ssRk === 1) styleTag = 'Power Player';
+  else if (behaviorallyDriveFocused && orientation === 'Offensive') styleTag = 'Attacker';
+  else if (behaviorallyDriveFocused) styleTag = 'Aggressor';
+  else if (behaviorallyDropFocused && defenseRk <= Math.ceil(n / 2)) styleTag = 'Technician';
+  else if (behaviorallyDropFocused) styleTag = 'Net Player';
   else if (orientation === 'Offensive') styleTag = 'Offensive';
   else if (orientation === 'Defensive' && errRk === 1) styleTag = 'Lockdown';
   else if (orientation === 'Defensive') styleTag = 'Defender';
-  else if (shotPreference === 'drive-heavy') styleTag = 'Aggressor';
-  else if (shotPreference === 'drop-first') styleTag = 'Technician';
   else styleTag = 'All-around';
 
   // ── Summary text ─────────────────────────────────────────────────────────
@@ -141,6 +148,25 @@ function buildSummary(pid: string, data: DashboardData): Summary {
 
   if (ss && ss.avgMph > 0 && ssRk === 1) {
     styleParts.push(`Biggest serve in the group at ${ss.avgMph.toFixed(0)} mph avg.`);
+  }
+
+  // Drop quality
+  if (sq && sq.dropTotal >= 5) {
+    const dropQRk = rankDesc(pid, data.shotQuality.filter(r => r.dropTotal >= 5).map((r) => ({ pid: r.pid, val: r.dropExcellentPct })));
+    if (sq.dropExcellentPct > 0) {
+      if (dropQRk === 1) styleParts.push(`Best drop quality on the team — ${sq.dropExcellentPct.toFixed(0)}% of drops rated excellent.`);
+      else if (sq.dropExcellentPct < 20 && dropQRk >= data.players.length - 1) styleParts.push(`Drop quality needs work — only ${sq.dropExcellentPct.toFixed(0)}% of drops rated excellent.`);
+    }
+  }
+
+  // Putaway / winner ability
+  if (sq && sq.winnerTotal >= 3) {
+    const winRk = rankDesc(pid, data.shotQuality.filter(r => r.winnerTotal >= 3).map((r) => ({ pid: r.pid, val: r.winnerTotal })));
+    if (winRk === 1) styleParts.push(`Finishes points more often than anyone — ${sq.winnerTotal} clean winners on the night.`);
+    if (sq.winnerExcellentPct > 0) {
+      const qualRk = rankDesc(pid, data.shotQuality.filter(r => r.winnerTotal >= 3).map((r) => ({ pid: r.pid, val: r.winnerExcellentPct })));
+      if (qualRk === 1 && sq.winnerExcellentPct > 40) styleParts.push(`Clean finisher — ${sq.winnerExcellentPct.toFixed(0)}% of putaways rated excellent.`);
+    }
   }
 
   const styleText = styleParts.join(' ') || 'Consistent all-around game with no extreme tendencies.';
@@ -207,6 +233,16 @@ function buildSummary(pid: string, data: DashboardData): Summary {
     const rk = rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.third_drop_kitchen_pct })));
     if (rk === 1 && m > 5) {
       candidates.push({ score: m * 0.4, text: `Best at getting to the kitchen after a drop (${ka.third_drop_kitchen_pct.toFixed(0)}%). This is the most important transition in pickleball — they do it better than anyone on the team.` });
+    }
+  }
+
+  // Putaway ability
+  if (sq && sq.winnerTotal >= 3) {
+    const allWinners = data.shotQuality.filter(r => r.winnerTotal >= 3).map((r) => ({ pid: r.pid, val: r.winnerTotal }));
+    const winRk = rankDesc(pid, allWinners);
+    const winMargin = margin(sq.winnerTotal, allWinners.map(x => x.val));
+    if (winRk === 1 && winMargin > 2) {
+      candidates.push({ score: winMargin * 0.7, text: `Point finisher — hits ${sq.winnerTotal} clean winners, more than anyone else on the team. When they see an attackable ball, they put it away.` });
     }
   }
 

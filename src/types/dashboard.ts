@@ -100,6 +100,12 @@ export interface ShotQualityRow {
   excellentPct: number;
   poorCount: number;
   poorPct: number;
+  // Per-shot drop quality (from rally-level shot data)
+  dropExcellentPct: number;  // avg q.ex for drop shots × 100
+  dropTotal: number;          // total drops with quality data
+  // Putaway / clean winners
+  winnerTotal: number;        // rallies where they hit the final un-errored shot on the winning team
+  winnerExcellentPct: number; // avg q.ex for those winners × 100
 }
 
 export interface DepthRow {
