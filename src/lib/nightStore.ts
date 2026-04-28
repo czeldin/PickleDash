@@ -1,18 +1,41 @@
 import { Night } from '@/types/nights';
 
-let _nights: Night[] = [];
+const STORAGE_KEY = 'pickledash_nights';
 
-export function getNights(): Night[] { return _nights; }
+function load(): Night[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Night[]) : [];
+  } catch { return []; }
+}
+
+function save(nights: Night[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nights));
+  } catch (e) {
+    // Likely exceeded storage quota (~5MB)
+    console.warn('Could not save nights to localStorage — file may be too large.', e);
+  }
+}
+
+export function getNights(): Night[] {
+  return load();
+}
 
 export function addNight(night: Night) {
-  _nights = [..._nights, night];
+  const nights = load();
+  save([...nights, night]);
 }
 
 export function removeNight(id: string) {
-  _nights = _nights.filter((n) => n.id !== id);
+  save(load().filter((n) => n.id !== id));
 }
 
-export function clearNights() { _nights = []; }
+export function clearNights() {
+  save([]);
+}
 
 // Auto-detect date label from raw pb.vision JSON
 export function detectNightLabel(raw: unknown): string {
