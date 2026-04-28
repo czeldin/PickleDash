@@ -45,17 +45,52 @@ function buildSummary(pid: string, data: DashboardData): Summary {
   const ds = driveSpeed.find((r) => r.pid === pid);
 
   // ── Style ────────────────────────────────────────────────────────────────
-  let style = 'All-around player';
+  // Build a unique profile from multiple dimensions rather than one threshold
+
+  // Dimension 1: offensive vs defensive orientation
+  const offenseRk = sr ? rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r.offense }))) : n;
+  const defenseRk = sr ? rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r.defense }))) : n;
+  const offDefGap = sr ? sr.offense - sr.defense : 0;
+  let orientation = '';
+  if (offDefGap > 0.12 && offenseRk <= Math.ceil(n / 2)) orientation = 'Offensive';
+  else if (offDefGap < -0.12 && defenseRk <= Math.ceil(n / 2)) orientation = 'Defensive';
+  else if (offenseRk === 1) orientation = 'Offensive';
+  else if (defenseRk === 1) orientation = 'Defensive';
+  else orientation = 'All-around';
+
+  // Dimension 2: 3rd shot style (lower thresholds for diversity)
+  let shotStyle = '';
   if (ts) {
-    if (ts.drivePct > 60) style = 'Drive-first attacker';
-    else if (ts.dropPct > 65) style = 'Drop-and-transition specialist';
-    else style = 'Balanced shot-maker';
+    if (ts.drivePct > 52) shotStyle = 'drive-heavy';
+    else if (ts.dropPct > 58) shotStyle = 'drop-first';
+    else shotStyle = 'balanced';
   }
-  if (er && er.totalPerGame < (errors.reduce((a, b) => a + b.totalPerGame, 0) / n) * 0.75) {
-    style += ' · Low-error';
-  } else if (sq && sq.excellentPct > 48 && sq.poorPct > 12) {
-    style += ' · High-variance';
-  }
+
+  // Dimension 3: quality/error personality
+  const avgErrPerGame = errors.reduce((a, b) => a + b.totalPerGame, 0) / n;
+  const errRk = er ? rankDesc(pid, errors.map((r) => ({ pid: r.pid, val: -r.totalPerGame }))) : n;
+  const exRk = sq ? rankDesc(pid, shotQuality.map((r) => ({ pid: r.pid, val: r.excellentPct }))) : n;
+  let personality = '';
+  if (er && er.totalPerGame < avgErrPerGame * 0.8) personality = 'low-error';
+  else if (sq && sq.excellentPct > 47 && sq.poorPct > 11) personality = 'high-variance';
+  else if (exRk === 1) personality = 'quality ball-striker';
+  else if (errRk === n) personality = 'error-prone';
+  else personality = 'consistent';
+
+  // Dimension 4: speed/aggression modifier
+  const ssRk = ss ? rankDesc(pid, serveSpeed.filter(r => r.avgMph > 0).map((r) => ({ pid: r.pid, val: r.avgMph }))) : n;
+  const rdRk = rd ? rankDesc(pid, returnDepth.map((r) => ({ pid: r.pid, val: r.deepPct }))) : n;
+  let modifier = '';
+  if (ssRk === 1) modifier = 'power server';
+  else if (rdRk === 1 && rd && rd.deepPct > 50) modifier = 'aggressive returner';
+
+  // Assemble style string — pick most informative combo
+  const parts = [
+    `${orientation}${shotStyle && shotStyle !== 'balanced' ? ` · ${shotStyle}` : ''}`,
+    personality !== 'consistent' ? personality : '',
+    modifier,
+  ].filter(Boolean);
+  const style = parts.join(' · ');
 
   // ── Superpower candidates ────────────────────────────────────────────────
   interface Candidate { score: number; text: string }
