@@ -110,7 +110,7 @@ export default function HomePage() {
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-3 text-4xl font-bold text-gray-900">
-            <span>🏓</span>
+            <img src="/icon.png" alt="PickleDash" className="w-12 h-12 rounded-2xl" />
             <span>PickleDash</span>
           </div>
           <p className="text-gray-500 text-base">

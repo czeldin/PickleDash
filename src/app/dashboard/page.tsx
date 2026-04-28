@@ -96,7 +96,7 @@ export default function DashboardPage() {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-2xl flex-shrink-0">🏓</span>
+            <img src="/icon.png" alt="PickleDash" className="w-9 h-9 rounded-xl flex-shrink-0" />
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-gray-900 leading-tight truncate">PickleDash</h1>
               <p className="text-sm font-semibold text-slate-500 leading-tight">{pageTitle}</p>
