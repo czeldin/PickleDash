@@ -127,7 +127,11 @@ export function HeroSection({ data }: Props) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-56 md:flex-shrink-0">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Record</p>
           <div className="space-y-3">
-            {sorted.map((h: HeroStats) => {
+            {[...sorted].sort((a, b) => {
+            const aR = (a.wins + a.losses) > 0 ? a.wins / (a.wins + a.losses) : 0;
+            const bR = (b.wins + b.losses) > 0 ? b.wins / (b.wins + b.losses) : 0;
+            return bR - aR;
+          }).map((h: HeroStats) => {
               const player = playerMap.get(h.pid);
               const total = h.wins + h.losses;
               const winPct = total > 0 ? h.wins / total : 0;
