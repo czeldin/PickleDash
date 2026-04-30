@@ -20,7 +20,10 @@ interface PaddleStats {
   offense: number;
   defense: number;
   serve: number;
+  return: number;
   consistency: number;
+  returnDeepPct: number;
+  returnShallowPct: number;
   drivePct: number;
   dropKitchenPct: number;
   excellentPct: number;
@@ -42,6 +45,7 @@ function parsePaddleStats(night: Night, playerName: string, paddle: string): Pad
 
   const h = parsed.hero.find(r => r.pid === pid);
   const sr = parsed.skillRatings.find(r => r.pid === pid);
+  const rd = parsed.returnDepth.find(r => r.pid === pid);
   const ts = parsed.thirdShot.find(r => r.pid === pid);
   const ka = parsed.kitchenArrival.find(r => r.pid === pid);
   const sq = parsed.shotQuality.find(r => r.pid === pid);
@@ -62,7 +66,10 @@ function parsePaddleStats(night: Night, playerName: string, paddle: string): Pad
     offense: sr?.offense ?? 0,
     defense: sr?.defense ?? 0,
     serve: sr?.serve ?? 0,
+    return: sr?.return ?? 0,
     consistency: sr?.consistency ?? 0,
+    returnDeepPct: rd?.deepPct ?? 0,
+    returnShallowPct: rd?.shallowPct ?? 0,
     drivePct: ts?.drivePct ?? 0,
     dropKitchenPct: ka?.third_drop_kitchen_pct ?? 0,
     excellentPct: sq?.excellentPct ?? 0,
@@ -142,7 +149,10 @@ function PlayerPaddleCard({ playerName, statsA, statsB, data }: {
           <StatRow label="Offense" a={statsA.offense} b={statsB.offense} fmt={rating} />
           <StatRow label="Defense" a={statsA.defense} b={statsB.defense} fmt={rating} />
           <StatRow label="Serve" a={statsA.serve} b={statsB.serve} fmt={rating} />
+          <StatRow label="Return" a={statsA.return} b={statsB.return} fmt={rating} />
           <StatRow label="Consistency" a={statsA.consistency} b={statsB.consistency} fmt={rating} />
+          <StatRow label="Return Depth (deep)" a={statsA.returnDeepPct} b={statsB.returnDeepPct} fmt={pct} />
+          <StatRow label="Return (shallow)" a={statsA.returnShallowPct} b={statsB.returnShallowPct} higherIsBetter={false} fmt={pct} />
           <StatRow label="Drive %" a={statsA.drivePct} b={statsB.drivePct} fmt={pct} higherIsBetter={false} />
           <StatRow label="Kitchen (after drop)" a={statsA.dropKitchenPct} b={statsB.dropKitchenPct} fmt={pct} />
           <StatRow label="Excellent Shot %" a={statsA.excellentPct} b={statsB.excellentPct} fmt={pct} />
