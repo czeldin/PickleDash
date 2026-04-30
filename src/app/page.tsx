@@ -132,30 +132,22 @@ export default function HomePage() {
   const [paddleEditId, setPaddleEditId] = useState<string | null>(null);
 
   useEffect(() => {
-    const existing = getNights();
-    if (existing.length === 0) {
-      fetch('/data/night.json')
-        .then((r) => r.json())
-        .then((raw) => {
-          const label = detectNightLabel(raw);
-          const playerNames = detectPlayerNames(raw);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const sessionCount = ((raw as any)?.data?.sessions ?? []).length;
-          if (sessionCount > 0) {
-            const night: Night = { id: 'preloaded', label, raw, sessionCount, playerNames, uploadedAt: 0, paddleTags: PRELOADED_PADDLE_TAGS };
-            addNight(night);
-          }
-          setNights(getNights());
-        })
-        .catch(() => setNights(existing));
-    } else {
-      // Ensure preloaded night always has the latest paddle tags
-      const preloaded = existing.find(n => n.id === 'preloaded');
-      if (preloaded && !preloaded.paddleTags) {
-        updateNightPaddleTags('preloaded', PRELOADED_PADDLE_TAGS);
-      }
-      setNights(getNights());
-    }
+    // Always refresh the preloaded night from the static file so data + paddle tags stay current
+    fetch('/data/night.json')
+      .then((r) => r.json())
+      .then((raw) => {
+        const label = detectNightLabel(raw);
+        const playerNames = detectPlayerNames(raw);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionCount = ((raw as any)?.data?.sessions ?? []).length;
+        if (sessionCount > 0) {
+          removeNight('preloaded');
+          const night: Night = { id: 'preloaded', label, raw, sessionCount, playerNames, uploadedAt: 0, paddleTags: PRELOADED_PADDLE_TAGS };
+          addNight(night);
+        }
+        setNights(getNights());
+      })
+      .catch(() => setNights(getNights()));
   }, []);
 
   function handleFile(file: File) {
