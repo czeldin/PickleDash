@@ -1,4 +1,4 @@
-import { Night } from '@/types/nights';
+import { Night, PaddleTag } from '@/types/nights';
 
 const STORAGE_KEY = 'pickledash_nights';
 
@@ -35,6 +35,24 @@ export function removeNight(id: string) {
 
 export function clearNights() {
   save([]);
+}
+
+export function updateNightPaddleTags(id: string, tags: PaddleTag[]) {
+  save(load().map((n) => n.id === id ? { ...n, paddleTags: tags } : n));
+}
+
+// Returns per-session player lists from raw pb.vision data
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getNightSessionDetails(night: Night): { idx: number; name: string; players: string[] }[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sessions = (night.raw as any)?.data?.sessions ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return sessions.map((s: any, idx: number) => ({
+    idx,
+    name: s.ses?.name ?? `Game ${idx + 1}`,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    players: (s.pd ?? []).map((p: any) => p.name?.trim()).filter(Boolean) as string[],
+  }));
 }
 
 // Auto-detect date label from raw pb.vision JSON

@@ -20,6 +20,7 @@ import { DepthSection } from '@/components/sections/DepthSection';
 import { ErrorSection } from '@/components/sections/ErrorSection';
 import { PlayerSummarySection } from '@/components/sections/PlayerSummarySection';
 import { AttackDinkSection } from '@/components/sections/AttackDinkSection';
+import { PaddleComparisonSection } from '@/components/sections/PaddleComparisonSection';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
   if (pids.size === data.players.length) return data;
@@ -148,6 +149,7 @@ export default function DashboardPage() {
         <DepthSection data={visibleData} />
         <ErrorSection data={visibleData} />
         <AttackDinkSection data={visibleData} />
+        <PaddleComparisonSection data={visibleData} night={night} />
         <PlayerSummarySection data={visibleData} />
       </main>
     </div>

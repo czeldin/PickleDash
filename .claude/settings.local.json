@@ -12,7 +12,8 @@
       "Bash(git config *)",
       "Bash(git remote *)",
       "Bash(git branch *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npx tsc *)"
     ]
   }
 }
