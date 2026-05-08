@@ -93,12 +93,19 @@ export async function GET() {
   }
 
   const preloaded = getPreloadedMeta();
-  // Preloaded always first, then uploaded nights newest-first
-  const uploaded = nights
-    .filter((n) => n.id !== 'preloaded')
-    .sort((a, b) => b.uploadedAt - a.uploadedAt);
 
-  return NextResponse.json([preloaded, ...uploaded]);
+  // Parse "M/D/YY" label into a sortable timestamp
+  function labelToDate(label: string): number {
+    const m = label.match(/^(\d+)\/(\d+)\/(\d+)$/);
+    if (!m) return 0;
+    return new Date(2000 + parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2])).getTime();
+  }
+
+  // Sort all nights (including preloaded) by game date, newest first
+  const all = [preloaded, ...nights.filter((n) => n.id !== 'preloaded')]
+    .sort((a, b) => labelToDate(b.label) - labelToDate(a.label));
+
+  return NextResponse.json(all);
 }
 
 // POST /api/nights — upload a new night
