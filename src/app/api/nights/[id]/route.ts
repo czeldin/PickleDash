@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { getManifest, saveManifest, getRawData, deleteNightFromBlob } from '@/lib/blobStore';
+import { getNightMeta, saveNightMeta, getRawData, deleteNightFromBlob } from '@/lib/blobStore';
 import { PaddleTag } from '@/types/nights';
 
 // GET /api/nights/[id] — full night with raw data
@@ -14,21 +14,19 @@ export async function GET(
   if (id === 'preloaded') {
     try {
       const raw = JSON.parse(readFileSync(join(process.cwd(), 'public/data/night.json'), 'utf-8'));
-      // Return with preloaded meta baked in — client builds Night object
       return NextResponse.json({ id: 'preloaded', raw });
     } catch {
       return NextResponse.json({ error: 'Preloaded night not found' }, { status: 404 });
     }
   }
 
-  const [manifest, raw] = await Promise.all([getManifest(), getRawData(id)]);
-  const meta = manifest.find((n) => n.id === id);
+  const [meta, raw] = await Promise.all([getNightMeta(id), getRawData(id)]);
 
-  if (!meta || !raw) {
+  if (!raw) {
     return NextResponse.json({ error: 'Night not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ ...meta, raw });
+  return NextResponse.json({ ...(meta ?? { id }), raw });
 }
 
 // PATCH /api/nights/[id] — update meta fields (label, paddleTags)
@@ -38,17 +36,14 @@ export async function PATCH(
 ) {
   const { id } = params;
   if (id === 'preloaded') {
-    // Paddle tags for preloaded are hardcoded server-side; ignore
     return NextResponse.json({ ok: true });
   }
 
   try {
     const updates = await req.json() as { label?: string; paddleTags?: PaddleTag[] };
-    const manifest = await getManifest();
-    const updated = manifest.map((n) =>
-      n.id === id ? { ...n, ...updates } : n
-    );
-    await saveManifest(updated);
+    const existing = await getNightMeta(id);
+    if (!existing) return NextResponse.json({ error: 'Night not found' }, { status: 404 });
+    await saveNightMeta(id, { ...existing, ...updates });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('PATCH /api/nights/[id] error:', e);
@@ -62,13 +57,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
-  if (id === 'preloaded') {
-    return NextResponse.json({ ok: true }); // cannot delete preloaded
-  }
+  if (id === 'preloaded') return NextResponse.json({ ok: true });
 
   try {
-    const manifest = await getManifest();
-    await saveManifest(manifest.filter((n) => n.id !== id));
     await deleteNightFromBlob(id);
     return NextResponse.json({ ok: true });
   } catch (e) {
