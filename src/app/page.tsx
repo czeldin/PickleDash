@@ -291,11 +291,18 @@ export default function HomePage() {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
             {nights.map((night) => (
               <div key={night.id}>
-                <div className="flex items-center gap-3 px-4 py-3">
+                <div
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={(e) => {
+                    // Don't navigate if clicking a button inside the row
+                    if ((e.target as HTMLElement).closest('button, input')) return;
+                    viewNight(night);
+                  }}
+                >
                   <span className="text-lg">🌙</span>
                   <div className="flex-1 min-w-0">
                     {editingId === night.id ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <input
                           className="border border-gray-300 rounded px-2 py-0.5 text-sm w-28 focus:outline-none focus:ring-1 focus:ring-blue-400"
                           value={editLabel}
@@ -309,11 +316,11 @@ export default function HomePage() {
                     ) : (
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-800">{night.label}</span>
-                        <button onClick={() => startEdit(night)} className="text-xs text-gray-400 hover:text-gray-600">✎</button>
+                        <button onClick={(e) => { e.stopPropagation(); startEdit(night); }} className="text-xs text-gray-400 hover:text-gray-600">✎</button>
                       </div>
                     )}
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {night.sessionCount} {night.sessionCount === 1 ? 'game' : 'games'} · {night.playerNames.slice(0, 3).join(', ')}{night.playerNames.length > 3 ? ` +${night.playerNames.length - 3}` : ''}
+                      {night.sessionCount} {night.sessionCount === 1 ? 'game' : 'games'} · {night.playerNames.join(', ')}
                       {night.paddleTags && night.paddleTags.length > 0 && (
                         <span className="ml-1 text-violet-400">· 🏓 paddle data</span>
                       )}
@@ -321,27 +328,12 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
-                      onClick={() => openPaddleEditor(night)}
+                      onClick={(e) => { e.stopPropagation(); openPaddleEditor(night); }}
                       className="text-xs text-gray-400 hover:text-violet-500 px-1"
                       title="Tag paddles"
                     >
                       🏓
                     </button>
-                    <button
-                      onClick={() => viewNight(night)}
-                      className="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold transition-colors"
-                    >
-                      View →
-                    </button>
-                    {night.id !== 'preloaded' && (
-                      <button
-                        onClick={() => deleteNight(night.id)}
-                        className="text-gray-300 hover:text-red-400 text-lg leading-none"
-                        title="Remove"
-                      >
-                        ×
-                      </button>
-                    )}
                   </div>
                 </div>
                 {paddleEditId === night.id && nightsWithRaw[night.id] && (
