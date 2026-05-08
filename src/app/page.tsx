@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getNightSessionDetails } from '@/lib/nightStore';
 import { Night, PaddleTag } from '@/types/nights';
 import { NightMeta } from '@/lib/blobStore';
+import { anonymizePlayerNames } from '@/lib/anonymize';
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ export default function HomePage() {
                       </div>
                     )}
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {night.sessionCount} {night.sessionCount === 1 ? 'game' : 'games'} · {night.playerNames.join(', ')}
+                      {night.sessionCount} {night.sessionCount === 1 ? 'game' : 'games'} · {(isAnon ? anonymizePlayerNames(night.playerNames) : night.playerNames).join(', ')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
