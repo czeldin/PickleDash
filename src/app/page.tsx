@@ -194,7 +194,7 @@ export default function HomePage() {
         }
         const names = new Set<string>();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const s of sessions) { for (const pd of s?.pd ?? []) { if (pd?.name) names.add(pd.name.trim()); } }
+        for (const s of sessions) { for (const pd of s?.pd ?? []) { if (pd?.name) names.add(pd.name.trim().split(/\s+/)[0]); } }
 
         const meta: NightMeta = {
           id: crypto.randomUUID(),

@@ -36,7 +36,7 @@ function getPreloadedMeta(): NightMeta {
     const names = new Set<string>();
     for (const s of sessions) {
       for (const pd of s?.pd ?? []) {
-        if (pd?.name) names.add(pd.name.trim());
+        if (pd?.name) names.add(pd.name.trim().split(/\s+/)[0]);
       }
     }
     return {

@@ -32,6 +32,9 @@ interface RawSession {
 function getInitials(name: string) {
   return name.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()).slice(0, 2).join('');
 }
+function toFirstName(name: string) {
+  return name.trim().split(/\s+/)[0];
+}
 function serveSpeedAvg(f: number[]) {
   let ws = 0, vs = 0;
   for (let i = 0; i < f.length; i++) { ws += f[i]; vs += f[i] * SERVE_SPEED_BUCKETS[i].mid; }
@@ -198,7 +201,7 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
 function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): DashboardData {
   accums.sort((a, b) => (b.overallW > 0 ? b.overallSum / b.overallW : 0) - (a.overallW > 0 ? a.overallSum / a.overallW : 0));
   const players: PlayerMeta[] = accums.map((acc, i) => ({
-    pid: acc.name.trim().toLowerCase(), name: acc.name, initials: getInitials(acc.name), color: PLAYER_COLORS[i % PLAYER_COLORS.length],
+    pid: acc.name.trim().toLowerCase(), name: toFirstName(acc.name), initials: getInitials(acc.name), color: PLAYER_COLORS[i % PLAYER_COLORS.length],
   }));
   function pct(h: number, t: number) { return t > 0 ? (h / t) * 100 : 0; }
   const hero: HeroStats[] = accums.map((acc, i) => ({ pid: players[i].pid, dupr: acc.overallW > 0 ? acc.overallSum / acc.overallW : 0, duprDelta: 0, gamesPlayed: acc.sessionCount, totalShots: acc.totalShots, wins: acc.wins, losses: acc.losses }));

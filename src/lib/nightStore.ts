@@ -70,7 +70,7 @@ export function detectNightLabel(raw: unknown): string {
   return 'Unknown';
 }
 
-// Collect all unique player names from a raw file
+// Collect all unique player first names from a raw file
 export function detectPlayerNames(raw: unknown): string[] {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,7 +78,7 @@ export function detectPlayerNames(raw: unknown): string[] {
     const names = new Set<string>();
     for (const s of sessions) {
       for (const pd of s?.pd ?? []) {
-        if (pd?.name) names.add(pd.name.trim());
+        if (pd?.name) names.add(pd.name.trim().split(/\s+/)[0]);
       }
     }
     return Array.from(names);
