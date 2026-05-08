@@ -56,24 +56,47 @@ export default function DashboardPage() {
     const nightId = new URLSearchParams(window.location.search).get('night');
     if (!nightId) { router.replace('/'); return; }
 
-    fetch(`/api/nights/${nightId}`, { cache: 'no-store' })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((fullNight: Night) => {
-        const allData = parseMultipleNights([fullNight]);
-        setNight(fullNight);
-        setData(allData);
-        setAvailableSessions(allData.sessions);
-        setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
-        setSelectedPids(new Set(allData.players.map((p) => p.pid)));
-        setDashboardData(allData);
-      })
-      .catch((err) => {
-        console.error('Failed to load night:', err);
-        setLoadError('Could not load this night. It may have been deleted.');
+    const loadOne = (id: string) =>
+      fetch(`/api/nights/${id}`, { cache: 'no-store' }).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<Night>;
       });
+
+    const loadNight = (n: Night) => {
+      const allData = parseMultipleNights([n]);
+      setNight(n);
+      setData(allData);
+      setAvailableSessions(allData.sessions);
+      setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
+      setSelectedPids(new Set(allData.players.map((p) => p.pid)));
+      setDashboardData(allData);
+    };
+
+    if (nightId === 'all') {
+      // Load all nights and combine
+      fetch('/api/nights', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then(async (metas: { id: string }[]) => {
+          const nights = await Promise.all(metas.map((m) => loadOne(m.id)));
+          const allData = parseMultipleNights(nights);
+          setData(allData);
+          setAvailableSessions(allData.sessions);
+          setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
+          setSelectedPids(new Set(allData.players.map((p) => p.pid)));
+          setDashboardData(allData);
+        })
+        .catch((err) => {
+          console.error('Failed to load all nights:', err);
+          setLoadError('Could not load all nights.');
+        });
+    } else {
+      loadOne(nightId)
+        .then(loadNight)
+        .catch((err) => {
+          console.error('Failed to load night:', err);
+          setLoadError('Could not load this night. It may have been deleted.');
+        });
+    }
   }, [router]);
 
   const reparse = useCallback((gameKeys: Set<string>, currentNight: Night | null) => {
@@ -112,7 +135,8 @@ export default function DashboardPage() {
   }
 
   const visibleData = filterDataByPlayers(data, selectedPids);
-  const pageTitle = night?.label ?? data.sessions[0]?.nightLabel ?? 'Dashboard';
+  const isAll = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('night') === 'all';
+  const pageTitle = isAll ? 'All Nights' : (night?.label ?? data.sessions[0]?.nightLabel ?? 'Dashboard');
 
   return (
     <div className="min-h-screen bg-gray-200">

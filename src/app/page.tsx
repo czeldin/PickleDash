@@ -153,6 +153,19 @@ export default function HomePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [paddleEditId, setPaddleEditId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const logoClickCount = useRef(0);
+  const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleLogoClick() {
+    logoClickCount.current += 1;
+    if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
+    logoClickTimer.current = setTimeout(() => { logoClickCount.current = 0; }, 600);
+    if (logoClickCount.current >= 3) {
+      logoClickCount.current = 0;
+      setShowAll(prev => !prev);
+    }
+  }
 
   const loadNights = useCallback(async () => {
     try {
@@ -263,7 +276,7 @@ export default function HomePage() {
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-3 text-4xl font-bold text-gray-900">
-            <img src="/icon.png" alt="PickleDash" className="w-12 h-12 rounded-2xl" />
+            <img src="/icon.png" alt="PickleDash" className="w-12 h-12 rounded-2xl cursor-pointer select-none" onClick={handleLogoClick} />
             <span>PickleDash</span>
           </div>
           <p className="text-gray-500 text-base">
@@ -280,6 +293,18 @@ export default function HomePage() {
           <div className="text-center text-gray-400 text-sm py-4">Loading nights…</div>
         ) : nights.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+            {showAll && (
+              <div
+                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => router.push('/dashboard?night=all')}
+              >
+                <span className="text-lg">🌐</span>
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold text-gray-800">All Nights</span>
+                  <p className="text-xs text-gray-400 mt-0.5">{nights.reduce((s, n) => s + n.sessionCount, 0)} games total</p>
+                </div>
+              </div>
+            )}
             {nights.map((night) => (
               <div key={night.id}>
                 <div
