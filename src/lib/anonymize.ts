@@ -1,7 +1,15 @@
 import { DashboardData } from '@/types/dashboard';
 
-// Assigned in alphabetical pid order so the same player always gets the same name
-const STAR_WARS_NAMES = ['Anakin', 'Finn', 'Han', 'Leia', 'Luke', 'Obi', 'Poe', 'Rey', 'Yoda', 'Mace'];
+// Assigned in alphabetical order so the same player always gets the same name
+export const STAR_WARS_NAMES = ['Anakin', 'Finn', 'Han', 'Leia', 'Luke', 'Obi', 'Poe', 'Rey', 'Yoda', 'Mace'];
+
+/** Map a list of first names (e.g. from NightMeta.playerNames) to Star Wars names.
+ *  Sorts alphabetically so the mapping is stable and matches the dashboard. */
+export function anonymizePlayerNames(names: string[]): string[] {
+  const sorted = [...names].sort((a, b) => a.localeCompare(b));
+  const map = new Map<string, string>(sorted.map((n, i) => [n, STAR_WARS_NAMES[i % STAR_WARS_NAMES.length]]));
+  return names.map((n) => map.get(n) ?? n);
+}
 
 export function anonymizeData(data: DashboardData): DashboardData {
   // Sort players by pid so assignment is stable across sessions
