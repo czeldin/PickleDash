@@ -101,9 +101,15 @@ export async function GET() {
     return new Date(2000 + parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2])).getTime();
   }
 
+  // Normalize player names to first name only (handles legacy full-name entries)
+  function normalizeNames(meta: NightMeta): NightMeta {
+    return { ...meta, playerNames: meta.playerNames.map((n) => n.trim().split(/\s+/)[0]) };
+  }
+
   // Sort all nights (including preloaded) by game date, newest first
   const all = [preloaded, ...nights.filter((n) => n.id !== 'preloaded')]
-    .sort((a, b) => labelToDate(b.label) - labelToDate(a.label));
+    .sort((a, b) => labelToDate(b.label) - labelToDate(a.label))
+    .map(normalizeNames);
 
   return NextResponse.json(all);
 }
