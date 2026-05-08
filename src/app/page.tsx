@@ -23,10 +23,6 @@ async function apiUploadNight(meta: NightMeta, raw: unknown): Promise<void> {
   if (!res.ok) throw new Error('Upload failed');
 }
 
-async function apiDeleteNight(id: string): Promise<void> {
-  await fetch(`/api/nights/${id}`, { method: 'DELETE' });
-}
-
 async function apiPatchNight(id: string, updates: Partial<NightMeta>): Promise<void> {
   await fetch(`/api/nights/${id}`, {
     method: 'PATCH',
@@ -226,11 +222,6 @@ export default function HomePage() {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handleFile(file);
-  }
-
-  async function deleteNight(id: string) {
-    await apiDeleteNight(id);
-    setNights(prev => prev.filter(n => n.id !== id));
   }
 
   function startEdit(night: NightMeta) {
