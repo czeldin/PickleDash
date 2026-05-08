@@ -21,6 +21,7 @@ import { DepthSection } from '@/components/sections/DepthSection';
 import { ErrorSection } from '@/components/sections/ErrorSection';
 import { PlayerSummarySection } from '@/components/sections/PlayerSummarySection';
 import { AttackDinkSection } from '@/components/sections/AttackDinkSection';
+import { anonymizeData } from '@/lib/anonymize';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
   if (pids.size === data.players.length) return data;
@@ -55,11 +56,14 @@ export default function DashboardPage() {
   const [availableSessions, setAvailableSessions] = useState<SessionInfo[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isAll, setIsAll] = useState(false);
+  const [isAnon, setIsAnon] = useState(false);
 
   useEffect(() => {
-    const nightId = new URLSearchParams(window.location.search).get('night');
+    const params = new URLSearchParams(window.location.search);
+    const nightId = params.get('night');
     if (!nightId) { router.replace('/'); return; }
     setIsAll(nightId === 'all');
+    setIsAnon(params.get('anon') === '1');
 
     const loadOne = (id: string) =>
       fetch(`/api/nights/${id}`, { cache: 'no-store' }).then((r) => {
@@ -149,7 +153,9 @@ export default function DashboardPage() {
     );
   }
 
-  const visibleData = filterDataByPlayers(data, selectedPids);
+  const visibleData = isAnon
+    ? anonymizeData(filterDataByPlayers(data, selectedPids))
+    : filterDataByPlayers(data, selectedPids);
   const pageTitle = isAll ? 'All Nights' : (night?.label ?? data.sessions[0]?.nightLabel ?? 'Dashboard');
 
   return (
