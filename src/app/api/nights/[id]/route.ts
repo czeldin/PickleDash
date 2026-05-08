@@ -13,8 +13,16 @@ export async function GET(
 
   if (id === 'preloaded') {
     try {
-      const raw = JSON.parse(readFileSync(join(process.cwd(), 'public/data/night.json'), 'utf-8'));
-      return NextResponse.json({ id: 'preloaded', raw });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = JSON.parse(readFileSync(join(process.cwd(), 'public/data/night.json'), 'utf-8')) as any;
+      const sessions = raw?.data?.sessions ?? [];
+      const ge = sessions[0]?.ses?.ge;
+      let label = '4/30/26';
+      if (ge && typeof ge === 'number') {
+        const d = new Date(ge * 1000);
+        label = `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+      }
+      return NextResponse.json({ id: 'preloaded', label, sessionCount: sessions.length, raw });
     } catch {
       return NextResponse.json({ error: 'Preloaded night not found' }, { status: 404 });
     }
