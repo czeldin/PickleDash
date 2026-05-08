@@ -154,6 +154,7 @@ export default function HomePage() {
   const [editLabel, setEditLabel] = useState('');
   const [paddleEditId, setPaddleEditId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [isAnon, setIsAnon] = useState(false);
   const logoClickCount = useRef(0);
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -178,7 +179,10 @@ export default function HomePage() {
     }
   }, []);
 
-  useEffect(() => { loadNights(); }, [loadNights]);
+  useEffect(() => {
+    setIsAnon(new URLSearchParams(window.location.search).get('anon') === '1');
+    loadNights();
+  }, [loadNights]);
 
   function handleFile(file: File) {
     setError(null);
@@ -252,7 +256,7 @@ export default function HomePage() {
   }
 
   async function viewNight(meta: NightMeta) {
-    router.push(`/dashboard?night=${meta.id}`);
+    router.push(`/dashboard?night=${meta.id}${isAnon ? '&anon=1' : ''}`);
   }
 
   async function openPaddleEditor(meta: NightMeta) {
@@ -296,7 +300,7 @@ export default function HomePage() {
             {showAll && (
               <div
                 className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => router.push('/dashboard?night=all')}
+                onClick={() => router.push(`/dashboard?night=all${isAnon ? '&anon=1' : ''}`)}
               >
                 <span className="text-lg">🌐</span>
                 <div className="flex-1 min-w-0">

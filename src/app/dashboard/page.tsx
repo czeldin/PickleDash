@@ -179,7 +179,7 @@ export default function DashboardPage() {
             )}
             <GameFilter sessions={availableSessions} selectedKeys={selectedGameKeys} onChange={handleGameChange} />
             <PlayerFilter players={data.players} selectedPids={selectedPids} onChange={setSelectedPids} />
-            <button onClick={() => router.push('/')} className="text-xs md:text-sm text-gray-400 hover:text-gray-700 underline ml-1">
+            <button onClick={() => router.push(isAnon ? '/?anon=1' : '/')} className="text-xs md:text-sm text-gray-400 hover:text-gray-700 underline ml-1">
               ← Nights
             </button>
           </div>
