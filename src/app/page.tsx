@@ -337,9 +337,6 @@ export default function HomePage() {
                     )}
                     <p className="text-xs text-gray-400 mt-0.5">
                       {night.sessionCount} {night.sessionCount === 1 ? 'game' : 'games'} · {night.playerNames.join(', ')}
-                      {night.paddleTags && night.paddleTags.length > 0 && (
-                        <span className="ml-1 text-violet-400">· 🏓 paddle data</span>
-                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
