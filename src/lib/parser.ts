@@ -216,7 +216,8 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const w = acc.sqW; const exF = w > 0 ? acc.sqExSum / w : 0, poF = w > 0 ? acc.sqPoSum / w : 0;
     const dropExcellentPct = acc.dropExW > 0 ? (acc.dropExSum / acc.dropExW) * 100 : 0;
     const winnerExcellentPct = acc.winnerExW > 0 ? (acc.winnerExSum / acc.winnerExW) * 100 : 0;
-    return { pid: players[i].pid, excellentCount: Math.round(exF * acc.totalShots), excellentPct: exF * 100, poorCount: Math.round(poF * acc.totalShots), poorPct: poF * 100, dropExcellentPct, dropTotal: acc.dropExW, winnerTotal: acc.winnerTotal, winnerExcellentPct };
+    const excellentPct = exF * 100, poorPct = poF * 100;
+    return { pid: players[i].pid, excellentCount: Math.round(exF * acc.totalShots), excellentPct, poorCount: Math.round(poF * acc.totalShots), poorPct, qualityScore: excellentPct - poorPct, dropExcellentPct, dropTotal: acc.dropExW, winnerTotal: acc.winnerTotal, winnerExcellentPct };
   });
   const serveDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.sdW || 1; return { pid: players[i].pid, deepPct: (acc.sdDeep / w) * 100, medPct: (acc.sdMed / w) * 100, shallowPct: (acc.sdShallow / w) * 100 }; });
   const returnDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.rdW || 1; return { pid: players[i].pid, deepPct: (acc.rdDeep / w) * 100, medPct: (acc.rdMed / w) * 100, shallowPct: (acc.rdShallow / w) * 100 }; });

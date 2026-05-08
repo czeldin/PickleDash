@@ -27,6 +27,20 @@ export function ShotQualitySection({ data }: Props) {
 
   const columns: ColumnDef<ShotQualityRow>[] = [
     {
+      key: 'qualityScore',
+      header: 'Quality Score',
+      getValue: (row) => row.qualityScore,
+      render: (row) => {
+        const v = row.qualityScore;
+        const color = v >= 10 ? 'text-green-700' : v >= 0 ? 'text-gray-700' : 'text-red-600';
+        return (
+          <span className={`text-sm font-bold ${color}`}>
+            {v > 0 ? '+' : ''}{v.toFixed(1)}
+          </span>
+        );
+      },
+    },
+    {
       key: 'bar',
       header: 'Excellent / Other / Poor',
       sortable: false,
@@ -67,7 +81,7 @@ export function ShotQualitySection({ data }: Props) {
         rows={shotQuality}
         columns={columns}
         players={players}
-        defaultSortKey="excellentPct"
+        defaultSortKey="qualityScore"
       />
     </SectionCard>
   );

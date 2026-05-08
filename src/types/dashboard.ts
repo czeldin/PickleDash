@@ -100,6 +100,7 @@ export interface ShotQualityRow {
   excellentPct: number;
   poorCount: number;
   poorPct: number;
+  qualityScore: number; // excellentPct - poorPct
   // Per-shot drop quality (from rally-level shot data)
   dropExcellentPct: number;  // avg q.ex for drop shots × 100
   dropTotal: number;          // total drops with quality data
