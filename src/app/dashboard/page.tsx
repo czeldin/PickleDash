@@ -8,6 +8,7 @@ import { DashboardData, SessionInfo } from '@/types/dashboard';
 import { Night } from '@/types/nights';
 import { GameFilter } from '@/components/GameFilter';
 import { PlayerFilter } from '@/components/PlayerFilter';
+import { NightFilter } from '@/components/NightFilter';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { HighlightsSection } from '@/components/sections/HighlightsSection';
 import { SkillRatingsSection } from '@/components/sections/SkillRatingsSection';
@@ -46,15 +47,19 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
 export default function DashboardPage() {
   const router = useRouter();
   const [night, setNight] = useState<Night | null>(null);
+  const [allNights, setAllNights] = useState<Night[]>([]);
+  const [selectedNightIds, setSelectedNightIds] = useState<string[]>([]);
   const [selectedGameKeys, setSelectedGameKeys] = useState<Set<string>>(new Set());
   const [selectedPids, setSelectedPids] = useState<Set<string>>(new Set());
   const [data, setData] = useState<DashboardData | null>(null);
   const [availableSessions, setAvailableSessions] = useState<SessionInfo[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isAll, setIsAll] = useState(false);
 
   useEffect(() => {
     const nightId = new URLSearchParams(window.location.search).get('night');
     if (!nightId) { router.replace('/'); return; }
+    setIsAll(nightId === 'all');
 
     const loadOne = (id: string) =>
       fetch(`/api/nights/${id}`, { cache: 'no-store' }).then((r) => {
@@ -62,9 +67,8 @@ export default function DashboardPage() {
         return r.json() as Promise<Night>;
       });
 
-    const loadNight = (n: Night) => {
-      const allData = parseMultipleNights([n]);
-      setNight(n);
+    const applyNights = (nights: Night[]) => {
+      const allData = parseMultipleNights(nights);
       setData(allData);
       setAvailableSessions(allData.sessions);
       setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
@@ -73,17 +77,13 @@ export default function DashboardPage() {
     };
 
     if (nightId === 'all') {
-      // Load all nights and combine
       fetch('/api/nights', { cache: 'no-store' })
         .then((r) => r.json())
         .then(async (metas: { id: string }[]) => {
           const nights = await Promise.all(metas.map((m) => loadOne(m.id)));
-          const allData = parseMultipleNights(nights);
-          setData(allData);
-          setAvailableSessions(allData.sessions);
-          setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
-          setSelectedPids(new Set(allData.players.map((p) => p.pid)));
-          setDashboardData(allData);
+          setAllNights(nights);
+          setSelectedNightIds(nights.map((n) => n.id));
+          applyNights(nights);
         })
         .catch((err) => {
           console.error('Failed to load all nights:', err);
@@ -91,13 +91,28 @@ export default function DashboardPage() {
         });
     } else {
       loadOne(nightId)
-        .then(loadNight)
+        .then((n) => { setNight(n); applyNights([n]); })
         .catch((err) => {
           console.error('Failed to load night:', err);
           setLoadError('Could not load this night. It may have been deleted.');
         });
     }
   }, [router]);
+
+  // Re-parse when night selection changes (all-nights mode only)
+  const handleNightChange = useCallback((ids: string[]) => {
+    setSelectedNightIds(ids);
+    const selected = allNights.filter((n) => ids.includes(n.id));
+    if (selected.length === 0) return;
+    const allData = parseMultipleNights(selected);
+    const allSessions = parseMultipleNights(allNights).sessions; // keep full session list
+    const withSessions = { ...allData, sessions: allSessions };
+    setData(withSessions);
+    setAvailableSessions(allSessions);
+    setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
+    setSelectedPids(new Set(allData.players.map((p) => p.pid)));
+    setDashboardData(withSessions);
+  }, [allNights]);
 
   const reparse = useCallback((gameKeys: Set<string>, currentNight: Night | null) => {
     if (!currentNight) return;
@@ -135,7 +150,6 @@ export default function DashboardPage() {
   }
 
   const visibleData = filterDataByPlayers(data, selectedPids);
-  const isAll = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('night') === 'all';
   const pageTitle = isAll ? 'All Nights' : (night?.label ?? data.sessions[0]?.nightLabel ?? 'Dashboard');
 
   return (
@@ -150,6 +164,13 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {isAll && allNights.length > 0 && (
+              <NightFilter
+                nights={allNights}
+                selectedIds={selectedNightIds}
+                onChange={handleNightChange}
+              />
+            )}
             <GameFilter sessions={availableSessions} selectedKeys={selectedGameKeys} onChange={handleGameChange} />
             <PlayerFilter players={data.players} selectedPids={selectedPids} onChange={setSelectedPids} />
             <button onClick={() => router.push('/')} className="text-xs md:text-sm text-gray-400 hover:text-gray-700 underline ml-1">
