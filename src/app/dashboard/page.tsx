@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getDashboardData, setDashboardData } from '@/lib/store';
+import { setDashboardData } from '@/lib/store';
 import { parseMultipleNights } from '@/lib/parser';
 import { DashboardData, SessionInfo } from '@/types/dashboard';
 import { Night } from '@/types/nights';
@@ -50,40 +50,30 @@ export default function DashboardPage() {
   const [selectedPids, setSelectedPids] = useState<Set<string>>(new Set());
   const [data, setData] = useState<DashboardData | null>(null);
   const [availableSessions, setAvailableSessions] = useState<SessionInfo[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const nightId = new URLSearchParams(window.location.search).get('night');
+    if (!nightId) { router.replace('/'); return; }
 
-    const loadNight = (n: Night) => {
-      const allData = parseMultipleNights([n]);
-      setNight(n);
-      setData(allData);
-      setAvailableSessions(allData.sessions);
-      setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
-      setSelectedPids(new Set(allData.players.map((p) => p.pid)));
-      setDashboardData(allData);
-    };
-
-    if (nightId) {
-      // Load directly from localStorage by night ID — enables shareable URLs
-      import('@/lib/nightStore').then(({ getNights }) => {
-        const found = getNights().find((n) => n.id === nightId);
-        if (found) { loadNight(found); }
-        else { router.replace('/'); }
+    fetch(`/api/nights/${nightId}`, { cache: 'no-store' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((fullNight: Night) => {
+        const allData = parseMultipleNights([fullNight]);
+        setNight(fullNight);
+        setData(allData);
+        setAvailableSessions(allData.sessions);
+        setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
+        setSelectedPids(new Set(allData.players.map((p) => p.pid)));
+        setDashboardData(allData);
+      })
+      .catch((err) => {
+        console.error('Failed to load night:', err);
+        setLoadError('Could not load this night. It may have been deleted.');
       });
-    } else {
-      // Fallback: use in-memory cached data (navigated via "View →" button)
-      const cached = getDashboardData();
-      if (!cached) { router.replace('/'); return; }
-      setData(cached);
-      setAvailableSessions(cached.sessions);
-      setSelectedGameKeys(new Set(cached.sessions.map((s) => s.key)));
-      setSelectedPids(new Set(cached.players.map((p) => p.pid)));
-      import('@/lib/nightStore').then(({ getNights }) => {
-        const nights = getNights();
-        if (nights.length > 0) setNight(nights[0]);
-      });
-    }
   }, [router]);
 
   const reparse = useCallback((gameKeys: Set<string>, currentNight: Night | null) => {
@@ -102,6 +92,15 @@ export default function DashboardPage() {
   function handleGameChange(keys: Set<string>) {
     setSelectedGameKeys(keys);
     reparse(keys, night);
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-red-500">{loadError}</p>
+        <button onClick={() => router.push('/')} className="text-sm text-blue-600 hover:underline">← Back to Nights</button>
+      </div>
+    );
   }
 
   if (!data) {
@@ -148,7 +147,7 @@ export default function DashboardPage() {
         <DepthSection data={visibleData} />
         <ErrorSection data={visibleData} />
         <AttackDinkSection data={visibleData} />
-<PlayerSummarySection data={visibleData} />
+        <PlayerSummarySection data={visibleData} />
       </main>
     </div>
   );

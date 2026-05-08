@@ -1,29 +1,48 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { parseMultipleNights } from '@/lib/parser';
-import { setDashboardData } from '@/lib/store';
-import { getNights, addNight, removeNight, detectNightLabel, detectPlayerNames, updateNightPaddleTags, getNightSessionDetails } from '@/lib/nightStore';
+import { getNightSessionDetails } from '@/lib/nightStore';
 import { Night, PaddleTag } from '@/types/nights';
+import { NightMeta } from '@/lib/blobStore';
 
-// Paddle tags for the preloaded Apr 30 night
-const PRELOADED_PADDLE_TAGS: PaddleTag[] = [
-  { sessionIdx: 0, playerName: 'Craig Zeldin', paddle: 'Luzz' },
-  { sessionIdx: 0, playerName: 'Christian', paddle: 'RPM' },
-  { sessionIdx: 1, playerName: 'Craig Zeldin', paddle: 'Luzz' },
-  { sessionIdx: 1, playerName: 'Christian', paddle: 'RPM' },
-  { sessionIdx: 2, playerName: 'Craig Zeldin', paddle: 'RPM' },
-  { sessionIdx: 2, playerName: 'Christian', paddle: 'Luzz' },
-  { sessionIdx: 3, playerName: 'Craig Zeldin', paddle: 'Luzz' },
-  { sessionIdx: 3, playerName: 'Christian', paddle: 'RPM' },
-  { sessionIdx: 4, playerName: 'Craig Zeldin', paddle: 'RPM' },
-  { sessionIdx: 5, playerName: 'Christian', paddle: 'RPM' },
-  { sessionIdx: 6, playerName: 'Craig Zeldin', paddle: 'RPM' },
-  { sessionIdx: 6, playerName: 'Christian', paddle: 'Luzz' },
-  { sessionIdx: 7, playerName: 'Craig Zeldin', paddle: 'Luzz' },
-  { sessionIdx: 7, playerName: 'Christian', paddle: 'RPM' },
-];
+// ─── API helpers ─────────────────────────────────────────────────────────────
+
+async function apiFetchNights(): Promise<NightMeta[]> {
+  const res = await fetch('/api/nights', { cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to load nights');
+  return res.json();
+}
+
+async function apiUploadNight(meta: NightMeta, raw: unknown): Promise<void> {
+  const res = await fetch('/api/nights', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ meta, raw }),
+  });
+  if (!res.ok) throw new Error('Upload failed');
+}
+
+async function apiDeleteNight(id: string): Promise<void> {
+  await fetch(`/api/nights/${id}`, { method: 'DELETE' });
+}
+
+async function apiPatchNight(id: string, updates: Partial<NightMeta>): Promise<void> {
+  await fetch(`/api/nights/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+}
+
+async function apiFetchNightWithRaw(id: string): Promise<Night | null> {
+  const res = await fetch(`/api/nights/${id}`, { cache: 'no-store' });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data as Night;
+}
+
+// ─── PaddleEditor ─────────────────────────────────────────────────────────────
 
 function PaddleEditor({ night, onClose }: { night: Night; onClose: () => void }) {
   const sessions = getNightSessionDetails(night);
@@ -39,8 +58,8 @@ function PaddleEditor({ night, onClose }: { night: Night; onClose: () => void })
   });
   const [paddleOptions] = useState<string[]>(defaultPaddles);
   const [newPaddle, setNewPaddle] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  // Collect all unique players across all sessions for this night
   const taggedPlayers = Array.from(new Set((night.paddleTags ?? []).map(t => t.playerName)));
   const allPlayers = Array.from(new Set(sessions.flatMap(s => s.players)));
   const players = taggedPlayers.length > 0 ? taggedPlayers : allPlayers;
@@ -50,14 +69,16 @@ function PaddleEditor({ night, onClose }: { night: Night; onClose: () => void })
     setTags(prev => paddle ? { ...prev, [key]: paddle } : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== key)));
   }
 
-  function save() {
+  async function save() {
+    setSaving(true);
     const newTags: PaddleTag[] = Object.entries(tags)
       .filter(([, v]) => v)
       .map(([k, paddle]) => {
         const [idx, ...rest] = k.split(':');
         return { sessionIdx: Number(idx), playerName: rest.join(':'), paddle };
       });
-    updateNightPaddleTags(night.id, newTags);
+    await apiPatchNight(night.id, { paddleTags: newTags });
+    setSaving(false);
     onClose();
   }
 
@@ -74,7 +95,9 @@ function PaddleEditor({ night, onClose }: { night: Night; onClose: () => void })
             value={newPaddle}
             onChange={e => setNewPaddle(e.target.value)}
           />
-          <button onClick={save} className="text-xs bg-slate-700 text-white px-2 py-0.5 rounded hover:bg-slate-800">Save</button>
+          <button onClick={save} disabled={saving} className="text-xs bg-slate-700 text-white px-2 py-0.5 rounded hover:bg-slate-800 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
           <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
         </div>
       </div>
@@ -121,57 +144,72 @@ function PaddleEditor({ night, onClose }: { night: Night; onClose: () => void })
   );
 }
 
+// ─── HomePage ─────────────────────────────────────────────────────────────────
+
 export default function HomePage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [nights, setNights] = useState<Night[]>([]);
+  const [nights, setNights] = useState<NightMeta[]>([]);
+  const [nightsWithRaw, setNightsWithRaw] = useState<Record<string, Night>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [nightsLoading, setNightsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [paddleEditId, setPaddleEditId] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Always refresh the preloaded night from the static file so data + paddle tags stay current
-    fetch('/data/night.json')
-      .then((r) => r.json())
-      .then((raw) => {
-        const label = detectNightLabel(raw);
-        const playerNames = detectPlayerNames(raw);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sessionCount = ((raw as any)?.data?.sessions ?? []).length;
-        if (sessionCount > 0) {
-          removeNight('preloaded');
-          const night: Night = { id: 'preloaded', label, raw, sessionCount, playerNames, uploadedAt: 0, paddleTags: PRELOADED_PADDLE_TAGS };
-          addNight(night);
-        }
-        setNights(getNights());
-      })
-      .catch(() => setNights(getNights()));
+  const loadNights = useCallback(async () => {
+    try {
+      const list = await apiFetchNights();
+      setNights(list);
+    } catch {
+      setError('Could not load nights from server.');
+    } finally {
+      setNightsLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadNights(); }, [loadNights]);
 
   function handleFile(file: File) {
     setError(null);
     setLoading(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const raw = JSON.parse(e.target?.result as string);
-        const label = detectNightLabel(raw);
-        const playerNames = detectPlayerNames(raw);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sessionCount = ((raw as any)?.data?.sessions ?? []).length;
-        if (sessionCount === 0) {
+        const sessions = (raw as any)?.data?.sessions ?? [];
+        if (sessions.length === 0) {
           setError('No sessions found. Make sure this is a valid pb.vision JSON export.');
           setLoading(false);
           return;
         }
-        const night: Night = { id: crypto.randomUUID(), label, raw, sessionCount, playerNames, uploadedAt: Date.now() };
-        addNight(night);
-        setNights(getNights());
+        // Build meta
+        const ge = sessions[0]?.ses?.ge;
+        let label = 'Unknown';
+        if (ge && typeof ge === 'number') {
+          const d = new Date(ge * 1000);
+          label = `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+        }
+        const names = new Set<string>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const s of sessions) { for (const pd of s?.pd ?? []) { if (pd?.name) names.add(pd.name.trim()); } }
+
+        const meta: NightMeta = {
+          id: crypto.randomUUID(),
+          label,
+          sessionCount: sessions.length,
+          playerNames: Array.from(names),
+          uploadedAt: Date.now(),
+        };
+
+        await apiUploadNight(meta, raw);
+        await loadNights();
         setLoading(false);
-      } catch {
-        setError('Failed to parse file. Make sure it is a valid pb.vision JSON export.');
+      } catch (err) {
+        console.error(err);
+        setError('Failed to upload. Make sure it is a valid pb.vision JSON export.');
         setLoading(false);
       }
     };
@@ -190,34 +228,41 @@ export default function HomePage() {
     if (file) handleFile(file);
   }
 
-  function deleteNight(id: string) {
-    removeNight(id);
-    setNights(getNights());
+  async function deleteNight(id: string) {
+    await apiDeleteNight(id);
+    setNights(prev => prev.filter(n => n.id !== id));
   }
 
-  function startEdit(night: Night) {
+  function startEdit(night: NightMeta) {
     setEditingId(night.id);
     setEditLabel(night.label);
   }
 
-  function saveEdit(id: string) {
-    const updated = getNights().map((n) => n.id === id ? { ...n, label: editLabel.trim() || n.label } : n);
-    import('@/lib/nightStore').then(({ clearNights, addNight: add }) => {
-      clearNights();
-      updated.forEach(add);
-      setNights(getNights());
-    });
+  async function saveEdit(id: string) {
+    const trimmed = editLabel.trim();
+    if (trimmed) {
+      await apiPatchNight(id, { label: trimmed });
+      setNights(prev => prev.map(n => n.id === id ? { ...n, label: trimmed } : n));
+    }
     setEditingId(null);
   }
 
-  function viewNight(night: Night) {
-    const data = parseMultipleNights([night]);
-    setDashboardData(data);
-    router.push(`/dashboard?night=${night.id}`);
+  async function viewNight(meta: NightMeta) {
+    router.push(`/dashboard?night=${meta.id}`);
+  }
+
+  async function openPaddleEditor(meta: NightMeta) {
+    if (paddleEditId === meta.id) { setPaddleEditId(null); return; }
+    // Need full Night (with raw) for session details
+    if (!nightsWithRaw[meta.id]) {
+      const full = await apiFetchNightWithRaw(meta.id);
+      if (full) setNightsWithRaw(prev => ({ ...prev, [meta.id]: full }));
+    }
+    setPaddleEditId(meta.id);
   }
 
   function closePaddleEditor() {
-    setNights(getNights());
+    loadNights();
     setPaddleEditId(null);
   }
 
@@ -240,7 +285,9 @@ export default function HomePage() {
         </div>
 
         {/* Nights list */}
-        {nights.length > 0 && (
+        {nightsLoading ? (
+          <div className="text-center text-gray-400 text-sm py-4">Loading nights…</div>
+        ) : nights.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
             {nights.map((night) => (
               <div key={night.id}>
@@ -274,7 +321,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
-                      onClick={() => setPaddleEditId(paddleEditId === night.id ? null : night.id)}
+                      onClick={() => openPaddleEditor(night)}
                       className="text-xs text-gray-400 hover:text-violet-500 px-1"
                       title="Tag paddles"
                     >
@@ -297,8 +344,8 @@ export default function HomePage() {
                     )}
                   </div>
                 </div>
-                {paddleEditId === night.id && (
-                  <PaddleEditor night={night} onClose={closePaddleEditor} />
+                {paddleEditId === night.id && nightsWithRaw[night.id] && (
+                  <PaddleEditor night={nightsWithRaw[night.id]} onClose={closePaddleEditor} />
                 )}
               </div>
             ))}
@@ -315,7 +362,7 @@ export default function HomePage() {
           {loading ? (
             <div className="space-y-2">
               <div className="text-3xl animate-spin inline-block">⚙️</div>
-              <p className="text-gray-500 text-sm">Parsing…</p>
+              <p className="text-gray-500 text-sm">Uploading…</p>
             </div>
           ) : (
             <div className="space-y-2">
