@@ -158,21 +158,8 @@ export default function HomePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [paddleEditId, setPaddleEditId] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const [isAnon, setIsAnon] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const logoClickCount = useRef(0);
-  const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleLogoClick() {
-    logoClickCount.current += 1;
-    if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
-    logoClickTimer.current = setTimeout(() => { logoClickCount.current = 0; }, 600);
-    if (logoClickCount.current >= 3) {
-      logoClickCount.current = 0;
-      setShowAll(prev => !prev);
-    }
-  }
 
   const loadNights = useCallback(async () => {
     try {
@@ -292,7 +279,7 @@ export default function HomePage() {
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-3 text-4xl font-bold text-gray-900">
-            <img src="/icon.png" alt="PickleDash" className="w-12 h-12 rounded-2xl cursor-pointer select-none" onClick={handleLogoClick} />
+            <img src="/icon.png" alt="PickleDash" className="w-12 h-12 rounded-2xl" />
             <span>PickleDash</span>
           </div>
           <p className="text-gray-500 text-base">
@@ -308,19 +295,26 @@ export default function HomePage() {
         {nightsLoading ? (
           <div className="text-center text-gray-400 text-sm py-4">Loading nights…</div>
         ) : nights.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
-            {showAll && (
+          <div className="space-y-3">
+            {/* All Nights card */}
+            {nights.length > 1 && (
               <div
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                className="bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
                 onClick={() => router.push(`/dashboard?night=all${isAnon ? '&anon=1' : ''}`)}
               >
                 <span className="text-lg">🌐</span>
                 <div className="flex-1 min-w-0">
                   <span className="font-semibold text-gray-800">All Nights</span>
-                  <p className="text-xs text-gray-400 mt-0.5">{nights.reduce((s, n) => s + n.sessionCount, 0)} games total</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {nights.length} nights · {nights.reduce((s, n) => s + n.sessionCount, 0)} games total
+                  </p>
                 </div>
+                <span className="text-gray-300 text-sm">→</span>
               </div>
             )}
+
+            {/* Individual nights */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
             {nights.map((night) => (
               <div key={night.id}>
                 <div
@@ -394,6 +388,7 @@ export default function HomePage() {
                 )}
               </div>
             ))}
+            </div>
           </div>
         )}
 
