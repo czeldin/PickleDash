@@ -63,6 +63,7 @@ export interface SkillRatingsByGameRow {
   sessionName: string;
   nightLabel: string;
   timestamp: number; // Unix seconds (ge), 0 if unavailable
+  team: number;      // team index (0 or 1) within the session
   serve: number;
   return: number;
   offense: number;

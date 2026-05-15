@@ -237,9 +237,9 @@ function PlayerTable({ player, rows, multiNight }: {
 
 // ─── "Playing with X" section ─────────────────────────────────────────────────
 
-function PartnerEffectSection({ data, sessionParticipants }: {
+function PartnerEffectSection({ data, sessionTeams }: {
   data: DashboardData;
-  sessionParticipants: Map<string, Set<string>>;
+  sessionTeams: Map<string, Map<string, number>>;
 }) {
   const { players, skillRatingsByGame } = data;
   const [focalPid, setFocalPid] = useState<string | null>(null);
@@ -287,11 +287,19 @@ function PartnerEffectSection({ data, sessionParticipants }: {
           const allRows = skillRatingsByGame.filter((r) => r.pid === player.pid);
           if (allRows.length === 0) return null;
 
-          // Games where the focal player was also present
-          const withRows = allRows.filter((r) => sessionParticipants.get(r.sessionKey)?.has(focalPid!));
-          const withoutRows = allRows.filter((r) => !sessionParticipants.get(r.sessionKey)?.has(focalPid!));
+          // Games where the focal player was the partner (same team)
+          const withRows = allRows.filter((r) => {
+            const teams = sessionTeams.get(r.sessionKey);
+            if (!teams || !teams.has(focalPid!)) return false;
+            return teams.get(focalPid!) === r.team; // same team = partner
+          });
+          const withoutRows = allRows.filter((r) => {
+            const teams = sessionTeams.get(r.sessionKey);
+            if (!teams || !teams.has(focalPid!)) return true; // focal not in game
+            return teams.get(focalPid!) !== r.team; // focal was opponent
+          });
 
-          if (withRows.length === 0) return null; // never played together
+          if (withRows.length === 0) return null; // never played as partners
 
           const allAvg = buildAvgRow(allRows);
           const withAvg = buildAvgRow(withRows);
@@ -311,8 +319,8 @@ function PartnerEffectSection({ data, sessionParticipants }: {
                 </span>
                 <span className="font-semibold text-gray-900">{player.name}</span>
                 <span className="text-xs text-gray-400 ml-auto">
-                  {withRows.length} game{withRows.length !== 1 ? 's' : ''} with {focalPlayer.name}
-                  {withoutRows.length > 0 && `, ${withoutRows.length} without`}
+                  {withRows.length} as partner{withRows.length !== 1 ? 's' : ''}
+                  {withoutRows.length > 0 && `, ${withoutRows.length} other`}
                 </span>
               </div>
               <div className="overflow-x-auto">
@@ -330,7 +338,7 @@ function PartnerEffectSection({ data, sessionParticipants }: {
                     {/* With focal player */}
                     <tr className="bg-blue-50">
                       <td className="px-4 md:px-5 py-2 text-blue-700 font-semibold whitespace-nowrap">
-                        With {focalPlayer.name}
+                        Partner: {focalPlayer.name}
                         <span className="ml-1 font-normal text-blue-400 text-xs">({withRows.length}g)</span>
                       </td>
                       <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(withOverall)}`}>
@@ -349,7 +357,7 @@ function PartnerEffectSection({ data, sessionParticipants }: {
                     {withoutAvg && withoutRows.length > 0 && (
                       <tr className="bg-gray-50">
                         <td className="px-4 md:px-5 py-2 text-gray-500 font-semibold whitespace-nowrap">
-                          Without {focalPlayer.name}
+                          Not partner: {focalPlayer.name}
                           <span className="ml-1 font-normal text-gray-400 text-xs">({withoutRows.length}g)</span>
                         </td>
                         <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(withoutOverall)}`}>
@@ -391,11 +399,11 @@ export function PlayerSkillsByGame({ data }: Props) {
   const { players, skillRatingsByGame } = data;
   const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
 
-  // Build sessionKey → Set<pid> for partner detection
-  const sessionParticipants = new Map<string, Set<string>>();
+  // Build sessionKey → Map<pid, team> for partner detection
+  const sessionTeams = new Map<string, Map<string, number>>();
   for (const row of skillRatingsByGame) {
-    if (!sessionParticipants.has(row.sessionKey)) sessionParticipants.set(row.sessionKey, new Set());
-    sessionParticipants.get(row.sessionKey)!.add(row.pid);
+    if (!sessionTeams.has(row.sessionKey)) sessionTeams.set(row.sessionKey, new Map());
+    sessionTeams.get(row.sessionKey)!.set(row.pid, row.team);
   }
 
   return (
@@ -410,7 +418,7 @@ export function PlayerSkillsByGame({ data }: Props) {
       </div>
 
       {/* "Playing with X" comparison section */}
-      <PartnerEffectSection data={data} sessionParticipants={sessionParticipants} />
+      <PartnerEffectSection data={data} sessionTeams={sessionTeams} />
     </div>
   );
 }
