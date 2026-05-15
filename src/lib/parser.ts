@@ -1,7 +1,7 @@
 import { SERVE_SPEED_BUCKETS } from '@/types/pbvision';
 import {
   DashboardData, PlayerMeta, PLAYER_COLORS,
-  HeroStats, SkillRatingsRow, ShotAccuracyRow, SpeedRow,
+  HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow,
 } from '@/types/dashboard';
@@ -230,7 +230,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -241,6 +241,7 @@ export function parseMultipleNights(
   const accumMap = new Map<string, PlayerAccum>();
   const allSessions: SessionInfo[] = [];
   const rawHighlights: HighlightRally[] = [];
+  const skillRatingsByGame: SkillRatingsByGameRow[] = [];
 
   for (const night of nights) {
     const rawSessions = getRawSessions(night.raw);
@@ -252,6 +253,29 @@ export function parseMultipleNights(
       allSessions.push(sessionInfo);
       if (!selectedSessionKeys || selectedSessionKeys.has(key)) {
         processSession(s, accumMap);
+        // Collect per-game skill ratings for the By Game breakdown tab
+        if (Array.isArray(s.pd)) {
+          for (const player of s.pd) {
+            const nm = player.name?.trim(); if (!nm) continue;
+            const sc = player.shot_count ?? 0;
+            const r = player.trends?.ratings;
+            if (r && sc > 0) {
+              skillRatingsByGame.push({
+                pid: nm.toLowerCase(),
+                sessionKey: key,
+                sessionName,
+                nightLabel: night.label,
+                serve: r.serve ?? 0,
+                return: r.return ?? 0,
+                offense: r.offense ?? 0,
+                defense: r.defense ?? 0,
+                agility: r.agility ?? 0,
+                consistency: r.consistency ?? 0,
+                shotCount: sc,
+              });
+            }
+          }
+        }
         // Collect rally highlights for this session
         const vid = s.ses?.vid;
         const si = s.ses?.si ?? i;
@@ -283,7 +307,7 @@ export function parseMultipleNights(
     .slice(0, 12);
 
   const data = accumsToData(Array.from(accumMap.values()), allSessions);
-  return { ...data, highlights };
+  return { ...data, highlights, skillRatingsByGame };
 }
 
 // Convenience wrapper for a single file

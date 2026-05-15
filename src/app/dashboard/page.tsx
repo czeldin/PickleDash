@@ -30,6 +30,7 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     players: data.players.filter((p) => pids.has(p.pid)),
     hero: data.hero.filter((r) => pids.has(r.pid)),
     skillRatings: data.skillRatings.filter((r) => pids.has(r.pid)),
+    skillRatingsByGame: data.skillRatingsByGame.filter((r) => pids.has(r.pid)),
     shotAccuracy: data.shotAccuracy.filter((r) => pids.has(r.pid)),
     serveSpeed: data.serveSpeed.filter((r) => pids.has(r.pid)),
     driveSpeed: data.driveSpeed.filter((r) => pids.has(r.pid)),

@@ -57,6 +57,20 @@ export interface SkillRatingsRow {
   consistency: number;
 }
 
+export interface SkillRatingsByGameRow {
+  pid: string;
+  sessionKey: string;
+  sessionName: string;
+  nightLabel: string;
+  serve: number;
+  return: number;
+  offense: number;
+  defense: number;
+  agility: number;
+  consistency: number;
+  shotCount: number;
+}
+
 export interface ShotAccuracyRow {
   pid: string;
   inShots: number;
@@ -150,6 +164,7 @@ export interface DashboardData {
   players: PlayerMeta[];
   hero: HeroStats[];
   skillRatings: SkillRatingsRow[];
+  skillRatingsByGame: SkillRatingsByGameRow[];
   shotAccuracy: ShotAccuracyRow[];
   serveSpeed: SpeedRow[];
   driveSpeed: SpeedRow[];
