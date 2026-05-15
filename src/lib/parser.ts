@@ -23,10 +23,31 @@ interface RawPd {
   };
 }
 interface RawSession {
-  ses: { vid: string; si: number; name?: string };
+  ses: { vid: string; si: number; name?: string; ge?: number };
   ral: { sh: RawShot[]; wt: number }[];
   pd: RawPd[];
   gd?: { game_outcome?: number[] };
+}
+
+/** Returns a human-readable session label.
+ *  If the raw name contains at least one player's first name, keep it.
+ *  Otherwise, fall back to HH:MM from the session's Unix timestamp (ge),
+ *  or "Game N" if no timestamp is available. */
+function getSessionName(s: RawSession, index: number): string {
+  const rawName = s.ses?.name ?? '';
+  const playerFirstNames = (s.pd ?? [])
+    .map((p) => p.name?.trim().split(/\s+/)[0])
+    .filter((n): n is string => Boolean(n));
+  const hasPlayerName = playerFirstNames.some((n) =>
+    rawName.toLowerCase().includes(n.toLowerCase())
+  );
+  if (rawName && hasPlayerName) return rawName;
+  const ge = s.ses?.ge;
+  if (ge && typeof ge === 'number') {
+    const d = new Date(ge * 1000);
+    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  return rawName || `Game ${index + 1}`;
 }
 
 function getInitials(name: string) {
@@ -105,7 +126,7 @@ export function getSessionInfos(raw: unknown, nightId: string, nightLabel: strin
     index: i,
     nightId,
     nightLabel,
-    name: s.ses?.name ?? `Game ${i + 1}`,
+    name: getSessionName(s, i),
   }));
 }
 
@@ -248,7 +269,7 @@ export function parseMultipleNights(
     for (let i = 0; i < rawSessions.length; i++) {
       const key = `${night.id}_${i}`;
       const s = rawSessions[i];
-      const sessionName = s.ses?.name ?? `Game ${i + 1}`;
+      const sessionName = getSessionName(s, i);
       const sessionInfo: SessionInfo = { key, index: i, nightId: night.id, nightLabel: night.label, name: sessionName };
       allSessions.push(sessionInfo);
       if (!selectedSessionKeys || selectedSessionKeys.has(key)) {
