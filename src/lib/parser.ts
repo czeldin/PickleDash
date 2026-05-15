@@ -45,7 +45,11 @@ function getSessionName(s: RawSession, index: number): string {
   const ge = s.ses?.ge;
   if (ge && typeof ge === 'number') {
     const d = new Date(ge * 1000);
-    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 || 12;
+    return `${h12}:${m} ${ampm}`;
   }
   return rawName || `Game ${index + 1}`;
 }
