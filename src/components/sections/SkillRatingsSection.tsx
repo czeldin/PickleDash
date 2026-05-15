@@ -142,13 +142,10 @@ function Delta({ val, base }: { val: number; base: number }) {
   );
 }
 
-function PlayerTable({ player, rows, multiNight, partnerPid, partnerName, partnerSessionKeys }: {
+function PlayerTable({ player, rows, multiNight }: {
   player: { pid: string; name: string; initials: string; color: { bg: string; text: string } };
   rows: SkillRatingsByGameRow[];
   multiNight: boolean;
-  partnerPid: string | null;
-  partnerName: string;
-  partnerSessionKeys: Set<string>;
 }) {
   const [sortCol, setSortCol] = useState<SortCol>('time');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -173,14 +170,6 @@ function PlayerTable({ player, rows, multiNight, partnerPid, partnerName, partne
 
   const avgRow = buildAvgRow(rows);
   const avgOverall = overallScore(avgRow as unknown as SkillRatingsRow);
-
-  // Partner comparison rows (only when a partner is selected and they share games)
-  const withRows = partnerPid ? rows.filter((r) => partnerSessionKeys.has(r.sessionKey)) : [];
-  const withoutRows = partnerPid ? rows.filter((r) => !partnerSessionKeys.has(r.sessionKey)) : [];
-  const withAvg = withRows.length > 0 ? buildAvgRow(withRows) : null;
-  const withoutAvg = withoutRows.length > 0 ? buildAvgRow(withoutRows) : null;
-  const withOverall = withAvg ? overallScore(withAvg as unknown as SkillRatingsRow) : 0;
-  const withoutOverall = withoutAvg ? overallScore(withoutAvg as unknown as SkillRatingsRow) : 0;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -209,13 +198,9 @@ function PlayerTable({ player, rows, multiNight, partnerPid, partnerName, partne
             {sorted.map((row) => {
               const label = multiNight ? `${row.nightLabel} · ${row.sessionName}` : row.sessionName;
               const ov = overallScore(row as unknown as SkillRatingsRow);
-              const hasPartner = partnerPid ? partnerSessionKeys.has(row.sessionKey) : false;
               return (
-                <tr key={row.sessionKey} className={`transition-colors ${hasPartner ? 'bg-blue-50/60 hover:bg-blue-50' : 'hover:bg-gray-50'}`}>
-                  <td className="px-4 md:px-5 py-2 text-gray-500 whitespace-nowrap">
-                    {label}
-                    {hasPartner && <span className="ml-1.5 text-blue-400 text-xs">w/ {partnerName}</span>}
-                  </td>
+                <tr key={row.sessionKey} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 md:px-5 py-2 text-gray-500 whitespace-nowrap">{label}</td>
                   <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(ov)}`}>
                     {ov > 0 ? ov.toFixed(2) : '—'}
                   </td>
@@ -230,55 +215,15 @@ function PlayerTable({ player, rows, multiNight, partnerPid, partnerName, partne
                 </tr>
               );
             })}
-
-            {/* Overall avg */}
             {rows.length > 1 && (
               <tr className="bg-gray-50 border-t border-gray-200 font-semibold">
-                <td className="px-4 md:px-5 py-2 text-gray-500">Overall avg</td>
+                <td className="px-4 md:px-5 py-2 text-gray-500">Avg</td>
                 <td className={`px-3 py-2 text-right tabular-nums ${skillColor(avgOverall)}`}>
                   {avgOverall > 0 ? avgOverall.toFixed(2) : '—'}
                 </td>
                 {SKILLS.map((skill) => (
                   <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(avgRow[skill])}`}>
                     {avgRow[skill] > 0 ? avgRow[skill].toFixed(2) : '—'}
-                  </td>
-                ))}
-              </tr>
-            )}
-
-            {/* With partner avg */}
-            {withAvg && withRows.length > 0 && (
-              <tr className="bg-blue-50 border-t border-blue-100 font-semibold">
-                <td className="px-4 md:px-5 py-2 text-blue-700 whitespace-nowrap">
-                  With {partnerName} <span className="font-normal text-blue-400">({withRows.length}g)</span>
-                </td>
-                <td className={`px-3 py-2 text-right tabular-nums ${skillColor(withOverall)}`}>
-                  {withOverall > 0 ? withOverall.toFixed(2) : '—'}
-                  <Delta val={withOverall} base={avgOverall} />
-                </td>
-                {SKILLS.map((skill) => (
-                  <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(withAvg[skill])}`}>
-                    {withAvg[skill] > 0 ? withAvg[skill].toFixed(2) : '—'}
-                    <Delta val={withAvg[skill]} base={avgRow[skill]} />
-                  </td>
-                ))}
-              </tr>
-            )}
-
-            {/* Without partner avg */}
-            {withoutAvg && withoutRows.length > 0 && withRows.length > 0 && (
-              <tr className="bg-gray-50 border-t border-gray-100 font-semibold text-gray-500">
-                <td className="px-4 md:px-5 py-2 whitespace-nowrap">
-                  Without {partnerName} <span className="font-normal text-gray-400">({withoutRows.length}g)</span>
-                </td>
-                <td className={`px-3 py-2 text-right tabular-nums ${skillColor(withoutOverall)}`}>
-                  {withoutOverall > 0 ? withoutOverall.toFixed(2) : '—'}
-                  <Delta val={withoutOverall} base={avgOverall} />
-                </td>
-                {SKILLS.map((skill) => (
-                  <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(withoutAvg[skill])}`}>
-                    {withoutAvg[skill] > 0 ? withoutAvg[skill].toFixed(2) : '—'}
-                    <Delta val={withoutAvg[skill]} base={avgRow[skill]} />
                   </td>
                 ))}
               </tr>
@@ -290,32 +235,29 @@ function PlayerTable({ player, rows, multiNight, partnerPid, partnerName, partne
   );
 }
 
-export function PlayerSkillsByGame({ data }: Props) {
+// ─── "Playing with X" section ─────────────────────────────────────────────────
+
+function PartnerEffectSection({ data, sessionParticipants }: {
+  data: DashboardData;
+  sessionParticipants: Map<string, Set<string>>;
+}) {
   const { players, skillRatingsByGame } = data;
-  const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
-  const [partnerPid, setPartnerPid] = useState<string | null>(null);
+  const [focalPid, setFocalPid] = useState<string | null>(null);
 
-  // Build sessionKey → Set<pid> for partner detection
-  const sessionParticipants = new Map<string, Set<string>>();
-  for (const row of skillRatingsByGame) {
-    if (!sessionParticipants.has(row.sessionKey)) sessionParticipants.set(row.sessionKey, new Set());
-    sessionParticipants.get(row.sessionKey)!.add(row.pid);
-  }
-
-  const partnerName = players.find((p) => p.pid === partnerPid)?.name ?? '';
+  const focalPlayer = players.find((p) => p.pid === focalPid);
 
   return (
-    <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-8">
-      {/* Partner selector */}
+    <div className="space-y-6">
+      {/* Focal player selector */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-4 md:px-5 py-3 flex flex-wrap items-center gap-3">
-        <span className="text-sm text-gray-500 font-medium flex-shrink-0">Compare when playing with:</span>
+        <span className="text-sm text-gray-500 font-medium flex-shrink-0">How does everyone play with:</span>
         <div className="flex flex-wrap gap-2">
           {players.map((p) => {
-            const selected = partnerPid === p.pid;
+            const selected = focalPid === p.pid;
             return (
               <button
                 key={p.pid}
-                onClick={() => setPartnerPid(selected ? null : p.pid)}
+                onClick={() => setFocalPid(selected ? null : p.pid)}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all border ${
                   selected
                     ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm'
@@ -333,33 +275,142 @@ export function PlayerSkillsByGame({ data }: Props) {
             );
           })}
         </div>
-        {partnerPid && (
-          <button onClick={() => setPartnerPid(null)} className="text-xs text-gray-400 hover:text-gray-600 ml-auto">
-            Clear
-          </button>
+        {focalPid && (
+          <button onClick={() => setFocalPid(null)} className="text-xs text-gray-400 hover:text-gray-600 ml-auto">Clear</button>
         )}
       </div>
 
-      {/* Player tables */}
-      {players.map((player) => {
-        const rows = skillRatingsByGame.filter((r) => r.pid === player.pid);
-        if (rows.length === 0) return null;
-        // Sessions where the selected partner also played
-        const partnerSessionKeys = partnerPid && partnerPid !== player.pid
-          ? new Set(rows.map((r) => r.sessionKey).filter((key) => sessionParticipants.get(key)?.has(partnerPid)))
-          : new Set<string>();
-        return (
-          <PlayerTable
-            key={player.pid}
-            player={player}
-            rows={rows}
-            multiNight={multiNight}
-            partnerPid={partnerPid !== player.pid ? partnerPid : null}
-            partnerName={partnerName}
-            partnerSessionKeys={partnerSessionKeys}
-          />
-        );
-      })}
+      {/* Per-player comparison tables */}
+      {focalPlayer && players
+        .filter((p) => p.pid !== focalPid)
+        .map((player) => {
+          const allRows = skillRatingsByGame.filter((r) => r.pid === player.pid);
+          if (allRows.length === 0) return null;
+
+          // Games where the focal player was also present
+          const withRows = allRows.filter((r) => sessionParticipants.get(r.sessionKey)?.has(focalPid!));
+          const withoutRows = allRows.filter((r) => !sessionParticipants.get(r.sessionKey)?.has(focalPid!));
+
+          if (withRows.length === 0) return null; // never played together
+
+          const allAvg = buildAvgRow(allRows);
+          const withAvg = buildAvgRow(withRows);
+          const withoutAvg = withoutRows.length > 0 ? buildAvgRow(withoutRows) : null;
+          const allOverall = overallScore(allAvg as unknown as SkillRatingsRow);
+          const withOverall = overallScore(withAvg as unknown as SkillRatingsRow);
+          const withoutOverall = withoutAvg ? overallScore(withoutAvg as unknown as SkillRatingsRow) : 0;
+
+          return (
+            <div key={player.pid} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 px-4 md:px-5 py-3 border-b border-gray-100">
+                <span
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0"
+                  style={{ backgroundColor: player.color.bg, color: player.color.text }}
+                >
+                  {player.initials}
+                </span>
+                <span className="font-semibold text-gray-900">{player.name}</span>
+                <span className="text-xs text-gray-400 ml-auto">
+                  {withRows.length} game{withRows.length !== 1 ? 's' : ''} with {focalPlayer.name}
+                  {withoutRows.length > 0 && `, ${withoutRows.length} without`}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs md:text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="text-left px-4 md:px-5 py-2 text-gray-500 font-medium w-36"></th>
+                      <th className="text-right px-3 py-2 text-gray-500 font-medium">Overall</th>
+                      {SKILLS.map((s) => (
+                        <th key={s} className="text-right px-3 py-2 text-gray-500 font-medium capitalize">{s}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {/* With focal player */}
+                    <tr className="bg-blue-50">
+                      <td className="px-4 md:px-5 py-2 text-blue-700 font-semibold whitespace-nowrap">
+                        With {focalPlayer.name}
+                        <span className="ml-1 font-normal text-blue-400 text-xs">({withRows.length}g)</span>
+                      </td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(withOverall)}`}>
+                        {withOverall > 0 ? withOverall.toFixed(2) : '—'}
+                        <Delta val={withOverall} base={allOverall} />
+                      </td>
+                      {SKILLS.map((skill) => (
+                        <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(withAvg[skill])}`}>
+                          {withAvg[skill] > 0 ? withAvg[skill].toFixed(2) : '—'}
+                          <Delta val={withAvg[skill]} base={allAvg[skill]} />
+                        </td>
+                      ))}
+                    </tr>
+
+                    {/* Without focal player */}
+                    {withoutAvg && withoutRows.length > 0 && (
+                      <tr className="bg-gray-50">
+                        <td className="px-4 md:px-5 py-2 text-gray-500 font-semibold whitespace-nowrap">
+                          Without {focalPlayer.name}
+                          <span className="ml-1 font-normal text-gray-400 text-xs">({withoutRows.length}g)</span>
+                        </td>
+                        <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(withoutOverall)}`}>
+                          {withoutOverall > 0 ? withoutOverall.toFixed(2) : '—'}
+                          <Delta val={withoutOverall} base={allOverall} />
+                        </td>
+                        {SKILLS.map((skill) => (
+                          <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(withoutAvg[skill])}`}>
+                            {withoutAvg[skill] > 0 ? withoutAvg[skill].toFixed(2) : '—'}
+                            <Delta val={withoutAvg[skill]} base={allAvg[skill]} />
+                          </td>
+                        ))}
+                      </tr>
+                    )}
+
+                    {/* Overall avg */}
+                    <tr className="border-t border-gray-200">
+                      <td className="px-4 md:px-5 py-2 text-gray-400 font-semibold">Overall avg</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(allOverall)}`}>
+                        {allOverall > 0 ? allOverall.toFixed(2) : '—'}
+                      </td>
+                      {SKILLS.map((skill) => (
+                        <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(allAvg[skill])}`}>
+                          {allAvg[skill] > 0 ? allAvg[skill].toFixed(2) : '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
+export function PlayerSkillsByGame({ data }: Props) {
+  const { players, skillRatingsByGame } = data;
+  const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
+
+  // Build sessionKey → Set<pid> for partner detection
+  const sessionParticipants = new Map<string, Set<string>>();
+  for (const row of skillRatingsByGame) {
+    if (!sessionParticipants.has(row.sessionKey)) sessionParticipants.set(row.sessionKey, new Set());
+    sessionParticipants.get(row.sessionKey)!.add(row.pid);
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-12">
+      {/* Per-game breakdown tables */}
+      <div className="space-y-8">
+        {players.map((player) => {
+          const rows = skillRatingsByGame.filter((r) => r.pid === player.pid);
+          if (rows.length === 0) return null;
+          return <PlayerTable key={player.pid} player={player} rows={rows} multiNight={multiNight} />;
+        })}
+      </div>
+
+      {/* "Playing with X" comparison section */}
+      <PartnerEffectSection data={data} sessionParticipants={sessionParticipants} />
     </div>
   );
 }
