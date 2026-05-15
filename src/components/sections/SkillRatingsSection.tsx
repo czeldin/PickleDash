@@ -144,11 +144,14 @@ function PlayerTable({ player, rows, multiNight }: {
     return sortDir === 'asc' ? av - bv : bv - av;
   });
 
-  // Avg row (always over original rows, not sorted order)
+  // Weighted avg (by shotCount) to match the Dashboard tab's aggregation
   const avgRow: Record<string, number> = {};
   for (const skill of SKILLS) {
-    const vals = rows.map((r) => r[skill as keyof SkillRatingsByGameRow] as number).filter((v) => v > 0);
-    avgRow[skill] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    const active = rows.filter((r) => (r[skill as keyof SkillRatingsByGameRow] as number) > 0);
+    const totalW = active.reduce((s, r) => s + r.shotCount, 0);
+    avgRow[skill] = totalW > 0
+      ? active.reduce((s, r) => s + (r[skill as keyof SkillRatingsByGameRow] as number) * r.shotCount, 0) / totalW
+      : 0;
   }
   const avgOverall = overallScore(avgRow as unknown as SkillRatingsRow);
 
