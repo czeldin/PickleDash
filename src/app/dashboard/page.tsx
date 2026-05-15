@@ -11,7 +11,7 @@ import { PlayerFilter } from '@/components/PlayerFilter';
 import { NightFilter } from '@/components/NightFilter';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { HighlightsSection } from '@/components/sections/HighlightsSection';
-import { SkillRatingsSection } from '@/components/sections/SkillRatingsSection';
+import { SkillRatingsSection, PlayerSkillsByGame } from '@/components/sections/SkillRatingsSection';
 import { ShotAccuracySection } from '@/components/sections/ShotAccuracySection';
 import { SpeedSection } from '@/components/sections/SpeedSection';
 import { KitchenArrivalSection } from '@/components/sections/KitchenArrivalSection';
@@ -58,6 +58,7 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isAll, setIsAll] = useState(false);
   const [isAnon, setIsAnon] = useState(false);
+  const [view, setView] = useState<'dashboard' | 'players'>('dashboard');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -163,13 +164,41 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-200">
       <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 md:gap-4">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <img src="/icon.png" alt="PickleDash" className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex-shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-lg md:text-xl font-bold text-gray-900 leading-tight">PickleDash</h1>
-              <p className="text-xs md:text-sm font-semibold text-slate-500 leading-tight truncate max-w-[140px] md:max-w-none">{pageTitle}</p>
+          {/* Left: logo + title + tabs */}
+          <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              <img src="/icon.png" alt="PickleDash" className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 leading-tight">PickleDash</h1>
+                <p className="text-xs md:text-sm font-semibold text-slate-500 leading-tight truncate max-w-[140px] md:max-w-none">{pageTitle}</p>
+              </div>
+            </div>
+            {/* View tabs */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 ml-1 flex-shrink-0">
+              <button
+                onClick={() => setView('dashboard')}
+                className={`px-3 py-1 text-xs md:text-sm font-medium rounded-md transition-colors ${
+                  view === 'dashboard'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setView('players')}
+                className={`px-3 py-1 text-xs md:text-sm font-medium rounded-md transition-colors ${
+                  view === 'players'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Players
+              </button>
             </div>
           </div>
+
+          {/* Right: filters + back */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {isAll && allNights.length > 0 && (
               <NightFilter
@@ -187,20 +216,24 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-10 md:space-y-12">
-        <HeroSection data={visibleData} />
-        <HighlightsSection data={visibleData} />
-        <SkillRatingsSection data={visibleData} />
-        <ShotAccuracySection data={visibleData} />
-        <SpeedSection data={visibleData} />
-        <ShotBreakdownSection data={visibleData} />
-        <KitchenArrivalSection data={visibleData} />
-        <ShotQualitySection data={visibleData} />
-        <DepthSection data={visibleData} />
-        <ErrorSection data={visibleData} />
-        <AttackDinkSection data={visibleData} />
-        <PlayerSummarySection data={visibleData} />
-      </main>
+      {view === 'dashboard' ? (
+        <main className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-10 md:space-y-12">
+          <HeroSection data={visibleData} />
+          <HighlightsSection data={visibleData} />
+          <SkillRatingsSection data={visibleData} />
+          <ShotAccuracySection data={visibleData} />
+          <SpeedSection data={visibleData} />
+          <ShotBreakdownSection data={visibleData} />
+          <KitchenArrivalSection data={visibleData} />
+          <ShotQualitySection data={visibleData} />
+          <DepthSection data={visibleData} />
+          <ErrorSection data={visibleData} />
+          <AttackDinkSection data={visibleData} />
+          <PlayerSummarySection data={visibleData} />
+        </main>
+      ) : (
+        <PlayerSkillsByGame data={visibleData} />
+      )}
     </div>
   );
 }
