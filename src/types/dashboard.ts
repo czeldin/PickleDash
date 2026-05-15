@@ -62,6 +62,7 @@ export interface SkillRatingsByGameRow {
   sessionKey: string;
   sessionName: string;
   nightLabel: string;
+  timestamp: number; // Unix seconds (ge), 0 if unavailable
   serve: number;
   return: number;
   offense: number;

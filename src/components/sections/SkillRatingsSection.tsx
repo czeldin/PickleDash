@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { DashboardData, SkillRatingsRow, SkillRatingsByGameRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
@@ -95,97 +96,136 @@ function skillColor(value: number): string {
   return 'text-red-600';
 }
 
-export function PlayerSkillsByGame({ data }: Props) {
-  const { players, skillRatingsByGame, sessions } = data;
-  const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
+type SortCol = 'time' | 'overall' | typeof SKILLS[number];
+type SortDir = 'asc' | 'desc';
 
-  // Build a lookup from sessionKey → its position in the sessions list (chronological order)
-  const sessionOrder = new Map(sessions.map((s, i) => [s.key, i]));
+function SortableHeader({
+  label, col, sortCol, sortDir, onSort, left,
+}: {
+  label: string; col: SortCol; sortCol: SortCol; sortDir: SortDir;
+  onSort: (col: SortCol) => void; left?: boolean;
+}) {
+  const active = sortCol === col;
+  const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+  return (
+    <th
+      onClick={() => onSort(col)}
+      className={`py-2 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-800 transition-colors ${left ? 'text-left px-4 md:px-5' : 'text-right px-3'} ${active ? 'text-gray-800' : ''}`}
+    >
+      {label}{arrow}
+    </th>
+  );
+}
+
+function PlayerTable({ player, rows, multiNight }: {
+  player: { pid: string; name: string; initials: string; color: { bg: string; text: string } };
+  rows: SkillRatingsByGameRow[];
+  multiNight: boolean;
+}) {
+  const [sortCol, setSortCol] = useState<SortCol>('time');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir(col === 'time' ? 'asc' : 'desc'); }
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    let av = 0, bv = 0;
+    if (sortCol === 'time') {
+      av = a.timestamp; bv = b.timestamp;
+    } else if (sortCol === 'overall') {
+      av = overallScore(a as unknown as SkillRatingsRow);
+      bv = overallScore(b as unknown as SkillRatingsRow);
+    } else {
+      av = a[sortCol as keyof SkillRatingsByGameRow] as number;
+      bv = b[sortCol as keyof SkillRatingsByGameRow] as number;
+    }
+    return sortDir === 'asc' ? av - bv : bv - av;
+  });
+
+  // Avg row (always over original rows, not sorted order)
+  const avgRow: Record<string, number> = {};
+  for (const skill of SKILLS) {
+    const vals = rows.map((r) => r[skill as keyof SkillRatingsByGameRow] as number).filter((v) => v > 0);
+    avgRow[skill] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
+  const avgOverall = overallScore(avgRow as unknown as SkillRatingsRow);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-4 md:px-5 py-3 border-b border-gray-100">
+        <span
+          className="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0"
+          style={{ backgroundColor: player.color.bg, color: player.color.text }}
+        >
+          {player.initials}
+        </span>
+        <span className="font-semibold text-gray-900">{player.name}</span>
+        <span className="text-xs text-gray-400 ml-auto">{rows.length} {rows.length === 1 ? 'game' : 'games'}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs md:text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              <SortableHeader label="Game" col="time" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} left />
+              <SortableHeader label="Overall" col="overall" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+              {SKILLS.map((s) => (
+                <SortableHeader key={s} label={s.charAt(0).toUpperCase() + s.slice(1)} col={s} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {sorted.map((row) => {
+              const label = multiNight ? `${row.nightLabel} · ${row.sessionName}` : row.sessionName;
+              const ov = overallScore(row as unknown as SkillRatingsRow);
+              return (
+                <tr key={row.sessionKey} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 md:px-5 py-2 text-gray-500 whitespace-nowrap">{label}</td>
+                  <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(ov)}`}>
+                    {ov > 0 ? ov.toFixed(2) : '—'}
+                  </td>
+                  {SKILLS.map((skill) => {
+                    const v = row[skill as keyof SkillRatingsByGameRow] as number;
+                    return (
+                      <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(v)}`}>
+                        {v > 0 ? v.toFixed(2) : '—'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+            {rows.length > 1 && (
+              <tr className="bg-gray-50 border-t border-gray-200 font-semibold">
+                <td className="px-4 md:px-5 py-2 text-gray-500">Avg</td>
+                <td className={`px-3 py-2 text-right tabular-nums ${skillColor(avgOverall)}`}>
+                  {avgOverall > 0 ? avgOverall.toFixed(2) : '—'}
+                </td>
+                {SKILLS.map((skill) => (
+                  <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(avgRow[skill])}`}>
+                    {avgRow[skill] > 0 ? avgRow[skill].toFixed(2) : '—'}
+                  </td>
+                ))}
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export function PlayerSkillsByGame({ data }: Props) {
+  const { players, skillRatingsByGame } = data;
+  const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
 
   return (
     <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-8">
       {players.map((player) => {
-        const rows = skillRatingsByGame
-          .filter((r) => r.pid === player.pid)
-          .sort((a, b) => (sessionOrder.get(a.sessionKey) ?? 0) - (sessionOrder.get(b.sessionKey) ?? 0));
+        const rows = skillRatingsByGame.filter((r) => r.pid === player.pid);
         if (rows.length === 0) return null;
-
-        return (
-          <div key={player.pid} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Player header */}
-            <div className="flex items-center gap-3 px-4 md:px-5 py-3 border-b border-gray-100">
-              <span
-                className="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0"
-                style={{ backgroundColor: player.color.bg, color: player.color.text }}
-              >
-                {player.initials}
-              </span>
-              <span className="font-semibold text-gray-900">{player.name}</span>
-              <span className="text-xs text-gray-400 ml-auto">{rows.length} {rows.length === 1 ? 'game' : 'games'}</span>
-            </div>
-
-            {/* Game table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs md:text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-4 md:px-5 py-2 text-gray-500 font-medium">Game</th>
-                    <th className="text-right px-3 py-2 text-gray-500 font-medium">Overall</th>
-                    {SKILLS.map((s) => (
-                      <th key={s} className="text-right px-3 py-2 text-gray-500 font-medium capitalize">{s}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {rows.map((row) => {
-                    const label = multiNight
-                      ? `${row.nightLabel} · ${row.sessionName}`
-                      : row.sessionName;
-                    const ov = overallScore(row as unknown as SkillRatingsRow);
-                    return (
-                      <tr key={row.sessionKey} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 md:px-5 py-2 text-gray-500 whitespace-nowrap">{label}</td>
-                        <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(ov)}`}>
-                          {ov > 0 ? ov.toFixed(2) : '—'}
-                        </td>
-                        {SKILLS.map((skill) => {
-                          const v = row[skill as keyof SkillRatingsByGameRow] as number;
-                          return (
-                            <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(v)}`}>
-                              {v > 0 ? v.toFixed(2) : '—'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                  {/* Avg row */}
-                  {rows.length > 1 && (() => {
-                    const avgRow: Record<string, number> = {};
-                    for (const skill of SKILLS) {
-                      const vals = rows.map((r) => r[skill as keyof SkillRatingsByGameRow] as number).filter((v) => v > 0);
-                      avgRow[skill] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-                    }
-                    const avgOverall = overallScore(avgRow as unknown as SkillRatingsRow);
-                    return (
-                      <tr className="bg-gray-50 border-t border-gray-200 font-semibold">
-                        <td className="px-4 md:px-5 py-2 text-gray-500">Avg</td>
-                        <td className={`px-3 py-2 text-right tabular-nums ${skillColor(avgOverall)}`}>
-                          {avgOverall > 0 ? avgOverall.toFixed(2) : '—'}
-                        </td>
-                        {SKILLS.map((skill) => (
-                          <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(avgRow[skill])}`}>
-                            {avgRow[skill] > 0 ? avgRow[skill].toFixed(2) : '—'}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
+        return <PlayerTable key={player.pid} player={player} rows={rows} multiNight={multiNight} />;
       })}
     </div>
   );

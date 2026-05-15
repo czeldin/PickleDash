@@ -290,6 +290,7 @@ export function parseMultipleNights(
                 sessionKey: key,
                 sessionName,
                 nightLabel: night.label,
+                timestamp: s.ses?.ge ?? 0,
                 serve: r.serve ?? 0,
                 return: r.return ?? 0,
                 offense: r.offense ?? 0,
