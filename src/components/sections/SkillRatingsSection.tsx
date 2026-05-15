@@ -96,13 +96,18 @@ function skillColor(value: number): string {
 }
 
 export function PlayerSkillsByGame({ data }: Props) {
-  const { players, skillRatingsByGame } = data;
+  const { players, skillRatingsByGame, sessions } = data;
   const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
+
+  // Build a lookup from sessionKey → its position in the sessions list (chronological order)
+  const sessionOrder = new Map(sessions.map((s, i) => [s.key, i]));
 
   return (
     <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-8">
       {players.map((player) => {
-        const rows = skillRatingsByGame.filter((r) => r.pid === player.pid);
+        const rows = skillRatingsByGame
+          .filter((r) => r.pid === player.pid)
+          .sort((a, b) => (sessionOrder.get(a.sessionKey) ?? 0) - (sessionOrder.get(b.sessionKey) ?? 0));
         if (rows.length === 0) return null;
 
         return (
