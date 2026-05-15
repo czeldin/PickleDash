@@ -235,16 +235,24 @@ function PlayerTable({ player, rows, multiNight }: {
   );
 }
 
-// ─── Partner ratings matrix ───────────────────────────────────────────────────
+// ─── Partner quality table ────────────────────────────────────────────────────
 
-function PartnerRatingsMatrix({ data, sessionTeams }: {
+function PartnerQualityTable({ data, sessionTeams }: {
   data: DashboardData;
   sessionTeams: Map<string, Map<string, number>>;
 }) {
   const { players, skillRatingsByGame } = data;
 
-  // partnerStats[pid][partnerPid] = { weightedSum, totalWeight }
-  const partnerStats: Record<string, Record<string, { weightedSum: number; totalWeight: number }>> = {};
+  // Build a lookup: sessionKey + pid → overall score
+  const gameOverall = new Map<string, number>();
+  for (const row of skillRatingsByGame) {
+    const ov = overallScore(row as unknown as SkillRatingsRow);
+    if (ov > 0) gameOverall.set(`${row.sessionKey}:${row.pid}`, ov);
+  }
+
+  // For each player, collect all partner overall scores across all games
+  // partnerScores[pid] = { weightedSum, totalWeight } (weighted by partner's shot count)
+  const partnerScores: Record<string, { weightedSum: number; totalWeight: number }> = {};
 
   for (const row of skillRatingsByGame) {
     const teams = sessionTeams.get(row.sessionKey);
@@ -252,76 +260,67 @@ function PartnerRatingsMatrix({ data, sessionTeams }: {
     const myTeam = teams.get(row.pid);
     if (myTeam === undefined) continue;
 
-    const overall = overallScore(row as unknown as SkillRatingsRow);
-    if (overall <= 0 || row.shotCount <= 0) continue;
-
     for (const [partnerPid, partnerTeam] of teams.entries()) {
       if (partnerPid === row.pid || partnerTeam !== myTeam) continue;
-      if (!partnerStats[row.pid]) partnerStats[row.pid] = {};
-      if (!partnerStats[row.pid][partnerPid]) partnerStats[row.pid][partnerPid] = { weightedSum: 0, totalWeight: 0 };
-      partnerStats[row.pid][partnerPid].weightedSum += overall * row.shotCount;
-      partnerStats[row.pid][partnerPid].totalWeight += row.shotCount;
+      const partnerRow = skillRatingsByGame.find((r) => r.pid === partnerPid && r.sessionKey === row.sessionKey);
+      if (!partnerRow) continue;
+      const partnerOv = gameOverall.get(`${row.sessionKey}:${partnerPid}`);
+      if (!partnerOv || partnerRow.shotCount <= 0) continue;
+
+      if (!partnerScores[row.pid]) partnerScores[row.pid] = { weightedSum: 0, totalWeight: 0 };
+      partnerScores[row.pid].weightedSum += partnerOv * partnerRow.shotCount;
+      partnerScores[row.pid].totalWeight += partnerRow.shotCount;
     }
   }
 
-  // Only show players who have at least one partnership entry
-  const activePlayers = players.filter((p) => partnerStats[p.pid] && Object.keys(partnerStats[p.pid]).length > 0);
-  if (activePlayers.length === 0) return null;
+  const rows = players
+    .map((p) => {
+      const s = partnerScores[p.pid];
+      return { player: p, avg: s && s.totalWeight > 0 ? s.weightedSum / s.totalWeight : 0 };
+    })
+    .filter((r) => r.avg > 0)
+    .sort((a, b) => b.avg - a.avg);
+
+  if (rows.length === 0) return null;
+
+  const vals = rows.map((r) => r.avg);
+  const maxVal = Math.max(...vals);
+  const minVal = Math.min(...vals);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 md:px-5 py-3 border-b border-gray-100">
-        <h3 className="font-semibold text-gray-900">Overall Rating by Partner</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Each player&apos;s weighted-avg overall in games with each partner</p>
+        <h3 className="font-semibold text-gray-900">Avg Partner Rating</h3>
+        <p className="text-xs text-gray-400 mt-0.5">Average overall rating of each player&apos;s partners</p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs md:text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <th className="text-left px-4 md:px-5 py-2 text-gray-500 font-medium">Player</th>
-              {players.map((p) => (
-                <th key={p.pid} className="text-right px-3 py-2 text-gray-500 font-medium">
+      <table className="w-full text-xs md:text-sm">
+        <thead>
+          <tr className="bg-gray-50 border-b border-gray-100">
+            <th className="text-left px-4 md:px-5 py-2 text-gray-500 font-medium">Player</th>
+            <th className="text-right px-4 md:px-5 py-2 text-gray-500 font-medium">Partner Avg</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {rows.map(({ player, avg }) => (
+            <tr key={player.pid} className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 md:px-5 py-2.5">
+                <div className="flex items-center gap-2">
                   <span
-                    className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
-                    style={{ backgroundColor: p.color.bg, color: p.color.text }}
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold flex-shrink-0"
+                    style={{ backgroundColor: player.color.bg, color: player.color.text }}
                   >
-                    {p.initials}
+                    {player.initials}
                   </span>
-                </th>
-              ))}
+                  <span className="text-gray-700 font-medium">{player.name}</span>
+                </div>
+              </td>
+              <td className="px-4 md:px-5 py-2.5 text-right tabular-nums">
+                {colorPill(avg, avg === maxVal && maxVal > 0, avg === minVal && minVal > 0)}
+              </td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {players.map((player) => (
-              <tr key={player.pid} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 md:px-5 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold flex-shrink-0"
-                      style={{ backgroundColor: player.color.bg, color: player.color.text }}
-                    >
-                      {player.initials}
-                    </span>
-                    <span className="text-gray-700 font-medium">{player.name}</span>
-                  </div>
-                </td>
-                {players.map((partner) => {
-                  if (partner.pid === player.pid) {
-                    return <td key={partner.pid} className="px-3 py-2.5 text-right text-gray-200 text-xs">—</td>;
-                  }
-                  const stats = partnerStats[player.pid]?.[partner.pid];
-                  const avg = stats && stats.totalWeight > 0 ? stats.weightedSum / stats.totalWeight : 0;
-                  return (
-                    <td key={partner.pid} className={`px-3 py-2.5 text-right tabular-nums ${avg > 0 ? skillColor(avg) : 'text-gray-300'}`}>
-                      {avg > 0 ? avg.toFixed(2) : '—'}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -508,8 +507,8 @@ export function PlayerSkillsByGame({ data }: Props) {
         })}
       </div>
 
-      {/* Partner ratings matrix */}
-      <PartnerRatingsMatrix data={data} sessionTeams={sessionTeams} />
+      {/* Partner quality table */}
+      <PartnerQualityTable data={data} sessionTeams={sessionTeams} />
 
       {/* "Playing with X" comparison section */}
       <PartnerEffectSection data={data} sessionTeams={sessionTeams} />
