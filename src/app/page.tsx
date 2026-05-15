@@ -32,6 +32,10 @@ async function apiPatchNight(id: string, updates: Partial<NightMeta>): Promise<v
   });
 }
 
+async function apiDeleteNight(id: string): Promise<void> {
+  await fetch(`/api/nights/${id}`, { method: 'DELETE' });
+}
+
 async function apiFetchNightWithRaw(id: string): Promise<Night | null> {
   const res = await fetch(`/api/nights/${id}`, { cache: 'no-store' });
   if (!res.ok) return null;
@@ -156,6 +160,7 @@ export default function HomePage() {
   const [paddleEditId, setPaddleEditId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [isAnon, setIsAnon] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const logoClickCount = useRef(0);
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -275,6 +280,12 @@ export default function HomePage() {
     setPaddleEditId(null);
   }
 
+  async function deleteNight(id: string) {
+    await apiDeleteNight(id);
+    setNights(prev => prev.filter(n => n.id !== id));
+    setConfirmDeleteId(null);
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-12">
       <div className="max-w-xl w-full space-y-8">
@@ -352,6 +363,30 @@ export default function HomePage() {
                     >
                       🏓
                     </button>
+                    {confirmDeleteId === night.id ? (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteNight(night.id); }}
+                          className="text-xs text-red-600 font-semibold hover:text-red-700 px-1"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                          className="text-xs text-gray-400 hover:text-gray-600 px-1"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(night.id); }}
+                        className="text-xs text-gray-300 hover:text-red-400 px-1"
+                        title="Delete night"
+                      >
+                        🗑
+                      </button>
+                    )}
                   </div>
                 </div>
                 {paddleEditId === night.id && nightsWithRaw[night.id] && (
