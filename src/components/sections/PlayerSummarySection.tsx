@@ -305,13 +305,31 @@ function buildSummary(pid: string, data: DashboardData): Summary {
     }
   }
 
-  // Win rate above expectation
+  // Win rate above expectation — with kitchen arrival explanation if applicable
   if (h && h.wins + h.losses >= 3) {
     const winRate = h.wins / (h.wins + h.losses);
     const duprRank = rankDesc(pid, hero.map((r) => ({ pid: r.pid, val: r.dupr })));
     const winRank = rankDesc(pid, hero.map((r) => ({ pid: r.pid, val: r.wins / Math.max(r.wins + r.losses, 1) })));
     if (winRank < duprRank && winRank === 1) {
-      candidates.push({ score: 6, text: `Top win rate on the team (${Math.round(winRate * 100)}%) despite not having the highest skill rating — a sign of composure, smart point construction, and clutch play.` });
+      // Check if kitchen arrival is also #1 — if so, connect the dots
+      const kaRk3 = ka && ka.third_drop_total >= 5
+        ? rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.third_drop_kitchen_pct })))
+        : n + 1;
+      const kaRk5 = ka && ka.fifth_drop_total >= 5
+        ? rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.fifth_drop_kitchen_pct })))
+        : n + 1;
+      const kitchenLeader = Math.min(kaRk3, kaRk5) === 1;
+
+      if (kitchenLeader && ka) {
+        const pct = kaRk3 === 1 ? ka.third_drop_kitchen_pct : ka.fifth_drop_kitchen_pct;
+        const shotLabel = kaRk3 === 1 ? '3rd' : '5th';
+        candidates.push({
+          score: 9,
+          text: `Wins more than their skill rating predicts (${Math.round(winRate * 100)}% win rate, ranked #${duprRank} by rating). The most likely reason: they get to the kitchen after ${pct.toFixed(0)}% of ${shotLabel} shot drops — best on the team. Net position wins rallies, and they earn it more consistently than anyone. The rating doesn't capture it; the scoreboard does.`,
+        });
+      } else {
+        candidates.push({ score: 6, text: `Top win rate on the team (${Math.round(winRate * 100)}%) despite not having the highest skill rating — a sign of composure, smart point construction, and clutch play.` });
+      }
     }
   }
 
