@@ -150,6 +150,23 @@ function buildSummary(pid: string, data: DashboardData): Summary {
     styleParts.push(`Biggest serve in the group at ${ss.avgMph.toFixed(0)} mph avg.`);
   }
 
+  // Kitchen arrival after drops
+  if (ka) {
+    const has3 = ka.third_drop_total >= 5 && ka.third_drop_kitchen_pct > 0;
+    const has5 = ka.fifth_drop_total >= 5 && ka.fifth_drop_kitchen_pct > 0;
+    if (has3 || has5) {
+      const kaRk3 = has3 ? rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.third_drop_kitchen_pct }))) : n + 1;
+      const kaRk5 = has5 ? rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.fifth_drop_kitchen_pct }))) : n + 1;
+      const bestRk = Math.min(kaRk3, kaRk5);
+      if (bestRk === 1) {
+        const parts: string[] = [];
+        if (has3 && kaRk3 === 1) parts.push(`${ka.third_drop_kitchen_pct.toFixed(0)}% on 3rd shot drops`);
+        if (has5 && kaRk5 === 1) parts.push(`${ka.fifth_drop_kitchen_pct.toFixed(0)}% on 5th shot drops`);
+        styleParts.push(`Best on the team at converting drops into net position (${parts.join(', ')}).`);
+      }
+    }
+  }
+
   // Drop quality
   if (sq && sq.dropTotal >= 5) {
     const dropQRk = rankDesc(pid, data.shotQuality.filter(r => r.dropTotal >= 5).map((r) => ({ pid: r.pid, val: r.dropExcellentPct })));
@@ -226,13 +243,35 @@ function buildSummary(pid: string, data: DashboardData): Summary {
     }
   }
 
-  // Kitchen arrival
-  if (ka && ka.third_drop_kitchen_pct > 0) {
-    const allDrop = kitchenArrival.map((r) => r.third_drop_kitchen_pct);
-    const m = margin(ka.third_drop_kitchen_pct, allDrop);
-    const rk = rankDesc(pid, kitchenArrival.map((r) => ({ pid: r.pid, val: r.third_drop_kitchen_pct })));
-    if (rk === 1 && m > 5) {
-      candidates.push({ score: m * 0.4, text: `Best at getting to the kitchen after a drop (${ka.third_drop_kitchen_pct.toFixed(0)}%). This is the most important transition in pickleball — they do it better than anyone on the team.` });
+  // Kitchen arrival after drops (3rd + 5th combined)
+  if (ka) {
+    const has3 = ka.third_drop_total >= 5 && ka.third_drop_kitchen_pct > 0;
+    const has5 = ka.fifth_drop_total >= 5 && ka.fifth_drop_kitchen_pct > 0;
+    if (has3 || has5) {
+      // Combined drop kitchen arrival: weighted average of 3rd and 5th
+      const totalDrops = (has3 ? ka.third_drop_total : 0) + (has5 ? ka.fifth_drop_total : 0);
+      const combinedPct = totalDrops > 0
+        ? ((has3 ? ka.third_drop_kitchen_pct * ka.third_drop_total : 0) +
+           (has5 ? ka.fifth_drop_kitchen_pct * ka.fifth_drop_total : 0)) / totalDrops
+        : 0;
+      const allCombined = kitchenArrival.map((r) => {
+        const t = (r.third_drop_total >= 5 ? r.third_drop_total : 0) + (r.fifth_drop_total >= 5 ? r.fifth_drop_total : 0);
+        return t > 0
+          ? ((r.third_drop_total >= 5 ? r.third_drop_kitchen_pct * r.third_drop_total : 0) +
+             (r.fifth_drop_total >= 5 ? r.fifth_drop_kitchen_pct * r.fifth_drop_total : 0)) / t
+          : 0;
+      });
+      const m = margin(combinedPct, allCombined);
+      const rk = rankDesc(pid, kitchenArrival.map((r, i) => ({ pid: r.pid, val: allCombined[i] })));
+      if (rk === 1 && m > 5) {
+        const parts: string[] = [];
+        if (has3) parts.push(`${ka.third_drop_kitchen_pct.toFixed(0)}% on 3rd shot drops`);
+        if (has5) parts.push(`${ka.fifth_drop_kitchen_pct.toFixed(0)}% on 5th shot drops`);
+        candidates.push({
+          score: m * 1.1,
+          text: `Best at getting to the kitchen after drop shots (${parts.join(', ')}). Consistently converting drops into net position is the most impactful transition in pickleball — they do it better than anyone on the team.`,
+        });
+      }
     }
   }
 
