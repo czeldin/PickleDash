@@ -3,7 +3,7 @@ import {
   DashboardData, PlayerMeta, PLAYER_COLORS,
   HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
-  AttackRow, DinkRow, KitchenByGameRow,
+  AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow,
 } from '@/types/dashboard';
 
 interface RawShot {
@@ -298,7 +298,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [] };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [] };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -311,6 +311,7 @@ export function parseMultipleNights(
   const rawHighlights: HighlightRally[] = [];
   const skillRatingsByGame: SkillRatingsByGameRow[] = [];
   const kitchenByGame: KitchenByGameRow[] = [];
+  const servingRallies: ServingRallyRow[] = [];
 
   for (const night of nights) {
     const rawSessions = getRawSessions(night.raw);
@@ -325,6 +326,25 @@ export function parseMultipleNights(
         // Per-game kitchen arrival for pairing analysis
         for (const [pid, stats] of getSessionKitchenByPlayer(s).entries()) {
           kitchenByGame.push({ pid, sessionKey: key, ...stats });
+        }
+        // Per-rally serving data for left/right side pairing analysis
+        if (Array.isArray(s.ral)) {
+          for (const rally of s.ral) {
+            const shots = rally.sh ?? [];
+            if (shots.length === 0) continue;
+            const serve = shots[0];
+            const servingPlayer = s.pd?.[serve.pid];
+            if (!servingPlayer) continue;
+            const servedByPid = servingPlayer.name?.trim()?.toLowerCase();
+            if (!servedByPid) continue;
+            servingRallies.push({
+              sessionKey: key,
+              servingTeam: serve.st,
+              servedByPid,
+              servedSide: serve.ss,
+              reachedKitchen: shots.some((s2) => s2.st === serve.st && (s2.sht === 1 || s2.sht === 5)),
+            });
+          }
         }
         // Collect per-game skill ratings for the By Game breakdown tab
         if (Array.isArray(s.pd)) {
@@ -382,7 +402,7 @@ export function parseMultipleNights(
     .slice(0, 12);
 
   const data = accumsToData(Array.from(accumMap.values()), allSessions);
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame };
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies };
 }
 
 // Convenience wrapper for a single file

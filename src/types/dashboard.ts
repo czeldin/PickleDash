@@ -153,6 +153,14 @@ export interface AttackRow {
   attackExcellentPct: number; // avg q.ex for attacks * 100
 }
 
+export interface ServingRallyRow {
+  sessionKey: string;
+  servingTeam: number;
+  servedByPid: string;
+  servedSide: number;      // ss field from the serve shot (0 or 1)
+  reachedKitchen: boolean;
+}
+
 export interface KitchenByGameRow {
   pid: string;
   sessionKey: string;
@@ -192,4 +200,5 @@ export interface DashboardData {
   attacks: AttackRow[];
   dinks: DinkRow[];
   kitchenByGame: KitchenByGameRow[];
+  servingRallies: ServingRallyRow[];
 }

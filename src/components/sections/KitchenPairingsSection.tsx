@@ -1,141 +1,161 @@
 'use client';
 
-import { DashboardData, KitchenByGameRow, PlayerMeta } from '@/types/dashboard';
+import { DashboardData, PlayerMeta } from '@/types/dashboard';
 
 interface Props {
   data: DashboardData;
 }
 
+interface SideStat { rallies: number; kitchen: number }
+
 interface PairingStats {
   p1: PlayerMeta;
   p2: PlayerMeta;
-  games: number;
-  ralliesTotal: number;
-  ralliesKitchen: number;
+  // keyed by p1's side: ss value when p1 is the server, or inverse when p2 serves
+  bySide: Map<number, SideStat>;
+  totalRallies: number;
 }
 
+// ss=0 appears to be right side, ss=1 left side based on pb.vision convention
+const SIDE_LABEL: Record<number, string> = { 0: 'Right', 1: 'Left' };
+
 function buildPairings(data: DashboardData): PairingStats[] {
-  const { players, kitchenByGame } = data;
+  const { players, kitchenByGame, servingRallies } = data;
   const playerMap = new Map(players.map((p) => [p.pid, p]));
 
-  // Group by session
-  const bySession = new Map<string, KitchenByGameRow[]>();
+  // sessionKey → Map<pid, team>
+  const sessionTeamMap = new Map<string, Map<string, number>>();
   for (const row of kitchenByGame) {
-    if (!bySession.has(row.sessionKey)) bySession.set(row.sessionKey, []);
-    bySession.get(row.sessionKey)!.push(row);
+    if (!sessionTeamMap.has(row.sessionKey)) sessionTeamMap.set(row.sessionKey, new Map());
+    sessionTeamMap.get(row.sessionKey)!.set(row.pid, row.team);
   }
 
   const pairingMap = new Map<string, {
     pids: [string, string];
-    games: number;
-    ralliesTotal: number;
-    ralliesKitchen: number;
+    bySide: Map<number, SideStat>;
+    totalRallies: number;
   }>();
 
-  for (const rows of bySession.values()) {
-    const teams = new Map<number, KitchenByGameRow[]>();
-    for (const row of rows) {
-      if (!teams.has(row.team)) teams.set(row.team, []);
-      teams.get(row.team)!.push(row);
+  for (const rally of servingRallies) {
+    const teams = sessionTeamMap.get(rally.sessionKey);
+    if (!teams) continue;
+
+    // Find the two players on the serving team in this session
+    const teamPids = [...teams.entries()]
+      .filter(([, t]) => t === rally.servingTeam)
+      .map(([pid]) => pid);
+    if (teamPids.length !== 2) continue;
+
+    const sorted = [...teamPids].sort();
+    const [pid1, pid2] = sorted;
+    if (!playerMap.has(pid1) || !playerMap.has(pid2)) continue;
+
+    const key = `${pid1}|${pid2}`;
+    if (!pairingMap.has(key)) {
+      pairingMap.set(key, { pids: [pid1, pid2], bySide: new Map(), totalRallies: 0 });
     }
-    for (const teamRows of teams.values()) {
-      if (teamRows.length !== 2) continue;
-      const sorted = [...teamRows].sort((x, y) => x.pid.localeCompare(y.pid));
-      const p1 = sorted[0], p2 = sorted[1];
-      const key = `${p1.pid}|${p2.pid}`;
-      if (!pairingMap.has(key)) {
-        pairingMap.set(key, { pids: [p1.pid, p2.pid], games: 0, ralliesTotal: 0, ralliesKitchen: 0 });
-      }
-      const p = pairingMap.get(key)!;
-      p.games++;
-      // Both players share the same team rally stats — use p1's
-      p.ralliesTotal += p1.teamRalliesTotal;
-      p.ralliesKitchen += p1.teamRalliesKitchen;
-    }
+    const p = pairingMap.get(key)!;
+    p.totalRallies++;
+
+    // Determine pid1's side: if pid1 served, their side = rally.servedSide
+    // if pid2 served, pid1's side = the other side (1 - rally.servedSide, assuming binary 0/1)
+    const pid1Served = rally.servedByPid === pid1;
+    const pid1Side = pid1Served ? rally.servedSide : (rally.servedSide === 0 ? 1 : 0);
+
+    if (!p.bySide.has(pid1Side)) p.bySide.set(pid1Side, { rallies: 0, kitchen: 0 });
+    const s = p.bySide.get(pid1Side)!;
+    s.rallies++;
+    if (rally.reachedKitchen) s.kitchen++;
   }
 
   return [...pairingMap.values()]
-    .filter((p) => playerMap.has(p.pids[0]) && playerMap.has(p.pids[1]) && p.ralliesTotal > 0)
-    .sort((a, b) => (b.ralliesKitchen / b.ralliesTotal) - (a.ralliesKitchen / a.ralliesTotal))
+    .filter((p) => playerMap.has(p.pids[0]) && playerMap.has(p.pids[1]) && p.totalRallies > 0)
+    .sort((a, b) => b.totalRallies - a.totalRallies)
     .map((p) => ({
       p1: playerMap.get(p.pids[0])!,
       p2: playerMap.get(p.pids[1])!,
-      games: p.games,
-      ralliesTotal: p.ralliesTotal,
-      ralliesKitchen: p.ralliesKitchen,
+      bySide: p.bySide,
+      totalRallies: p.totalRallies,
     }));
+}
+
+function pct(s: SideStat) {
+  return s.rallies > 0 ? Math.round((s.kitchen / s.rallies) * 100) : null;
 }
 
 export function KitchenPairingsSection({ data }: Props) {
   const pairings = buildPairings(data);
   if (pairings.length === 0) return null;
 
-  const pcts = pairings.map((p) => p.ralliesKitchen / p.ralliesTotal);
-  const maxPct = Math.max(...pcts);
-  const minPct = Math.min(...pcts);
+  // Collect all side keys present across all pairings (should be 0 and 1)
+  const allSides = [...new Set(pairings.flatMap((p) => [...p.bySide.keys()]))].sort();
 
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2">
-        Kitchen Arrival by Pairing
+        Kitchen Arrival by Pairing &amp; Side
       </h2>
       <p className="text-sm text-gray-500 -mt-1">
-        % of serving rallies where the team reached the kitchen, for each partner combination.
+        % of serving rallies where the team reached the kitchen, split by which side the first player is on.
       </p>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-medium">
               <th className="text-left px-5 py-3">Pairing</th>
-              <th className="text-right px-5 py-3">Kitchen %</th>
-              <th className="text-right px-5 py-3 hidden md:table-cell">Rallies</th>
-              <th className="text-right px-5 py-3 hidden md:table-cell">Games</th>
+              {allSides.map((side) => (
+                <th key={side} className="text-right px-4 py-3">
+                  P1 on {SIDE_LABEL[side] ?? `Side ${side}`}
+                </th>
+              ))}
+              <th className="text-right px-5 py-3 hidden md:table-cell">Total serves</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {pairings.map((p) => {
-              const pct = p.ralliesKitchen / p.ralliesTotal;
-              const pctDisplay = Math.round(pct * 100);
-              const isTop = pct === maxPct && maxPct > minPct;
-              const isBot = pct === minPct && maxPct > minPct;
-              return (
-                <tr key={`${p.p1.pid}|${p.p2.pid}`} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold flex-shrink-0"
-                        style={{ backgroundColor: p.p1.color.bg, color: p.p1.color.text }}
-                      >{p.p1.initials}</span>
-                      <span className="text-gray-700 font-medium">{p.p1.name}</span>
-                      <span className="text-gray-300 text-xs">+</span>
-                      <span
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold flex-shrink-0"
-                        style={{ backgroundColor: p.p2.color.bg, color: p.p2.color.text }}
-                      >{p.p2.initials}</span>
-                      <span className="text-gray-700 font-medium">{p.p2.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-sm font-semibold tabular-nums ${
-                      isTop ? 'bg-emerald-100 text-emerald-700' :
-                      isBot ? 'bg-red-100 text-red-600' :
-                      'text-gray-700'
-                    }`}>
-                      {pctDisplay}%
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right text-gray-400 tabular-nums hidden md:table-cell">
-                    {p.ralliesKitchen}/{p.ralliesTotal}
-                  </td>
-                  <td className="px-5 py-3 text-right text-gray-400 tabular-nums hidden md:table-cell">
-                    {p.games}g
-                  </td>
-                </tr>
-              );
-            })}
+            {pairings.map((p) => (
+              <tr key={`${p.p1.pid}|${p.p2.pid}`} className="hover:bg-gray-50 transition-colors">
+                <td className="px-5 py-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold flex-shrink-0"
+                      style={{ backgroundColor: p.p1.color.bg, color: p.p1.color.text }}
+                    >{p.p1.initials}</span>
+                    <span className="text-gray-700 font-medium">{p.p1.name}</span>
+                    <span className="text-gray-300 text-xs">+</span>
+                    <span
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold flex-shrink-0"
+                      style={{ backgroundColor: p.p2.color.bg, color: p.p2.color.text }}
+                    >{p.p2.initials}</span>
+                    <span className="text-gray-700 font-medium">{p.p2.name}</span>
+                  </div>
+                </td>
+                {allSides.map((side) => {
+                  const s = p.bySide.get(side);
+                  const val = s ? pct(s) : null;
+                  return (
+                    <td key={side} className="px-4 py-3 text-right">
+                      {val !== null ? (
+                        <span className="font-semibold tabular-nums text-gray-800">{val}%</span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                      {s && s.rallies > 0 && (
+                        <span className="text-gray-400 text-xs ml-1">({s.rallies})</span>
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="px-5 py-3 text-right text-gray-400 tabular-nums hidden md:table-cell">
+                  {p.totalRallies}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+      <p className="text-xs text-gray-400">
+        &ldquo;P1&rdquo; is the first player listed (alphabetical). Side 0/1 maps to pb.vision&apos;s court sides — verify with your data which is left vs right.
+      </p>
     </section>
   );
 }

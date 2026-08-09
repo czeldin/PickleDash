@@ -45,6 +45,7 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     attacks: data.attacks.filter((r) => pids.has(r.pid)),
     dinks: data.dinks.filter((r) => pids.has(r.pid)),
     kitchenByGame: data.kitchenByGame.filter((r) => pids.has(r.pid)),
+    servingRallies: data.servingRallies,
   };
 }
 
