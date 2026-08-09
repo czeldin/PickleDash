@@ -16,8 +16,8 @@ interface PairingStats {
   totalRallies: number;
 }
 
-// ss=0 appears to be right side, ss=1 left side based on pb.vision convention
-const SIDE_LABEL: Record<number, string> = { 0: 'Right', 1: 'Left' };
+// Confirmed from pb.vision: ss=0 = Left, ss=1 = Right
+const SIDE_LABEL: Record<number, string> = { 0: 'Left', 1: 'Right' };
 
 function buildPairings(data: DashboardData): PairingStats[] {
   const { players, kitchenByGame, servingRallies } = data;
@@ -85,21 +85,6 @@ function pct(s: SideStat) {
 
 export function KitchenPairingsSection({ data }: Props) {
   const pairings = buildPairings(data);
-
-  // Debug: log serve side distribution per player so we can map ss=0/1 to left/right
-  if (typeof window !== 'undefined' && data.servingRallies.length > 0) {
-    const dist: Record<string, { ss0: number; ss1: number }> = {};
-    for (const r of data.servingRallies) {
-      if (!dist[r.servedByPid]) dist[r.servedByPid] = { ss0: 0, ss1: 0 };
-      if (r.servedSide === 0) dist[r.servedByPid].ss0++;
-      else dist[r.servedByPid].ss1++;
-    }
-    console.log('[KitchenPairings] Serve side distribution (compare to pb.vision Left side %):');
-    for (const [pid, counts] of Object.entries(dist)) {
-      const total = counts.ss0 + counts.ss1;
-      console.log(`  ${pid}: ss=0 → ${counts.ss0}/${total} (${Math.round(counts.ss0/total*100)}%), ss=1 → ${counts.ss1}/${total} (${Math.round(counts.ss1/total*100)}%)`);
-    }
-  }
 
   if (pairings.length === 0) return null;
 
@@ -170,7 +155,7 @@ export function KitchenPairingsSection({ data }: Props) {
         </table>
       </div>
       <p className="text-xs text-gray-400">
-        &ldquo;P1&rdquo; is the first player listed (alphabetical). Side 0/1 maps to pb.vision&apos;s court sides — verify with your data which is left vs right.
+        &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on when their team serves.
       </p>
     </section>
   );
