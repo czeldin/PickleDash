@@ -80,7 +80,7 @@ export function KitchenPairingsSection({ data }: Props) {
         Kitchen Arrival by Pairing
       </h2>
       <p className="text-sm text-gray-500 -mt-1">
-        % of rallies where the team reached the kitchen, for each partner combination.
+        % of serving rallies where the team reached the kitchen, for each partner combination.
       </p>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-sm">

@@ -146,13 +146,13 @@ function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: num
       if (idx === 2) { r.k3dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k3dHits++; }
       else if (idx === 4) { r.k5dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k5dHits++; }
     }
-    // Team-level kitchen arrival: did this team hit any dink/NVZ shot this rally?
-    const teamsPresent = new Set<number>(shots.map((s) => s.st));
-    for (const team of teamsPresent) {
-      if (!teamRally.has(team)) teamRally.set(team, { total: 0, kitchen: 0 });
-      const tr = teamRally.get(team)!;
+    // Team-level kitchen arrival: only count rallies where this team is serving
+    if (shots.length > 0) {
+      const servingTeam = shots[0].st;
+      if (!teamRally.has(servingTeam)) teamRally.set(servingTeam, { total: 0, kitchen: 0 });
+      const tr = teamRally.get(servingTeam)!;
       tr.total++;
-      if (shots.some((s) => s.st === team && (s.sht === 1 || s.sht === 5))) tr.kitchen++;
+      if (shots.some((s) => s.st === servingTeam && (s.sht === 1 || s.sht === 5))) tr.kitchen++;
     }
   }
   // Assign team rally stats to each player on that team
