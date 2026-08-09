@@ -161,6 +161,8 @@ export interface KitchenByGameRow {
   k3dTotal: number;
   k5dHits: number;
   k5dTotal: number;
+  teamRalliesTotal: number;    // rallies where this player's team participated
+  teamRalliesKitchen: number;  // rallies where this player's team reached the kitchen
 }
 
 export interface DinkRow {

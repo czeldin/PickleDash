@@ -121,19 +121,22 @@ function makeAccum(name: string): PlayerAccum {
   };
 }
 
-function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number }> {
-  const result = new Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number }>();
+function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number; teamRalliesTotal: number; teamRalliesKitchen: number }> {
+  const result = new Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number; teamRalliesTotal: number; teamRalliesKitchen: number }>();
   const { pd, ral } = session;
   if (!Array.isArray(pd) || !Array.isArray(ral)) return result;
   for (const player of pd) {
     const nm = player.name?.trim()?.toLowerCase();
-    if (nm) result.set(nm, { team: player.team ?? 0, k3dHits: 0, k3dTotal: 0, k5dHits: 0, k5dTotal: 0 });
+    if (nm) result.set(nm, { team: player.team ?? 0, k3dHits: 0, k3dTotal: 0, k5dHits: 0, k5dTotal: 0, teamRalliesTotal: 0, teamRalliesKitchen: 0 });
   }
+  // Per-team rally kitchen arrival
+  const teamRally = new Map<number, { total: number; kitchen: number }>();
   for (const rally of ral) {
     const shots = rally.sh ?? [];
+    // Drop shot tracking per player
     for (let idx = 0; idx < shots.length; idx++) {
       const shot = shots[idx];
-      if (shot.sht !== 2) continue; // only drops
+      if (shot.sht !== 2) continue;
       const player = pd[shot.pid];
       if (!player) continue;
       const nm = player.name?.trim()?.toLowerCase();
@@ -143,6 +146,20 @@ function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: num
       if (idx === 2) { r.k3dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k3dHits++; }
       else if (idx === 4) { r.k5dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k5dHits++; }
     }
+    // Team-level kitchen arrival: did this team hit any dink/NVZ shot this rally?
+    const teamsPresent = new Set<number>(shots.map((s) => s.st));
+    for (const team of teamsPresent) {
+      if (!teamRally.has(team)) teamRally.set(team, { total: 0, kitchen: 0 });
+      const tr = teamRally.get(team)!;
+      tr.total++;
+      if (shots.some((s) => s.st === team && (s.sht === 1 || s.sht === 5))) tr.kitchen++;
+    }
+  }
+  // Assign team rally stats to each player on that team
+  for (const stats of result.values()) {
+    const tr = teamRally.get(stats.team) ?? { total: 0, kitchen: 0 };
+    stats.teamRalliesTotal = tr.total;
+    stats.teamRalliesKitchen = tr.kitchen;
   }
   return result;
 }

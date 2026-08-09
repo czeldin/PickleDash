@@ -10,14 +10,15 @@ interface PairingStats {
   p1: PlayerMeta;
   p2: PlayerMeta;
   games: number;
-  p1Hits: number; p1Total: number;
-  p2Hits: number; p2Total: number;
+  ralliesTotal: number;
+  ralliesKitchen: number;
 }
 
 function buildPairings(data: DashboardData): PairingStats[] {
   const { players, kitchenByGame } = data;
   const playerMap = new Map(players.map((p) => [p.pid, p]));
 
+  // Group by session
   const bySession = new Map<string, KitchenByGameRow[]>();
   for (const row of kitchenByGame) {
     if (!bySession.has(row.sessionKey)) bySession.set(row.sessionKey, []);
@@ -27,7 +28,8 @@ function buildPairings(data: DashboardData): PairingStats[] {
   const pairingMap = new Map<string, {
     pids: [string, string];
     games: number;
-    stats: Record<string, { hits: number; total: number }>;
+    ralliesTotal: number;
+    ralliesKitchen: number;
   }>();
 
   for (const rows of bySession.values()) {
@@ -38,108 +40,101 @@ function buildPairings(data: DashboardData): PairingStats[] {
     }
     for (const teamRows of teams.values()) {
       if (teamRows.length !== 2) continue;
-      const [a, b] = [...teamRows].sort((x, y) => x.pid.localeCompare(y.pid));
-      const key = `${a.pid}|${b.pid}`;
+      const sorted = [...teamRows].sort((x, y) => x.pid.localeCompare(y.pid));
+      const p1 = sorted[0], p2 = sorted[1];
+      const key = `${p1.pid}|${p2.pid}`;
       if (!pairingMap.has(key)) {
-        pairingMap.set(key, {
-          pids: [a.pid, b.pid],
-          games: 0,
-          stats: { [a.pid]: { hits: 0, total: 0 }, [b.pid]: { hits: 0, total: 0 } },
-        });
+        pairingMap.set(key, { pids: [p1.pid, p2.pid], games: 0, ralliesTotal: 0, ralliesKitchen: 0 });
       }
       const p = pairingMap.get(key)!;
       p.games++;
-      for (const row of teamRows) {
-        const s = p.stats[row.pid];
-        if (s) { s.hits += row.k3dHits + row.k5dHits; s.total += row.k3dTotal + row.k5dTotal; }
-      }
+      // Both players share the same team rally stats — use p1's
+      p.ralliesTotal += p1.teamRalliesTotal;
+      p.ralliesKitchen += p1.teamRalliesKitchen;
     }
   }
 
   return [...pairingMap.values()]
-    .filter((p) => playerMap.has(p.pids[0]) && playerMap.has(p.pids[1]))
-    .sort((a, b) => b.games - a.games)
+    .filter((p) => playerMap.has(p.pids[0]) && playerMap.has(p.pids[1]) && p.ralliesTotal > 0)
+    .sort((a, b) => (b.ralliesKitchen / b.ralliesTotal) - (a.ralliesKitchen / a.ralliesTotal))
     .map((p) => ({
       p1: playerMap.get(p.pids[0])!,
       p2: playerMap.get(p.pids[1])!,
       games: p.games,
-      p1Hits: p.stats[p.pids[0]].hits,
-      p1Total: p.stats[p.pids[0]].total,
-      p2Hits: p.stats[p.pids[1]].hits,
-      p2Total: p.stats[p.pids[1]].total,
+      ralliesTotal: p.ralliesTotal,
+      ralliesKitchen: p.ralliesKitchen,
     }));
-}
-
-function pct(hits: number, total: number) {
-  return total > 0 ? Math.round((hits / total) * 100) : null;
-}
-
-function PlayerBar({ player, hits, total }: { player: PlayerMeta; hits: number; total: number }) {
-  const val = pct(hits, total);
-  return (
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0"
-            style={{ backgroundColor: player.color.bg, color: player.color.text }}
-          >{player.initials}</span>
-          <span className="text-xs font-medium text-gray-700">{player.name}</span>
-        </div>
-        <span className="text-xs tabular-nums font-semibold" style={{ color: val !== null ? player.color.text : undefined }}>
-          {val !== null ? `${val}%` : '—'}
-        </span>
-      </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        {val !== null && (
-          <div
-            className="h-full rounded-full transition-all"
-            style={{ width: `${val}%`, backgroundColor: player.color.text }}
-          />
-        )}
-      </div>
-      {total > 0 && (
-        <p className="text-[10px] text-gray-400 mt-0.5">{hits}/{total} drops</p>
-      )}
-    </div>
-  );
 }
 
 export function KitchenPairingsSection({ data }: Props) {
   const pairings = buildPairings(data);
   if (pairings.length === 0) return null;
 
+  const pcts = pairings.map((p) => p.ralliesKitchen / p.ralliesTotal);
+  const maxPct = Math.max(...pcts);
+  const minPct = Math.min(...pcts);
+
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2">
-        Getting to Kitchen by Pairing
+        Kitchen Arrival by Pairing
       </h2>
       <p className="text-sm text-gray-500 -mt-1">
-        Each player&apos;s drop → kitchen arrival rate in games they played as partners (3rd + 5th shot drops combined).
+        % of rallies where the team reached the kitchen, for each partner combination.
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {pairings.map((p) => (
-          <div key={`${p.p1.pid}|${p.p2.pid}`} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
-                  style={{ backgroundColor: p.p1.color.bg, color: p.p1.color.text }}
-                >{p.p1.initials}</span>
-                <span className="text-xs font-semibold text-gray-500">+</span>
-                <span
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
-                  style={{ backgroundColor: p.p2.color.bg, color: p.p2.color.text }}
-                >{p.p2.initials}</span>
-              </div>
-              <span className="text-[10px] text-gray-400">{p.games} game{p.games !== 1 ? 's' : ''} together</span>
-            </div>
-            <div className="flex gap-4">
-              <PlayerBar player={p.p1} hits={p.p1Hits} total={p.p1Total} />
-              <PlayerBar player={p.p2} hits={p.p2Hits} total={p.p2Total} />
-            </div>
-          </div>
-        ))}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-medium">
+              <th className="text-left px-5 py-3">Pairing</th>
+              <th className="text-right px-5 py-3">Kitchen %</th>
+              <th className="text-right px-5 py-3 hidden md:table-cell">Rallies</th>
+              <th className="text-right px-5 py-3 hidden md:table-cell">Games</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {pairings.map((p) => {
+              const pct = p.ralliesKitchen / p.ralliesTotal;
+              const pctDisplay = Math.round(pct * 100);
+              const isTop = pct === maxPct && maxPct > minPct;
+              const isBot = pct === minPct && maxPct > minPct;
+              return (
+                <tr key={`${p.p1.pid}|${p.p2.pid}`} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold flex-shrink-0"
+                        style={{ backgroundColor: p.p1.color.bg, color: p.p1.color.text }}
+                      >{p.p1.initials}</span>
+                      <span className="text-gray-700 font-medium">{p.p1.name}</span>
+                      <span className="text-gray-300 text-xs">+</span>
+                      <span
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold flex-shrink-0"
+                        style={{ backgroundColor: p.p2.color.bg, color: p.p2.color.text }}
+                      >{p.p2.initials}</span>
+                      <span className="text-gray-700 font-medium">{p.p2.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-sm font-semibold tabular-nums ${
+                      isTop ? 'bg-emerald-100 text-emerald-700' :
+                      isBot ? 'bg-red-100 text-red-600' :
+                      'text-gray-700'
+                    }`}>
+                      {pctDisplay}%
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-right text-gray-400 tabular-nums hidden md:table-cell">
+                    {p.ralliesKitchen}/{p.ralliesTotal}
+                  </td>
+                  <td className="px-5 py-3 text-right text-gray-400 tabular-nums hidden md:table-cell">
+                    {p.games}g
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </section>
   );
