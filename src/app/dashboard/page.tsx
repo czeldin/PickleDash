@@ -21,6 +21,7 @@ import { DepthSection } from '@/components/sections/DepthSection';
 import { ErrorSection } from '@/components/sections/ErrorSection';
 import { PlayerSummarySection } from '@/components/sections/PlayerSummarySection';
 import { AttackDinkSection } from '@/components/sections/AttackDinkSection';
+import { KitchenPairingsSection } from '@/components/sections/KitchenPairingsSection';
 import { anonymizeData } from '@/lib/anonymize';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
@@ -43,6 +44,7 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     errors: data.errors.filter((r) => pids.has(r.pid)),
     attacks: data.attacks.filter((r) => pids.has(r.pid)),
     dinks: data.dinks.filter((r) => pids.has(r.pid)),
+    kitchenByGame: data.kitchenByGame.filter((r) => pids.has(r.pid)),
   };
 }
 
@@ -225,6 +227,7 @@ export default function DashboardPage() {
           <SpeedSection data={visibleData} />
           <ShotBreakdownSection data={visibleData} />
           <KitchenArrivalSection data={visibleData} />
+          <KitchenPairingsSection data={visibleData} />
           <ShotQualitySection data={visibleData} />
           <DepthSection data={visibleData} />
           <ErrorSection data={visibleData} />

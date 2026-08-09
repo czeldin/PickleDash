@@ -3,7 +3,7 @@ import {
   DashboardData, PlayerMeta, PLAYER_COLORS,
   HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
-  AttackRow, DinkRow,
+  AttackRow, DinkRow, KitchenByGameRow,
 } from '@/types/dashboard';
 
 interface RawShot {
@@ -119,6 +119,32 @@ function makeAccum(name: string): PlayerAccum {
     errNet: 0, errOut: 0, errShort: 0, errPop: 0, errUf: 0, errForced: 0,
     wins: 0, losses: 0,
   };
+}
+
+function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number }> {
+  const result = new Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number }>();
+  const { pd, ral } = session;
+  if (!Array.isArray(pd) || !Array.isArray(ral)) return result;
+  for (const player of pd) {
+    const nm = player.name?.trim()?.toLowerCase();
+    if (nm) result.set(nm, { team: player.team ?? 0, k3dHits: 0, k3dTotal: 0, k5dHits: 0, k5dTotal: 0 });
+  }
+  for (const rally of ral) {
+    const shots = rally.sh ?? [];
+    for (let idx = 0; idx < shots.length; idx++) {
+      const shot = shots[idx];
+      if (shot.sht !== 2) continue; // only drops
+      const player = pd[shot.pid];
+      if (!player) continue;
+      const nm = player.name?.trim()?.toLowerCase();
+      if (!nm) continue;
+      const r = result.get(nm);
+      if (!r) continue;
+      if (idx === 2) { r.k3dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k3dHits++; }
+      else if (idx === 4) { r.k5dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k5dHits++; }
+    }
+  }
+  return result;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -255,7 +281,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [] };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -267,6 +293,7 @@ export function parseMultipleNights(
   const allSessions: SessionInfo[] = [];
   const rawHighlights: HighlightRally[] = [];
   const skillRatingsByGame: SkillRatingsByGameRow[] = [];
+  const kitchenByGame: KitchenByGameRow[] = [];
 
   for (const night of nights) {
     const rawSessions = getRawSessions(night.raw);
@@ -278,6 +305,10 @@ export function parseMultipleNights(
       allSessions.push(sessionInfo);
       if (!selectedSessionKeys || selectedSessionKeys.has(key)) {
         processSession(s, accumMap);
+        // Per-game kitchen arrival for pairing analysis
+        for (const [pid, stats] of getSessionKitchenByPlayer(s).entries()) {
+          kitchenByGame.push({ pid, sessionKey: key, ...stats });
+        }
         // Collect per-game skill ratings for the By Game breakdown tab
         if (Array.isArray(s.pd)) {
           for (const player of s.pd) {
@@ -334,7 +365,7 @@ export function parseMultipleNights(
     .slice(0, 12);
 
   const data = accumsToData(Array.from(accumMap.values()), allSessions);
-  return { ...data, highlights, skillRatingsByGame };
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame };
 }
 
 // Convenience wrapper for a single file

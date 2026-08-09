@@ -153,6 +153,16 @@ export interface AttackRow {
   attackExcellentPct: number; // avg q.ex for attacks * 100
 }
 
+export interface KitchenByGameRow {
+  pid: string;
+  sessionKey: string;
+  team: number;
+  k3dHits: number;
+  k3dTotal: number;
+  k5dHits: number;
+  k5dTotal: number;
+}
+
 export interface DinkRow {
   pid: string;
   dinkTotal: number;          // total dink shots (sht=1)
@@ -179,4 +189,5 @@ export interface DashboardData {
   errors: ErrorRow[];
   attacks: AttackRow[];
   dinks: DinkRow[];
+  kitchenByGame: KitchenByGameRow[];
 }
