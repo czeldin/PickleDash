@@ -109,11 +109,14 @@ export function KitchenPairingsSection({ data }: Props) {
                   P1 on {SIDE_LABEL[side] ?? `Side ${side}`}
                 </th>
               ))}
-              <th className="text-right px-5 py-3 hidden md:table-cell">Total serves</th>
+              <th className="text-right px-4 py-3 font-semibold text-gray-600">Overall</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {pairings.map((p) => (
+            {pairings.map((p) => {
+              const totalKitchen = [...p.bySide.values()].reduce((s, r) => s + r.kitchen, 0);
+              const overallPct = p.totalRallies > 0 ? Math.round((totalKitchen / p.totalRallies) * 100) : null;
+              return (
               <tr key={`${p.p1.pid}|${p.p2.pid}`} className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -146,11 +149,17 @@ export function KitchenPairingsSection({ data }: Props) {
                     </td>
                   );
                 })}
-                <td className="px-5 py-3 text-right text-gray-400 tabular-nums hidden md:table-cell">
-                  {p.totalRallies}
+                <td className="px-4 py-3 text-right">
+                  {overallPct !== null ? (
+                    <span className="font-bold tabular-nums text-gray-900">{overallPct}%</span>
+                  ) : (
+                    <span className="text-gray-300">—</span>
+                  )}
+                  <span className="text-gray-400 text-xs ml-1">({p.totalRallies})</span>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
