@@ -55,9 +55,13 @@ function buildPairings(data: DashboardData): PairingStats[] {
     if (!pairingMap.has(key)) {
       pairingMap.set(key, { pids: [pid1, pid2], bySide: new Map(), overall: { rallies: 0, kitchen: 0, win: 0 } });
     }
+    // "Kitchen" success = reached the kitchen OR won the point before having to
+    // (e.g. a drive winner). A fast win isn't penalized as a kitchen failure.
+    const kitchenSuccess = rally.reached || rally.won;
+
     const p = pairingMap.get(key)!;
     p.overall.rallies++;
-    if (rally.reached) p.overall.kitchen++;
+    if (kitchenSuccess) p.overall.kitchen++;
     if (rally.won) p.overall.win++;
 
     // pid1's actual physical side this rally, read directly from rally.pls.
@@ -66,7 +70,7 @@ function buildPairings(data: DashboardData): PairingStats[] {
       if (!p.bySide.has(pid1Side)) p.bySide.set(pid1Side, { rallies: 0, kitchen: 0, win: 0 });
       const s = p.bySide.get(pid1Side)!;
       s.rallies++;
-      if (rally.reached) s.kitchen++;
+      if (kitchenSuccess) s.kitchen++;
       if (rally.won) s.win++;
     }
   }
@@ -198,7 +202,7 @@ export function KitchenPairingsSection({ data }: Props) {
         </div>
       </div>
       <p className="text-sm text-gray-500 -mt-1">
-        Serving rallies split by which side the first player is on. <strong className="text-gray-600">Kit</strong> = reached the kitchen; <strong className="text-emerald-700">Win</strong> = won the point.
+        Serving rallies split by which side the first player is on. <strong className="text-gray-600">Kit</strong> = reached the kitchen <em>or</em> won the point before having to (e.g. a drive winner); <strong className="text-emerald-700">Win</strong> = won the point.
       </p>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
