@@ -12,12 +12,13 @@ interface SideStat { rallies: number; kitchen: number }
 interface PairingStats {
   p1: PlayerMeta;
   p2: PlayerMeta;
-  // keyed by p1's side: ss value when p1 is the server, or inverse when p2 serves
+  // keyed by p1's actual physical side that rally (from rally.pls): 0 = Left, 1 = Right
   bySide: Map<number, SideStat>;
   totalRallies: number;
+  totalKitchen: number;
 }
 
-// Confirmed from pb.vision: ss=0 = Left, ss=1 = Right
+// From pb.vision rally.pls: 0 = Left, 1 = Right
 const SIDE_LABEL: Record<number, string> = { 0: 'Left', 1: 'Right' };
 
 function buildPairings(data: DashboardData): PairingStats[] {
@@ -35,6 +36,7 @@ function buildPairings(data: DashboardData): PairingStats[] {
     pids: [string, string];
     bySide: Map<number, SideStat>;
     totalRallies: number;
+    totalKitchen: number;
   }>();
 
   for (const rally of servingRallies) {
@@ -53,20 +55,20 @@ function buildPairings(data: DashboardData): PairingStats[] {
 
     const key = `${pid1}|${pid2}`;
     if (!pairingMap.has(key)) {
-      pairingMap.set(key, { pids: [pid1, pid2], bySide: new Map(), totalRallies: 0 });
+      pairingMap.set(key, { pids: [pid1, pid2], bySide: new Map(), totalRallies: 0, totalKitchen: 0 });
     }
     const p = pairingMap.get(key)!;
     p.totalRallies++;
+    if (rally.reachedKitchen) p.totalKitchen++;
 
-    // Determine pid1's side: if pid1 served, their side = rally.servedSide
-    // if pid2 served, pid1's side = the other side (1 - rally.servedSide, assuming binary 0/1)
-    const pid1Served = rally.servedByPid === pid1;
-    const pid1Side = pid1Served ? rally.servedSide : (rally.servedSide === 0 ? 1 : 0);
-
-    if (!p.bySide.has(pid1Side)) p.bySide.set(pid1Side, { rallies: 0, kitchen: 0 });
-    const s = p.bySide.get(pid1Side)!;
-    s.rallies++;
-    if (rally.reachedKitchen) s.kitchen++;
+    // pid1's actual physical side this rally, read directly from rally.pls.
+    const pid1Side = rally.sides[pid1];
+    if (pid1Side === 0 || pid1Side === 1) {
+      if (!p.bySide.has(pid1Side)) p.bySide.set(pid1Side, { rallies: 0, kitchen: 0 });
+      const s = p.bySide.get(pid1Side)!;
+      s.rallies++;
+      if (rally.reachedKitchen) s.kitchen++;
+    }
   }
 
   return [...pairingMap.values()]
@@ -77,6 +79,7 @@ function buildPairings(data: DashboardData): PairingStats[] {
       p2: playerMap.get(p.pids[1])!,
       bySide: p.bySide,
       totalRallies: p.totalRallies,
+      totalKitchen: p.totalKitchen,
     }));
 }
 
@@ -134,9 +137,8 @@ export function KitchenPairingsSection({ data }: Props) {
           const s = p.bySide.get(side);
           sidePct.set(side, s ? pct(s) : null);
         }
-        const totalKitchen = [...p.bySide.values()].reduce((s, r) => s + r.kitchen, 0);
-        const overallPct = p.totalRallies > 0 ? Math.round((totalKitchen / p.totalRallies) * 100) : null;
-        return { ...p, totalKitchen, sidePct, overallPct };
+        const overallPct = p.totalRallies > 0 ? Math.round((p.totalKitchen / p.totalRallies) * 100) : null;
+        return { ...p, sidePct, overallPct };
       }),
     [pairings, allSides]
   );

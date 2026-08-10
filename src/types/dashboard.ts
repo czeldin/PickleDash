@@ -157,7 +157,9 @@ export interface ServingRallyRow {
   sessionKey: string;
   servingTeam: number;
   servedByPid: string;
-  servedSide: number;      // ss field from the serve shot (0 or 1)
+  // Physical court side per serving-team player this rally, from rally.pls.
+  // Keyed by lowercased player name. 0 = Left, 1 = Right.
+  sides: Record<string, number>;
   reachedKitchen: boolean;
 }
 

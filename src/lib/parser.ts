@@ -24,7 +24,7 @@ interface RawPd {
 }
 interface RawSession {
   ses: { vid: string; si: number; name?: string; ge?: number };
-  ral: { sh: RawShot[]; wt: number }[];
+  ral: { sh: RawShot[]; wt: number; pls?: { left?: number }[] }[];
   pd: RawPd[];
   gd?: { game_outcome?: number[] };
 }
@@ -327,21 +327,37 @@ export function parseMultipleNights(
         for (const [pid, stats] of getSessionKitchenByPlayer(s).entries()) {
           kitchenByGame.push({ pid, sessionKey: key, ...stats });
         }
-        // Per-rally serving data for left/right side pairing analysis
+        // Per-rally serving data for left/right side pairing analysis.
+        // Court side comes from rally.pls (per-player position: left=1 means the
+        // player is on the left half), NOT the serve shot's ss field — ss only
+        // encodes which end the serving *team* is on, so it's constant per game.
         if (Array.isArray(s.ral)) {
+          const pd = s.pd ?? [];
           for (const rally of s.ral) {
             const shots = rally.sh ?? [];
             if (shots.length === 0) continue;
             const serve = shots[0];
-            const servingPlayer = s.pd?.[serve.pid];
+            const servingPlayer = pd[serve.pid];
             if (!servingPlayer) continue;
             const servedByPid = servingPlayer.name?.trim()?.toLowerCase();
             if (!servedByPid) continue;
+            // Physical side per serving-team player: 0 = Left, 1 = Right.
+            const pls = rally.pls;
+            const sides: Record<string, number> = {};
+            if (Array.isArray(pls)) {
+              for (let pi = 0; pi < pd.length; pi++) {
+                const pl = pd[pi];
+                if (!pl || pl.team !== serve.st) continue;
+                const nm = pl.name?.trim()?.toLowerCase();
+                if (!nm) continue;
+                sides[nm] = pls[pi]?.left ? 0 : 1;
+              }
+            }
             servingRallies.push({
               sessionKey: key,
               servingTeam: serve.st,
               servedByPid,
-              servedSide: serve.ss,
+              sides,
               reachedKitchen: shots.some((s2) => s2.st === serve.st && (s2.sht === 1 || s2.sht === 5)),
             });
           }
