@@ -1,9 +1,9 @@
 import { SERVE_SPEED_BUCKETS } from '@/types/pbvision';
 import {
   DashboardData, PlayerMeta, PLAYER_COLORS,
-  HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
+  HeroStats, SkillRatingsRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
-  AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
+  AttackRow, DinkRow,
 } from '@/types/dashboard';
 
 interface RawShot {
@@ -23,42 +23,14 @@ interface RawPd {
   };
 }
 interface RawSession {
-  ses: { vid: string; si: number; name?: string; ge?: number };
-  ral: { sh: RawShot[]; wt: number; pls?: { left?: number }[] }[];
+  ses: { vid: string; si: number; name?: string };
+  ral: { sh: RawShot[]; wt: number }[];
   pd: RawPd[];
   gd?: { game_outcome?: number[] };
 }
 
-/** Returns a human-readable session label.
- *  If the raw name contains at least one player's first name, keep it.
- *  Otherwise, fall back to HH:MM from the session's Unix timestamp (ge),
- *  or "Game N" if no timestamp is available. */
-function getSessionName(s: RawSession, index: number): string {
-  const rawName = s.ses?.name ?? '';
-  const playerFirstNames = (s.pd ?? [])
-    .map((p) => p.name?.trim().split(/\s+/)[0])
-    .filter((n): n is string => Boolean(n));
-  const hasPlayerName = playerFirstNames.some((n) =>
-    rawName.toLowerCase().includes(n.toLowerCase())
-  );
-  if (rawName && hasPlayerName) return rawName;
-  const ge = s.ses?.ge;
-  if (ge && typeof ge === 'number') {
-    const d = new Date(ge * 1000);
-    const h = d.getHours();
-    const m = String(d.getMinutes()).padStart(2, '0');
-    const ampm = h >= 12 ? 'pm' : 'am';
-    const h12 = h % 12 || 12;
-    return `${h12}:${m} ${ampm}`;
-  }
-  return rawName || `Game ${index + 1}`;
-}
-
 function getInitials(name: string) {
   return name.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()).slice(0, 2).join('');
-}
-function toFirstName(name: string) {
-  return name.trim().split(/\s+/)[0];
 }
 function serveSpeedAvg(f: number[]) {
   let ws = 0, vs = 0;
@@ -121,49 +93,6 @@ function makeAccum(name: string): PlayerAccum {
   };
 }
 
-function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number; teamRalliesTotal: number; teamRalliesKitchen: number }> {
-  const result = new Map<string, { team: number; k3dHits: number; k3dTotal: number; k5dHits: number; k5dTotal: number; teamRalliesTotal: number; teamRalliesKitchen: number }>();
-  const { pd, ral } = session;
-  if (!Array.isArray(pd) || !Array.isArray(ral)) return result;
-  for (const player of pd) {
-    const nm = player.name?.trim()?.toLowerCase();
-    if (nm) result.set(nm, { team: player.team ?? 0, k3dHits: 0, k3dTotal: 0, k5dHits: 0, k5dTotal: 0, teamRalliesTotal: 0, teamRalliesKitchen: 0 });
-  }
-  // Per-team rally kitchen arrival
-  const teamRally = new Map<number, { total: number; kitchen: number }>();
-  for (const rally of ral) {
-    const shots = rally.sh ?? [];
-    // Drop shot tracking per player
-    for (let idx = 0; idx < shots.length; idx++) {
-      const shot = shots[idx];
-      if (shot.sht !== 2) continue;
-      const player = pd[shot.pid];
-      if (!player) continue;
-      const nm = player.name?.trim()?.toLowerCase();
-      if (!nm) continue;
-      const r = result.get(nm);
-      if (!r) continue;
-      if (idx === 2) { r.k3dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k3dHits++; }
-      else if (idx === 4) { r.k5dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k5dHits++; }
-    }
-    // Team-level kitchen arrival: only count rallies where this team is serving
-    if (shots.length > 0) {
-      const servingTeam = shots[0].st;
-      if (!teamRally.has(servingTeam)) teamRally.set(servingTeam, { total: 0, kitchen: 0 });
-      const tr = teamRally.get(servingTeam)!;
-      tr.total++;
-      if (shots.some((s) => s.st === servingTeam && (s.sht === 1 || s.sht === 5))) tr.kitchen++;
-    }
-  }
-  // Assign team rally stats to each player on that team
-  for (const stats of result.values()) {
-    const tr = teamRally.get(stats.team) ?? { total: 0, kitchen: 0 };
-    stats.teamRalliesTotal = tr.total;
-    stats.teamRalliesKitchen = tr.kitchen;
-  }
-  return result;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getRawSessions(raw: unknown): RawSession[] { return (raw as any)?.data?.sessions ?? []; }
 
@@ -173,7 +102,7 @@ export function getSessionInfos(raw: unknown, nightId: string, nightLabel: strin
     index: i,
     nightId,
     nightLabel,
-    name: getSessionName(s, i),
+    name: s.ses?.name ?? `Game ${i + 1}`,
   }));
 }
 
@@ -269,7 +198,7 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
 function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): DashboardData {
   accums.sort((a, b) => (b.overallW > 0 ? b.overallSum / b.overallW : 0) - (a.overallW > 0 ? a.overallSum / a.overallW : 0));
   const players: PlayerMeta[] = accums.map((acc, i) => ({
-    pid: acc.name.trim().toLowerCase(), name: toFirstName(acc.name), initials: getInitials(acc.name), color: PLAYER_COLORS[i % PLAYER_COLORS.length],
+    pid: acc.name.trim().toLowerCase(), name: acc.name, initials: getInitials(acc.name), color: PLAYER_COLORS[i % PLAYER_COLORS.length],
   }));
   function pct(h: number, t: number) { return t > 0 ? (h / t) * 100 : 0; }
   const hero: HeroStats[] = accums.map((acc, i) => ({ pid: players[i].pid, dupr: acc.overallW > 0 ? acc.overallSum / acc.overallW : 0, duprDelta: 0, gamesPlayed: acc.sessionCount, totalShots: acc.totalShots, wins: acc.wins, losses: acc.losses }));
@@ -284,8 +213,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const w = acc.sqW; const exF = w > 0 ? acc.sqExSum / w : 0, poF = w > 0 ? acc.sqPoSum / w : 0;
     const dropExcellentPct = acc.dropExW > 0 ? (acc.dropExSum / acc.dropExW) * 100 : 0;
     const winnerExcellentPct = acc.winnerExW > 0 ? (acc.winnerExSum / acc.winnerExW) * 100 : 0;
-    const excellentPct = exF * 100, poorPct = poF * 100;
-    return { pid: players[i].pid, excellentCount: Math.round(exF * acc.totalShots), excellentPct, poorCount: Math.round(poF * acc.totalShots), poorPct, qualityScore: excellentPct - poorPct, dropExcellentPct, dropTotal: acc.dropExW, winnerTotal: acc.winnerTotal, winnerExcellentPct };
+    return { pid: players[i].pid, excellentCount: Math.round(exF * acc.totalShots), excellentPct: exF * 100, poorCount: Math.round(poF * acc.totalShots), poorPct: poF * 100, dropExcellentPct, dropTotal: acc.dropExW, winnerTotal: acc.winnerTotal, winnerExcellentPct };
   });
   const serveDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.sdW || 1; return { pid: players[i].pid, deepPct: (acc.sdDeep / w) * 100, medPct: (acc.sdMed / w) * 100, shallowPct: (acc.sdShallow / w) * 100 }; });
   const returnDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.rdW || 1; return { pid: players[i].pid, deepPct: (acc.rdDeep / w) * 100, medPct: (acc.rdMed / w) * 100, shallowPct: (acc.rdShallow / w) * 100 }; });
@@ -298,7 +226,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [] };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -309,114 +237,17 @@ export function parseMultipleNights(
   const accumMap = new Map<string, PlayerAccum>();
   const allSessions: SessionInfo[] = [];
   const rawHighlights: HighlightRally[] = [];
-  const skillRatingsByGame: SkillRatingsByGameRow[] = [];
-  const kitchenByGame: KitchenByGameRow[] = [];
-  const servingRallies: ServingRallyRow[] = [];
-  const rallySides: RallySideRow[] = [];
 
   for (const night of nights) {
     const rawSessions = getRawSessions(night.raw);
     for (let i = 0; i < rawSessions.length; i++) {
       const key = `${night.id}_${i}`;
       const s = rawSessions[i];
-      const sessionName = getSessionName(s, i);
+      const sessionName = s.ses?.name ?? `Game ${i + 1}`;
       const sessionInfo: SessionInfo = { key, index: i, nightId: night.id, nightLabel: night.label, name: sessionName };
       allSessions.push(sessionInfo);
       if (!selectedSessionKeys || selectedSessionKeys.has(key)) {
         processSession(s, accumMap);
-        // Per-game kitchen arrival for pairing analysis
-        for (const [pid, stats] of getSessionKitchenByPlayer(s).entries()) {
-          kitchenByGame.push({ pid, sessionKey: key, ...stats });
-        }
-        // Per-rally serving data for left/right side pairing analysis.
-        // Court side comes from rally.pls (per-player position: left=1 means the
-        // player is on the left half), NOT the serve shot's ss field — ss only
-        // encodes which end the serving *team* is on, so it's constant per game.
-        if (Array.isArray(s.ral)) {
-          const pd = s.pd ?? [];
-          for (const rally of s.ral) {
-            const shots = rally.sh ?? [];
-            if (shots.length === 0) continue;
-            const serve = shots[0];
-            const servingPlayer = pd[serve.pid];
-            if (!servingPlayer) continue;
-            const servedByPid = servingPlayer.name?.trim()?.toLowerCase();
-            if (!servedByPid) continue;
-            // Physical side per serving-team player: 0 = Left, 1 = Right.
-            const pls = rally.pls;
-            const sides: Record<string, number> = {};
-            if (Array.isArray(pls)) {
-              for (let pi = 0; pi < pd.length; pi++) {
-                const pl = pd[pi];
-                if (!pl || pl.team !== serve.st) continue;
-                const nm = pl.name?.trim()?.toLowerCase();
-                if (!nm) continue;
-                sides[nm] = pls[pi]?.left ? 0 : 1;
-              }
-            }
-            // Track kitchen arrival and the point outcome separately so the UI
-            // can show both. Reached = the serving team hit a dink/volley.
-            const reached = shots.some((s2) => s2.st === serve.st && (s2.sht === 1 || s2.sht === 5));
-            const won = rally.wt === serve.st;
-            servingRallies.push({
-              sessionKey: key,
-              servingTeam: serve.st,
-              servedByPid,
-              sides,
-              reached,
-              won,
-            });
-
-            // Per-team side rows (both teams) for the win-by-side section, so we
-            // can split serving vs receiving. Skip rallies with no clear winner.
-            if (Array.isArray(pls) && (rally.wt === 0 || rally.wt === 1)) {
-              const teamSides = new Map<number, Record<string, number>>();
-              for (let pi = 0; pi < pd.length; pi++) {
-                const pl = pd[pi];
-                if (!pl || !pls[pi]) continue;
-                const nm = pl.name?.trim()?.toLowerCase();
-                if (!nm) continue;
-                if (!teamSides.has(pl.team)) teamSides.set(pl.team, {});
-                teamSides.get(pl.team)![nm] = pls[pi]?.left ? 0 : 1;
-              }
-              for (const [team, teamSide] of teamSides) {
-                rallySides.push({
-                  sessionKey: key,
-                  team,
-                  serving: team === serve.st,
-                  won: rally.wt === team,
-                  reached: shots.some((s2) => s2.st === team && (s2.sht === 1 || s2.sht === 5)),
-                  sides: teamSide,
-                });
-              }
-            }
-          }
-        }
-        // Collect per-game skill ratings for the By Game breakdown tab
-        if (Array.isArray(s.pd)) {
-          for (const player of s.pd) {
-            const nm = player.name?.trim(); if (!nm) continue;
-            const sc = player.shot_count ?? 0;
-            const r = player.trends?.ratings;
-            if (r && sc > 0) {
-              skillRatingsByGame.push({
-                pid: nm.toLowerCase(),
-                sessionKey: key,
-                sessionName,
-                nightLabel: night.label,
-                timestamp: s.ses?.ge ?? 0,
-                team: player.team ?? 0,
-                serve: r.serve ?? 0,
-                return: r.return ?? 0,
-                offense: r.offense ?? 0,
-                defense: r.defense ?? 0,
-                agility: r.agility ?? 0,
-                consistency: r.consistency ?? 0,
-                shotCount: sc,
-              });
-            }
-          }
-        }
         // Collect rally highlights for this session
         const vid = s.ses?.vid;
         const si = s.ses?.si ?? i;
@@ -448,7 +279,7 @@ export function parseMultipleNights(
     .slice(0, 12);
 
   const data = accumsToData(Array.from(accumMap.values()), allSessions);
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides };
+  return { ...data, highlights };
 }
 
 // Convenience wrapper for a single file

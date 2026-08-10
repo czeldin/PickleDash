@@ -57,22 +57,6 @@ export interface SkillRatingsRow {
   consistency: number;
 }
 
-export interface SkillRatingsByGameRow {
-  pid: string;
-  sessionKey: string;
-  sessionName: string;
-  nightLabel: string;
-  timestamp: number; // Unix seconds (ge), 0 if unavailable
-  team: number;      // team index (0 or 1) within the session
-  serve: number;
-  return: number;
-  offense: number;
-  defense: number;
-  agility: number;
-  consistency: number;
-  shotCount: number;
-}
-
 export interface ShotAccuracyRow {
   pid: string;
   inShots: number;
@@ -116,7 +100,6 @@ export interface ShotQualityRow {
   excellentPct: number;
   poorCount: number;
   poorPct: number;
-  qualityScore: number; // excellentPct - poorPct
   // Per-shot drop quality (from rally-level shot data)
   dropExcellentPct: number;  // avg q.ex for drop shots × 100
   dropTotal: number;          // total drops with quality data
@@ -153,42 +136,6 @@ export interface AttackRow {
   attackExcellentPct: number; // avg q.ex for attacks * 100
 }
 
-export interface ServingRallyRow {
-  sessionKey: string;
-  servingTeam: number;
-  servedByPid: string;
-  // Physical court side per serving-team player this rally, from rally.pls.
-  // Keyed by lowercased player name. 0 = Left, 1 = Right.
-  sides: Record<string, number>;
-  reached: boolean;  // serving team reached the kitchen (hit a dink/volley)
-  won: boolean;      // serving team won the point
-}
-
-// One row per (rally, team) — covers both teams of every rally, so the
-// win-by-side section can measure serving and receiving separately.
-export interface RallySideRow {
-  sessionKey: string;
-  team: number;
-  serving: boolean;   // was this team the serving team this rally
-  won: boolean;       // did this team win the point
-  reached: boolean;   // did this team reach the kitchen (hit a dink/volley)
-  // Physical court side per this team's players, from rally.pls.
-  // Keyed by lowercased player name. 0 = Left, 1 = Right.
-  sides: Record<string, number>;
-}
-
-export interface KitchenByGameRow {
-  pid: string;
-  sessionKey: string;
-  team: number;
-  k3dHits: number;
-  k3dTotal: number;
-  k5dHits: number;
-  k5dTotal: number;
-  teamRalliesTotal: number;    // rallies where this player's team participated
-  teamRalliesKitchen: number;  // rallies where this player's team reached the kitchen
-}
-
 export interface DinkRow {
   pid: string;
   dinkTotal: number;          // total dink shots (sht=1)
@@ -202,7 +149,6 @@ export interface DashboardData {
   players: PlayerMeta[];
   hero: HeroStats[];
   skillRatings: SkillRatingsRow[];
-  skillRatingsByGame: SkillRatingsByGameRow[];
   shotAccuracy: ShotAccuracyRow[];
   serveSpeed: SpeedRow[];
   driveSpeed: SpeedRow[];
@@ -215,7 +161,4 @@ export interface DashboardData {
   errors: ErrorRow[];
   attacks: AttackRow[];
   dinks: DinkRow[];
-  kitchenByGame: KitchenByGameRow[];
-  servingRallies: ServingRallyRow[];
-  rallySides: RallySideRow[];
 }

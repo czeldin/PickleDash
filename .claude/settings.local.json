@@ -13,7 +13,23 @@
       "Bash(git remote *)",
       "Bash(git branch *)",
       "Bash(git push *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(mkdir -p /Users/craigzeldin1/Desktop/PickleDash/src/app/api/nights/\\\\[id\\\\])",
+      "Bash(npx vercel *)",
+      "Bash(vercel --version)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__find",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(curl -s http://localhost:3000/api/nights)",
+      "Bash(curl -s --max-time 3 http://localhost:3000/api/nights)",
+      "mcp__Claude_in_Chrome__get_page_text",
+      "mcp__plugin_vercel_vercel__get_deployment_build_logs",
+      "mcp__plugin_vercel_vercel__list_teams",
+      "mcp__plugin_vercel_vercel__list_deployments",
+      "mcp__plugin_vercel_vercel__list_projects"
     ]
   }
 }

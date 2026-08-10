@@ -21,8 +21,7 @@ import { DepthSection } from '@/components/sections/DepthSection';
 import { ErrorSection } from '@/components/sections/ErrorSection';
 import { PlayerSummarySection } from '@/components/sections/PlayerSummarySection';
 import { AttackDinkSection } from '@/components/sections/AttackDinkSection';
-import { KitchenPairingsSection } from '@/components/sections/KitchenPairingsSection';
-import { WinBySideSection } from '@/components/sections/WinBySideSection';
+import { PairingSideSection } from '@/components/sections/PairingSideSection';
 import { anonymizeData } from '@/lib/anonymize';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
@@ -229,8 +228,7 @@ export default function DashboardPage() {
           <SpeedSection data={visibleData} />
           <ShotBreakdownSection data={visibleData} />
           <KitchenArrivalSection data={visibleData} />
-          <KitchenPairingsSection data={visibleData} />
-          <WinBySideSection data={visibleData} />
+          <PairingSideSection data={visibleData} />
           <ShotQualitySection data={visibleData} />
           <DepthSection data={visibleData} />
           <ErrorSection data={visibleData} />
