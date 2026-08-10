@@ -1,20 +1,42 @@
 /**
- * Server-only Vercel Blob helpers.
+ * Server-only storage helpers — backed by Cloudflare R2 (S3-compatible).
  * Import only from API routes (never from client components).
  *
- * Architecture: each night has two blobs:
- *   nights/{id}/meta.json  — NightMeta (small, no raw data)
- *   nights/{id}/raw.json   — full pb.vision JSON
+ * Architecture: each night has two objects:
+ *   nights/{id}/meta.json    — NightMeta (small, no raw data)
+ *   nights/{id}/raw.json.gz  — gzip-compressed pb.vision JSON
  *
- * No shared manifest file → no race conditions on concurrent uploads.
+ * Required env vars:
+ *   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+ *   R2_BUCKET_NAME, R2_PUBLIC_URL (e.g. https://pub-xxx.r2.dev)
  */
-import { put, del, list } from '@vercel/blob';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from '@aws-sdk/client-s3';
 import { gzip, gunzip } from 'zlib';
 import { promisify } from 'util';
 import { PaddleTag } from '@/types/nights';
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
+
+function r2Client() {
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    },
+  });
+}
+
+const BUCKET = () => process.env.R2_BUCKET_NAME!;
+const publicUrl = (key: string) => `${process.env.R2_PUBLIC_URL}/${key}`;
 
 export interface NightMeta {
   id: string;
@@ -28,35 +50,38 @@ export interface NightMeta {
 // ─── Meta helpers ─────────────────────────────────────────────────────────────
 
 export async function saveNightMeta(id: string, meta: NightMeta): Promise<void> {
-  await put(`nights/${id}/meta.json`, JSON.stringify(meta), {
-    access: 'public',
-    contentType: 'application/json',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  await r2Client().send(new PutObjectCommand({
+    Bucket: BUCKET(),
+    Key: `nights/${id}/meta.json`,
+    Body: JSON.stringify(meta),
+    ContentType: 'application/json',
+  }));
 }
 
 export async function getNightMeta(id: string): Promise<NightMeta | null> {
   try {
-    const { blobs } = await list({ prefix: `nights/${id}/meta.json` });
-    const blob = blobs.find((b) => b.pathname === `nights/${id}/meta.json`);
-    if (!blob) return null;
-    const res = await fetch(blob.url, { cache: 'no-store' });
+    const res = await fetch(publicUrl(`nights/${id}/meta.json`), { cache: 'no-store' });
     if (!res.ok) return null;
     return (await res.json()) as NightMeta;
   } catch { return null; }
 }
 
-/** List all uploaded nights by scanning meta.json files in parallel. */
+/** List all uploaded nights by scanning meta.json files. */
 export async function getAllNightMetas(): Promise<NightMeta[]> {
   try {
-    const { blobs } = await list({ prefix: 'nights/' });
-    const metaBlobs = blobs.filter((b) => b.pathname.endsWith('/meta.json'));
-    if (metaBlobs.length === 0) return [];
+    const client = r2Client();
+    const listed = await client.send(new ListObjectsV2Command({
+      Bucket: BUCKET(),
+      Prefix: 'nights/',
+    }));
+    const metaKeys = (listed.Contents ?? [])
+      .map((o) => o.Key!)
+      .filter((k) => k.endsWith('/meta.json'));
+    if (metaKeys.length === 0) return [];
     const results = await Promise.all(
-      metaBlobs.map(async (b) => {
+      metaKeys.map(async (key) => {
         try {
-          const res = await fetch(b.url, { cache: 'no-store' });
+          const res = await fetch(publicUrl(key), { cache: 'no-store' });
           if (!res.ok) return null;
           return (await res.json()) as NightMeta;
         } catch { return null; }
@@ -67,21 +92,26 @@ export async function getAllNightMetas(): Promise<NightMeta[]> {
 }
 
 /**
- * Find nights that have raw.json but no meta.json (caused by old race-condition
- * manifest approach). Returns their IDs so callers can repair them.
+ * Find nights that have raw data but no meta.json.
+ * Returns their IDs so callers can repair them.
  */
 export async function getOrphanedRawIds(): Promise<string[]> {
   try {
-    const { blobs } = await list({ prefix: 'nights/' });
+    const client = r2Client();
+    const listed = await client.send(new ListObjectsV2Command({
+      Bucket: BUCKET(),
+      Prefix: 'nights/',
+    }));
+    const keys = (listed.Contents ?? []).map((o) => o.Key!);
     const rawIds = new Set(
-      blobs
-        .filter((b) => b.pathname.endsWith('/raw.json') || b.pathname.endsWith('/raw.json.gz'))
-        .map((b) => b.pathname.split('/')[1])
+      keys
+        .filter((k) => k.endsWith('/raw.json') || k.endsWith('/raw.json.gz'))
+        .map((k) => k.split('/')[1])
     );
     const metaIds = new Set(
-      blobs
-        .filter((b) => b.pathname.endsWith('/meta.json'))
-        .map((b) => b.pathname.split('/')[1])
+      keys
+        .filter((k) => k.endsWith('/meta.json'))
+        .map((k) => k.split('/')[1])
     );
     return [...rawIds].filter((id) => !metaIds.has(id));
   } catch { return []; }
@@ -91,31 +121,25 @@ export async function getOrphanedRawIds(): Promise<string[]> {
 
 export async function saveRawData(id: string, raw: unknown): Promise<void> {
   const compressed = await gzipAsync(Buffer.from(JSON.stringify(raw), 'utf-8'));
-  await put(`nights/${id}/raw.json.gz`, compressed, {
-    access: 'public',
-    contentType: 'application/gzip',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  await r2Client().send(new PutObjectCommand({
+    Bucket: BUCKET(),
+    Key: `nights/${id}/raw.json.gz`,
+    Body: compressed,
+    ContentType: 'application/gzip',
+  }));
 }
 
 export async function getRawData(id: string): Promise<unknown | null> {
   try {
     // Try compressed first
-    const { blobs: gzBlobs } = await list({ prefix: `nights/${id}/raw.json.gz` });
-    const gzBlob = gzBlobs.find((b) => b.pathname === `nights/${id}/raw.json.gz`);
-    if (gzBlob) {
-      const res = await fetch(gzBlob.url, { cache: 'no-store' });
-      if (!res.ok) return null;
-      const buf = Buffer.from(await res.arrayBuffer());
+    const gzRes = await fetch(publicUrl(`nights/${id}/raw.json.gz`), { cache: 'no-store' });
+    if (gzRes.ok) {
+      const buf = Buffer.from(await gzRes.arrayBuffer());
       const decompressed = await gunzipAsync(buf);
       return JSON.parse(decompressed.toString('utf-8'));
     }
     // Fall back to legacy uncompressed
-    const { blobs } = await list({ prefix: `nights/${id}/raw.json` });
-    const blob = blobs.find((b) => b.pathname === `nights/${id}/raw.json`);
-    if (!blob) return null;
-    const res = await fetch(blob.url, { cache: 'no-store' });
+    const res = await fetch(publicUrl(`nights/${id}/raw.json`), { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch { return null; }
@@ -123,20 +147,22 @@ export async function getRawData(id: string): Promise<unknown | null> {
 
 export async function deleteNightFromBlob(id: string): Promise<void> {
   try {
-    const { blobs } = await list({ prefix: `nights/${id}/` });
-    if (blobs.length > 0) await del(blobs.map((b) => b.url));
+    const client = r2Client();
+    const listed = await client.send(new ListObjectsV2Command({
+      Bucket: BUCKET(),
+      Prefix: `nights/${id}/`,
+    }));
+    const keys = (listed.Contents ?? []).map((o) => o.Key!).filter(Boolean);
+    if (keys.length === 0) return;
+    await client.send(new DeleteObjectsCommand({
+      Bucket: BUCKET(),
+      Delete: { Objects: keys.map((Key) => ({ Key })) },
+    }));
   } catch { /* ignore */ }
 }
 
-// ─── Legacy manifest (kept for backward compat — not used for writes) ─────────
+// ─── Legacy manifest (no-op — not used with R2) ───────────────────────────────
 
 export async function getManifest(): Promise<NightMeta[]> {
-  try {
-    const { blobs } = await list({ prefix: 'nights/manifest.json' });
-    const blob = blobs.find((b) => b.pathname === 'nights/manifest.json');
-    if (!blob) return [];
-    const res = await fetch(blob.url, { cache: 'no-store' });
-    if (!res.ok) return [];
-    return (await res.json()) as NightMeta[];
-  } catch { return []; }
+  return [];
 }
