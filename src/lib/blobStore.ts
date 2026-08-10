@@ -9,7 +9,12 @@
  * No shared manifest file → no race conditions on concurrent uploads.
  */
 import { put, del, list } from '@vercel/blob';
+import { gzip, gunzip } from 'zlib';
+import { promisify } from 'util';
 import { PaddleTag } from '@/types/nights';
+
+const gzipAsync = promisify(gzip);
+const gunzipAsync = promisify(gunzip);
 
 export interface NightMeta {
   id: string;
@@ -70,7 +75,7 @@ export async function getOrphanedRawIds(): Promise<string[]> {
     const { blobs } = await list({ prefix: 'nights/' });
     const rawIds = new Set(
       blobs
-        .filter((b) => b.pathname.endsWith('/raw.json'))
+        .filter((b) => b.pathname.endsWith('/raw.json') || b.pathname.endsWith('/raw.json.gz'))
         .map((b) => b.pathname.split('/')[1])
     );
     const metaIds = new Set(
@@ -85,9 +90,10 @@ export async function getOrphanedRawIds(): Promise<string[]> {
 // ─── Raw data helpers ─────────────────────────────────────────────────────────
 
 export async function saveRawData(id: string, raw: unknown): Promise<void> {
-  await put(`nights/${id}/raw.json`, JSON.stringify(raw), {
+  const compressed = await gzipAsync(Buffer.from(JSON.stringify(raw), 'utf-8'));
+  await put(`nights/${id}/raw.json.gz`, compressed, {
     access: 'public',
-    contentType: 'application/json',
+    contentType: 'application/gzip',
     addRandomSuffix: false,
     allowOverwrite: true,
   });
@@ -95,6 +101,17 @@ export async function saveRawData(id: string, raw: unknown): Promise<void> {
 
 export async function getRawData(id: string): Promise<unknown | null> {
   try {
+    // Try compressed first
+    const { blobs: gzBlobs } = await list({ prefix: `nights/${id}/raw.json.gz` });
+    const gzBlob = gzBlobs.find((b) => b.pathname === `nights/${id}/raw.json.gz`);
+    if (gzBlob) {
+      const res = await fetch(gzBlob.url, { cache: 'no-store' });
+      if (!res.ok) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      const decompressed = await gunzipAsync(buf);
+      return JSON.parse(decompressed.toString('utf-8'));
+    }
+    // Fall back to legacy uncompressed
     const { blobs } = await list({ prefix: `nights/${id}/raw.json` });
     const blob = blobs.find((b) => b.pathname === `nights/${id}/raw.json`);
     if (!blob) return null;
