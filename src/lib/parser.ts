@@ -376,7 +376,12 @@ export function parseMultipleNights(
 
             // Per-team side rows (both teams) for the win-by-side section, so we
             // can split serving vs receiving. Skip rallies with no clear winner.
+            // IMPORTANT: the hitting team is the player's roster team
+            // (pd[pid].team), NOT shot.st — st is the court side, which is
+            // constant-ish per rally and does not identify the team. wt is a
+            // roster team, so `won` compares correctly.
             if (Array.isArray(pls) && (rally.wt === 0 || rally.wt === 1)) {
+              const servingTeamRoster = pd[serve.pid]?.team;
               const teamSides = new Map<number, Record<string, number>>();
               for (let pi = 0; pi < pd.length; pi++) {
                 const pl = pd[pi];
@@ -390,9 +395,9 @@ export function parseMultipleNights(
                 rallySides.push({
                   sessionKey: key,
                   team,
-                  serving: team === serve.st,
+                  serving: team === servingTeamRoster,
                   won: rally.wt === team,
-                  reached: shots.some((s2) => s2.st === team && isKitchenShot(s2)),
+                  reached: shots.some((s2) => pd[s2.pid]?.team === team && isKitchenShot(s2)),
                   sides: teamSide,
                 });
               }
