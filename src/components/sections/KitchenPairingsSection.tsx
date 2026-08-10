@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { DashboardData, PlayerMeta } from '@/types/dashboard';
 
 interface Props {
@@ -83,13 +84,95 @@ function pct(s: SideStat) {
   return s.rallies > 0 ? Math.round((s.kitchen / s.rallies) * 100) : null;
 }
 
+// A pairing row with precomputed values so sorting doesn't recompute per compare.
+interface PairingRow {
+  p1: PlayerMeta;
+  p2: PlayerMeta;
+  bySide: Map<number, SideStat>;
+  totalRallies: number;
+  sidePct: Map<number, number | null>;
+  overallPct: number | null;
+}
+
+// sortKey: 'pairing' | 'overall' | `side:${n}`
+type SortKey = 'pairing' | 'overall' | `side:${number}`;
+type SortDir = 'asc' | 'desc';
+
+// Compare with nulls always sorted last, regardless of direction.
+function cmpNullable(a: number | null, b: number | null, dir: SortDir): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return dir === 'asc' ? a - b : b - a;
+}
+
+function SortArrow({ active, dir }: { active: boolean; dir: SortDir }) {
+  return (
+    <span className={`ml-1 text-[10px] ${active ? 'text-gray-700' : 'text-gray-300'}`}>
+      {active ? (dir === 'asc' ? '▲' : '▼') : '▲'}
+    </span>
+  );
+}
+
 export function KitchenPairingsSection({ data }: Props) {
   const pairings = buildPairings(data);
+  const [sortKey, setSortKey] = useState<SortKey>('overall');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // Collect all side keys present across all pairings (should be 0 and 1)
+  const allSides = useMemo(
+    () => [...new Set(pairings.flatMap((p) => [...p.bySide.keys()]))].sort(),
+    [pairings]
+  );
+
+  const rows: PairingRow[] = useMemo(
+    () =>
+      pairings.map((p) => {
+        const sidePct = new Map<number, number | null>();
+        for (const side of allSides) {
+          const s = p.bySide.get(side);
+          sidePct.set(side, s ? pct(s) : null);
+        }
+        const totalKitchen = [...p.bySide.values()].reduce((s, r) => s + r.kitchen, 0);
+        const overallPct = p.totalRallies > 0 ? Math.round((totalKitchen / p.totalRallies) * 100) : null;
+        return { ...p, sidePct, overallPct };
+      }),
+    [pairings, allSides]
+  );
+
+  const sortedRows = useMemo(() => {
+    const arr = [...rows];
+    arr.sort((a, b) => {
+      if (sortKey === 'pairing') {
+        const an = `${a.p1.name} ${a.p2.name}`.toLowerCase();
+        const bn = `${b.p1.name} ${b.p2.name}`.toLowerCase();
+        const c = an.localeCompare(bn);
+        return sortDir === 'asc' ? c : -c;
+      }
+      if (sortKey === 'overall') {
+        const c = cmpNullable(a.overallPct, b.overallPct, sortDir);
+        return c !== 0 ? c : b.totalRallies - a.totalRallies;
+      }
+      // side:N
+      const side = Number(sortKey.slice(5));
+      const c = cmpNullable(a.sidePct.get(side) ?? null, b.sidePct.get(side) ?? null, sortDir);
+      return c !== 0 ? c : b.totalRallies - a.totalRallies;
+    });
+    return arr;
+  }, [rows, sortKey, sortDir]);
 
   if (pairings.length === 0) return null;
 
-  // Collect all side keys present across all pairings (should be 0 and 1)
-  const allSides = [...new Set(pairings.flatMap((p) => [...p.bySide.keys()]))].sort();
+  // Click a header: toggle direction if already active, else select it with a
+  // sensible default direction (desc for numbers, asc for the name column).
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'pairing' ? 'asc' : 'desc');
+    }
+  }
 
   return (
     <section className="space-y-4">
@@ -103,20 +186,45 @@ export function KitchenPairingsSection({ data }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-medium">
-              <th className="text-left px-5 py-3">Pairing</th>
-              {allSides.map((side) => (
-                <th key={side} className="text-right px-4 py-3">
-                  P1 on {SIDE_LABEL[side] ?? `Side ${side}`}
-                </th>
-              ))}
-              <th className="text-right px-4 py-3 font-semibold text-gray-600">Overall</th>
+              <th className="text-left px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleSort('pairing')}
+                  className="inline-flex items-center hover:text-gray-800 transition-colors"
+                >
+                  Pairing
+                  <SortArrow active={sortKey === 'pairing'} dir={sortDir} />
+                </button>
+              </th>
+              {allSides.map((side) => {
+                const key = `side:${side}` as SortKey;
+                return (
+                  <th key={side} className="text-right px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSort(key)}
+                      className="inline-flex items-center hover:text-gray-800 transition-colors"
+                    >
+                      P1 on {SIDE_LABEL[side] ?? `Side ${side}`}
+                      <SortArrow active={sortKey === key} dir={sortDir} />
+                    </button>
+                  </th>
+                );
+              })}
+              <th className="text-right px-4 py-3 font-semibold text-gray-600">
+                <button
+                  type="button"
+                  onClick={() => handleSort('overall')}
+                  className="inline-flex items-center hover:text-gray-800 transition-colors"
+                >
+                  Overall
+                  <SortArrow active={sortKey === 'overall'} dir={sortDir} />
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {pairings.map((p) => {
-              const totalKitchen = [...p.bySide.values()].reduce((s, r) => s + r.kitchen, 0);
-              const overallPct = p.totalRallies > 0 ? Math.round((totalKitchen / p.totalRallies) * 100) : null;
-              return (
+            {sortedRows.map((p) => (
               <tr key={`${p.p1.pid}|${p.p2.pid}`} className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -135,7 +243,7 @@ export function KitchenPairingsSection({ data }: Props) {
                 </td>
                 {allSides.map((side) => {
                   const s = p.bySide.get(side);
-                  const val = s ? pct(s) : null;
+                  const val = p.sidePct.get(side) ?? null;
                   return (
                     <td key={side} className="px-4 py-3 text-right">
                       {val !== null ? (
@@ -150,16 +258,15 @@ export function KitchenPairingsSection({ data }: Props) {
                   );
                 })}
                 <td className="px-4 py-3 text-right">
-                  {overallPct !== null ? (
-                    <span className="font-bold tabular-nums text-gray-900">{overallPct}%</span>
+                  {p.overallPct !== null ? (
+                    <span className="font-bold tabular-nums text-gray-900">{p.overallPct}%</span>
                   ) : (
                     <span className="text-gray-300">—</span>
                   )}
                   <span className="text-gray-400 text-xs ml-1">({p.totalRallies})</span>
                 </td>
               </tr>
-              );
-            })}
+            ))}
           </tbody>
         </table>
       </div>
