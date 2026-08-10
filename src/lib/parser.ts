@@ -81,10 +81,13 @@ function isKitchenShot(sh: RawShot): boolean {
   return sh.sht === 1 || sh.sht === 5 || sh.vol === 1;
 }
 
-function reachedKitchen(shots: RawShot[], team: number, afterIdx: number) {
+// Did `team` (a roster team, 0 or 1) reach the kitchen within their next 5 shots
+// after `afterIdx`? The hitting team is pd[pid].team — shot.st is the court side,
+// not the team.
+function reachedKitchen(shots: RawShot[], pd: RawPd[], team: number, afterIdx: number) {
   let checked = 0;
   for (let i = afterIdx + 1; i < shots.length && checked < 5; i++) {
-    if (shots[i].st === team) { if (isKitchenShot(shots[i])) return true; checked++; }
+    if (pd[shots[i].pid]?.team === team) { if (isKitchenShot(shots[i])) return true; checked++; }
   }
   return false;
 }
@@ -150,16 +153,18 @@ function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: num
       if (!nm) continue;
       const r = result.get(nm);
       if (!r) continue;
-      if (idx === 2) { r.k3dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k3dHits++; }
-      else if (idx === 4) { r.k5dTotal++; if (reachedKitchen(shots, shot.st, idx)) r.k5dHits++; }
+      if (idx === 2) { r.k3dTotal++; if (reachedKitchen(shots, pd, player.team, idx)) r.k3dHits++; }
+      else if (idx === 4) { r.k5dTotal++; if (reachedKitchen(shots, pd, player.team, idx)) r.k5dHits++; }
     }
     // Team-level kitchen arrival: only count rallies where this team is serving
     if (shots.length > 0) {
-      const servingTeam = shots[0].st;
-      if (!teamRally.has(servingTeam)) teamRally.set(servingTeam, { total: 0, kitchen: 0 });
-      const tr = teamRally.get(servingTeam)!;
-      tr.total++;
-      if (shots.some((s) => s.st === servingTeam && isKitchenShot(s))) tr.kitchen++;
+      const servingTeam = pd[shots[0].pid]?.team;
+      if (servingTeam != null) {
+        if (!teamRally.has(servingTeam)) teamRally.set(servingTeam, { total: 0, kitchen: 0 });
+        const tr = teamRally.get(servingTeam)!;
+        tr.total++;
+        if (shots.some((s) => pd[s.pid]?.team === servingTeam && isKitchenShot(s))) tr.kitchen++;
+      }
     }
   }
   // Assign team rally stats to each player on that team
@@ -242,7 +247,7 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
       // Attack (speed-up / overhead): sht=4
       if (shot.sht === 4) {
         acc.attackTotal++;
-        if (wt != null && shot.st === wt) acc.attackWins++;
+        if (wt != null && player.team === wt) acc.attackWins++;
         if (shot.q?.ex != null) { acc.attackExSum += shot.q.ex; acc.attackExW++; }
       }
       // Dink quality: sht=1
@@ -251,23 +256,22 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
         if (shot.q?.ex != null) { acc.dinkExSum += shot.q.ex; acc.dinkExW++; }
       }
       if (idx === 2) {
-        if (shot.sht === 2) { acc.t3Drop++; acc.k3Drop[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k3Drop[0]++; }
-        else if (shot.sht === 0) { acc.t3Drive++; acc.k3Drive[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k3Drive[0]++; }
+        if (shot.sht === 2) { acc.t3Drop++; acc.k3Drop[1]++; if (reachedKitchen(shots, pd, player.team, idx)) acc.k3Drop[0]++; }
+        else if (shot.sht === 0) { acc.t3Drive++; acc.k3Drive[1]++; if (reachedKitchen(shots, pd, player.team, idx)) acc.k3Drive[0]++; }
       }
       if (idx === 4) {
-        if (shot.sht === 2) { acc.t5Drop++; acc.k5Drop[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k5Drop[0]++; }
-        else if (shot.sht === 0) { acc.t5Drive++; acc.k5Drive[1]++; if (reachedKitchen(shots, shot.st, idx)) acc.k5Drive[0]++; }
+        if (shot.sht === 2) { acc.t5Drop++; acc.k5Drop[1]++; if (reachedKitchen(shots, pd, player.team, idx)) acc.k5Drop[0]++; }
+        else if (shot.sht === 0) { acc.t5Drive++; acc.k5Drive[1]++; if (reachedKitchen(shots, pd, player.team, idx)) acc.k5Drive[0]++; }
       }
     }
     // Clean winner: last shot, no error, hitter's team won
     if (shots.length > 0 && wt != null) {
       const last = shots[shots.length - 1];
-      if (!last.err && last.st === wt) {
-        const wp = pd[last.pid]; if (wp) {
-          const wacc = getOrCreate(wp.name?.trim() ?? '');
-          wacc.winnerTotal++;
-          if (last.q?.ex != null) { wacc.winnerExSum += last.q.ex; wacc.winnerExW++; }
-        }
+      const wp = pd[last.pid];
+      if (!last.err && wp && wp.team === wt) {
+        const wacc = getOrCreate(wp.name?.trim() ?? '');
+        wacc.winnerTotal++;
+        if (last.q?.ex != null) { wacc.winnerExSum += last.q.ex; wacc.winnerExW++; }
       }
     }
   }
