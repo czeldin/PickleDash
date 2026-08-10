@@ -160,7 +160,8 @@ export interface ServingRallyRow {
   // Physical court side per serving-team player this rally, from rally.pls.
   // Keyed by lowercased player name. 0 = Left, 1 = Right.
   sides: Record<string, number>;
-  reachedKitchen: boolean;
+  // True if the serving team reached the kitchen OR won the point.
+  success: boolean;
 }
 
 export interface KitchenByGameRow {

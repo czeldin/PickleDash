@@ -59,7 +59,7 @@ function buildPairings(data: DashboardData): PairingStats[] {
     }
     const p = pairingMap.get(key)!;
     p.totalRallies++;
-    if (rally.reachedKitchen) p.totalKitchen++;
+    if (rally.success) p.totalKitchen++;
 
     // pid1's actual physical side this rally, read directly from rally.pls.
     const pid1Side = rally.sides[pid1];
@@ -67,7 +67,7 @@ function buildPairings(data: DashboardData): PairingStats[] {
       if (!p.bySide.has(pid1Side)) p.bySide.set(pid1Side, { rallies: 0, kitchen: 0 });
       const s = p.bySide.get(pid1Side)!;
       s.rallies++;
-      if (rally.reachedKitchen) s.kitchen++;
+      if (rally.success) s.kitchen++;
     }
   }
 
@@ -180,10 +180,10 @@ export function KitchenPairingsSection({ data }: Props) {
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2">
-        Kitchen Arrival by Pairing &amp; Side
+        Serving Success by Pairing &amp; Side
       </h2>
       <p className="text-sm text-gray-500 -mt-1">
-        % of serving rallies where the team reached the kitchen, split by which side the first player is on.
+        % of serving rallies where the team reached the kitchen <em>or</em> won the point, split by which side the first player is on.
       </p>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
@@ -283,7 +283,7 @@ export function KitchenPairingsSection({ data }: Props) {
         </table>
       </div>
       <p className="text-xs text-gray-400">
-        &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on when their team serves. Counts show (kitchen arrivals / serving rallies).
+        &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on when their team serves. A rally counts as a success if the team reached the kitchen or won the point. Counts show (successes / serving rallies).
       </p>
     </section>
   );
