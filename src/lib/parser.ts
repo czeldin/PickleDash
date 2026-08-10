@@ -7,7 +7,7 @@ import {
 } from '@/types/dashboard';
 
 interface RawShot {
-  pid: number; t: number[]; ss: number; st: number; sht?: number;
+  pid: number; t: number[]; ss: number; st: number; sht?: number; vol?: number;
   q?: { ex?: number };
   err?: { f?: { n?: number; out?: number; sh?: number }; pop?: number; uf?: number };
 }
@@ -74,10 +74,17 @@ function driveSpeedMph(t0: number, t1: number): number | null {
   if (ms <= 0) return null;
   return Math.max(10, Math.min(90, 55 - ((ms - 200) / 800) * 35));
 }
+// A shot that indicates the hitter was up at the kitchen: a dink (sht=1), a
+// volley shot type (sht=5), or any shot hit as a volley (vol=1 — a block,
+// counter, or volley-drop taken at the net before the ball bounced).
+function isKitchenShot(sh: RawShot): boolean {
+  return sh.sht === 1 || sh.sht === 5 || sh.vol === 1;
+}
+
 function reachedKitchen(shots: RawShot[], team: number, afterIdx: number) {
   let checked = 0;
   for (let i = afterIdx + 1; i < shots.length && checked < 5; i++) {
-    if (shots[i].st === team) { if (shots[i].sht === 1 || shots[i].sht === 5) return true; checked++; }
+    if (shots[i].st === team) { if (isKitchenShot(shots[i])) return true; checked++; }
   }
   return false;
 }
@@ -152,7 +159,7 @@ function getSessionKitchenByPlayer(session: RawSession): Map<string, { team: num
       if (!teamRally.has(servingTeam)) teamRally.set(servingTeam, { total: 0, kitchen: 0 });
       const tr = teamRally.get(servingTeam)!;
       tr.total++;
-      if (shots.some((s) => s.st === servingTeam && (s.sht === 1 || s.sht === 5))) tr.kitchen++;
+      if (shots.some((s) => s.st === servingTeam && isKitchenShot(s))) tr.kitchen++;
     }
   }
   // Assign team rally stats to each player on that team
@@ -356,7 +363,7 @@ export function parseMultipleNights(
             }
             // Track kitchen arrival and the point outcome separately so the UI
             // can show both. Reached = the serving team hit a dink/volley.
-            const reached = shots.some((s2) => s2.st === serve.st && (s2.sht === 1 || s2.sht === 5));
+            const reached = shots.some((s2) => s2.st === serve.st && isKitchenShot(s2));
             const won = rally.wt === serve.st;
             servingRallies.push({
               sessionKey: key,
@@ -385,7 +392,7 @@ export function parseMultipleNights(
                   team,
                   serving: team === serve.st,
                   won: rally.wt === team,
-                  reached: shots.some((s2) => s2.st === team && (s2.sht === 1 || s2.sht === 5)),
+                  reached: shots.some((s2) => s2.st === team && isKitchenShot(s2)),
                   sides: teamSide,
                 });
               }
