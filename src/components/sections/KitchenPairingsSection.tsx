@@ -90,6 +90,7 @@ interface PairingRow {
   p2: PlayerMeta;
   bySide: Map<number, SideStat>;
   totalRallies: number;
+  totalKitchen: number;
   sidePct: Map<number, number | null>;
   overallPct: number | null;
 }
@@ -135,7 +136,7 @@ export function KitchenPairingsSection({ data }: Props) {
         }
         const totalKitchen = [...p.bySide.values()].reduce((s, r) => s + r.kitchen, 0);
         const overallPct = p.totalRallies > 0 ? Math.round((totalKitchen / p.totalRallies) * 100) : null;
-        return { ...p, sidePct, overallPct };
+        return { ...p, totalKitchen, sidePct, overallPct };
       }),
     [pairings, allSides]
   );
@@ -260,7 +261,7 @@ export function KitchenPairingsSection({ data }: Props) {
                           <span className="text-gray-300">—</span>
                         )}
                         {s && s.rallies > 0 && (
-                          <span className="text-gray-400 text-xs ml-1">({s.rallies})</span>
+                          <span className="text-gray-400 text-xs ml-1">({s.kitchen}/{s.rallies})</span>
                         )}
                       </div>
                     </td>
@@ -272,7 +273,7 @@ export function KitchenPairingsSection({ data }: Props) {
                   ) : (
                     <span className="text-gray-300">—</span>
                   )}
-                  <span className="text-gray-400 text-xs ml-1">({p.totalRallies})</span>
+                  <span className="text-gray-400 text-xs ml-1">({p.totalKitchen}/{p.totalRallies})</span>
                 </td>
               </tr>
             ))}
@@ -280,7 +281,7 @@ export function KitchenPairingsSection({ data }: Props) {
         </table>
       </div>
       <p className="text-xs text-gray-400">
-        &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on when their team serves.
+        &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on when their team serves. Counts show (kitchen arrivals / serving rallies).
       </p>
     </section>
   );
