@@ -1,5 +1,5 @@
 /**
- * Server-only storage helpers — backed by Cloudflare R2 (S3-compatible).
+ * Server-only storage helpers — backed by Backblaze B2 (S3-compatible).
  * Import only from API routes (never from client components).
  *
  * Architecture: each night has two objects:
@@ -7,8 +7,11 @@
  *   nights/{id}/raw.json.gz  — gzip-compressed pb.vision JSON
  *
  * Required env vars:
- *   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
- *   R2_BUCKET_NAME, R2_PUBLIC_URL (e.g. https://pub-xxx.r2.dev)
+ *   B2_REGION            e.g. us-west-004
+ *   B2_ACCESS_KEY_ID     keyID from Backblaze App Key
+ *   B2_SECRET_ACCESS_KEY applicationKey from Backblaze App Key
+ *   B2_BUCKET_NAME       e.g. pickledash
+ *   B2_PUBLIC_URL        e.g. https://pickledash.s3.us-west-004.backblazeb2.com
  */
 import {
   S3Client,
@@ -24,19 +27,19 @@ import { PaddleTag } from '@/types/nights';
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
 
-function r2Client() {
+function b2Client() {
   return new S3Client({
-    region: 'auto',
-    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    region: process.env.B2_REGION!,
+    endpoint: `https://s3.${process.env.B2_REGION}.backblazeb2.com`,
     credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.B2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.B2_SECRET_ACCESS_KEY!,
     },
   });
 }
 
-const BUCKET = () => process.env.R2_BUCKET_NAME!;
-const publicUrl = (key: string) => `${process.env.R2_PUBLIC_URL}/${key}`;
+const BUCKET = () => process.env.B2_BUCKET_NAME!;
+const publicUrl = (key: string) => `${process.env.B2_PUBLIC_URL}/${key}`;
 
 export interface NightMeta {
   id: string;
@@ -50,7 +53,7 @@ export interface NightMeta {
 // ─── Meta helpers ─────────────────────────────────────────────────────────────
 
 export async function saveNightMeta(id: string, meta: NightMeta): Promise<void> {
-  await r2Client().send(new PutObjectCommand({
+  await b2Client().send(new PutObjectCommand({
     Bucket: BUCKET(),
     Key: `nights/${id}/meta.json`,
     Body: JSON.stringify(meta),
@@ -69,7 +72,7 @@ export async function getNightMeta(id: string): Promise<NightMeta | null> {
 /** List all uploaded nights by scanning meta.json files. */
 export async function getAllNightMetas(): Promise<NightMeta[]> {
   try {
-    const client = r2Client();
+    const client = b2Client();
     const listed = await client.send(new ListObjectsV2Command({
       Bucket: BUCKET(),
       Prefix: 'nights/',
@@ -97,7 +100,7 @@ export async function getAllNightMetas(): Promise<NightMeta[]> {
  */
 export async function getOrphanedRawIds(): Promise<string[]> {
   try {
-    const client = r2Client();
+    const client = b2Client();
     const listed = await client.send(new ListObjectsV2Command({
       Bucket: BUCKET(),
       Prefix: 'nights/',
@@ -121,7 +124,7 @@ export async function getOrphanedRawIds(): Promise<string[]> {
 
 export async function saveRawData(id: string, raw: unknown): Promise<void> {
   const compressed = await gzipAsync(Buffer.from(JSON.stringify(raw), 'utf-8'));
-  await r2Client().send(new PutObjectCommand({
+  await b2Client().send(new PutObjectCommand({
     Bucket: BUCKET(),
     Key: `nights/${id}/raw.json.gz`,
     Body: compressed,
@@ -147,7 +150,7 @@ export async function getRawData(id: string): Promise<unknown | null> {
 
 export async function deleteNightFromBlob(id: string): Promise<void> {
   try {
-    const client = r2Client();
+    const client = b2Client();
     const listed = await client.send(new ListObjectsV2Command({
       Bucket: BUCKET(),
       Prefix: `nights/${id}/`,
