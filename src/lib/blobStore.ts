@@ -11,11 +11,14 @@
  *   B2_ACCESS_KEY_ID     keyID from Backblaze App Key
  *   B2_SECRET_ACCESS_KEY applicationKey from Backblaze App Key
  *   B2_BUCKET_NAME       e.g. pickledash
- *   B2_PUBLIC_URL        e.g. https://pickledash.s3.us-west-004.backblazeb2.com
+ *
+ * Reads and writes both go through the authenticated S3 API, so the bucket can
+ * stay private and no public URL is required.
  */
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
@@ -38,7 +41,26 @@ function b2Client() {
 }
 
 const BUCKET = () => process.env.B2_BUCKET_NAME!;
-const publicUrl = (key: string) => `${process.env.B2_PUBLIC_URL}/${key}`;
+
+/**
+ * Read an object via the authenticated S3 API. Returns the raw bytes, or null
+ * if the object doesn't exist. Uses the same credentials as writes — no
+ * dependence on the bucket being public.
+ */
+async function getObjectBytes(key: string): Promise<Buffer | null> {
+  try {
+    const res = await b2Client().send(new GetObjectCommand({
+      Bucket: BUCKET(),
+      Key: key,
+    }));
+    if (!res.Body) return null;
+    // AWS SDK v3 Node stream helper
+    const bytes = await res.Body.transformToByteArray();
+    return Buffer.from(bytes);
+  } catch {
+    return null;
+  }
+}
 
 export interface NightMeta {
   id: string;
@@ -61,10 +83,10 @@ export async function saveNightMeta(id: string, meta: NightMeta): Promise<void> 
 }
 
 export async function getNightMeta(id: string): Promise<NightMeta | null> {
+  const buf = await getObjectBytes(`nights/${id}/meta.json`);
+  if (!buf) return null;
   try {
-    const res = await fetch(publicUrl(`nights/${id}/meta.json`), { cache: 'no-store' });
-    if (!res.ok) return null;
-    return (await res.json()) as NightMeta;
+    return JSON.parse(buf.toString('utf-8')) as NightMeta;
   } catch { return null; }
 }
 
@@ -82,10 +104,10 @@ export async function getAllNightMetas(): Promise<NightMeta[]> {
     if (metaKeys.length === 0) return [];
     const results = await Promise.all(
       metaKeys.map(async (key) => {
+        const buf = await getObjectBytes(key);
+        if (!buf) return null;
         try {
-          const res = await fetch(publicUrl(key), { cache: 'no-store' });
-          if (!res.ok) return null;
-          return (await res.json()) as NightMeta;
+          return JSON.parse(buf.toString('utf-8')) as NightMeta;
         } catch { return null; }
       })
     );
@@ -134,16 +156,15 @@ export async function saveRawData(id: string, raw: unknown): Promise<void> {
 export async function getRawData(id: string): Promise<unknown | null> {
   try {
     // Try compressed first
-    const gzRes = await fetch(publicUrl(`nights/${id}/raw.json.gz`), { cache: 'no-store' });
-    if (gzRes.ok) {
-      const buf = Buffer.from(await gzRes.arrayBuffer());
-      const decompressed = await gunzipAsync(buf);
+    const gz = await getObjectBytes(`nights/${id}/raw.json.gz`);
+    if (gz) {
+      const decompressed = await gunzipAsync(gz);
       return JSON.parse(decompressed.toString('utf-8'));
     }
     // Fall back to legacy uncompressed
-    const res = await fetch(publicUrl(`nights/${id}/raw.json`), { cache: 'no-store' });
-    if (!res.ok) return null;
-    return await res.json();
+    const raw = await getObjectBytes(`nights/${id}/raw.json`);
+    if (!raw) return null;
+    return JSON.parse(raw.toString('utf-8'));
   } catch { return null; }
 }
 
