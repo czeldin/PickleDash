@@ -3,7 +3,7 @@ import {
   DashboardData, PlayerMeta, PLAYER_COLORS,
   HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
-  AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow,
+  AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
 } from '@/types/dashboard';
 
 interface RawShot {
@@ -298,7 +298,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [] };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [] };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -312,6 +312,7 @@ export function parseMultipleNights(
   const skillRatingsByGame: SkillRatingsByGameRow[] = [];
   const kitchenByGame: KitchenByGameRow[] = [];
   const servingRallies: ServingRallyRow[] = [];
+  const rallySides: RallySideRow[] = [];
 
   for (const night of nights) {
     const rawSessions = getRawSessions(night.raw);
@@ -365,6 +366,29 @@ export function parseMultipleNights(
               reached,
               won,
             });
+
+            // Per-team side rows (both teams) for the win-by-side section, so we
+            // can split serving vs receiving. Skip rallies with no clear winner.
+            if (Array.isArray(pls) && (rally.wt === 0 || rally.wt === 1)) {
+              const teamSides = new Map<number, Record<string, number>>();
+              for (let pi = 0; pi < pd.length; pi++) {
+                const pl = pd[pi];
+                if (!pl || !pls[pi]) continue;
+                const nm = pl.name?.trim()?.toLowerCase();
+                if (!nm) continue;
+                if (!teamSides.has(pl.team)) teamSides.set(pl.team, {});
+                teamSides.get(pl.team)![nm] = pls[pi]?.left ? 0 : 1;
+              }
+              for (const [team, teamSide] of teamSides) {
+                rallySides.push({
+                  sessionKey: key,
+                  team,
+                  serving: team === serve.st,
+                  won: rally.wt === team,
+                  sides: teamSide,
+                });
+              }
+            }
           }
         }
         // Collect per-game skill ratings for the By Game breakdown tab
@@ -423,7 +447,7 @@ export function parseMultipleNights(
     .slice(0, 12);
 
   const data = accumsToData(Array.from(accumMap.values()), allSessions);
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies };
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides };
 }
 
 // Convenience wrapper for a single file

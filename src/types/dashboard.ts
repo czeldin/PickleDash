@@ -164,6 +164,18 @@ export interface ServingRallyRow {
   won: boolean;      // serving team won the point
 }
 
+// One row per (rally, team) — covers both teams of every rally, so the
+// win-by-side section can measure serving and receiving separately.
+export interface RallySideRow {
+  sessionKey: string;
+  team: number;
+  serving: boolean;   // was this team the serving team this rally
+  won: boolean;       // did this team win the point
+  // Physical court side per this team's players, from rally.pls.
+  // Keyed by lowercased player name. 0 = Left, 1 = Right.
+  sides: Record<string, number>;
+}
+
 export interface KitchenByGameRow {
   pid: string;
   sessionKey: string;
@@ -204,4 +216,5 @@ export interface DashboardData {
   dinks: DinkRow[];
   kitchenByGame: KitchenByGameRow[];
   servingRallies: ServingRallyRow[];
+  rallySides: RallySideRow[];
 }
