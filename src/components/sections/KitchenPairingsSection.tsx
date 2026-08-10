@@ -7,15 +7,14 @@ interface Props {
   data: DashboardData;
 }
 
-interface SideStat { rallies: number; kitchen: number }
+interface SideStat { rallies: number; kitchen: number; win: number }
 
 interface PairingStats {
   p1: PlayerMeta;
   p2: PlayerMeta;
   // keyed by p1's actual physical side that rally (from rally.pls): 0 = Left, 1 = Right
   bySide: Map<number, SideStat>;
-  totalRallies: number;
-  totalKitchen: number;
+  overall: SideStat;
 }
 
 // From pb.vision rally.pls: 0 = Left, 1 = Right
@@ -35,8 +34,7 @@ function buildPairings(data: DashboardData): PairingStats[] {
   const pairingMap = new Map<string, {
     pids: [string, string];
     bySide: Map<number, SideStat>;
-    totalRallies: number;
-    totalKitchen: number;
+    overall: SideStat;
   }>();
 
   for (const rally of servingRallies) {
@@ -55,52 +53,46 @@ function buildPairings(data: DashboardData): PairingStats[] {
 
     const key = `${pid1}|${pid2}`;
     if (!pairingMap.has(key)) {
-      pairingMap.set(key, { pids: [pid1, pid2], bySide: new Map(), totalRallies: 0, totalKitchen: 0 });
+      pairingMap.set(key, { pids: [pid1, pid2], bySide: new Map(), overall: { rallies: 0, kitchen: 0, win: 0 } });
     }
     const p = pairingMap.get(key)!;
-    p.totalRallies++;
-    if (rally.success) p.totalKitchen++;
+    p.overall.rallies++;
+    if (rally.reached) p.overall.kitchen++;
+    if (rally.won) p.overall.win++;
 
     // pid1's actual physical side this rally, read directly from rally.pls.
     const pid1Side = rally.sides[pid1];
     if (pid1Side === 0 || pid1Side === 1) {
-      if (!p.bySide.has(pid1Side)) p.bySide.set(pid1Side, { rallies: 0, kitchen: 0 });
+      if (!p.bySide.has(pid1Side)) p.bySide.set(pid1Side, { rallies: 0, kitchen: 0, win: 0 });
       const s = p.bySide.get(pid1Side)!;
       s.rallies++;
-      if (rally.success) s.kitchen++;
+      if (rally.reached) s.kitchen++;
+      if (rally.won) s.win++;
     }
   }
 
   return [...pairingMap.values()]
-    .filter((p) => playerMap.has(p.pids[0]) && playerMap.has(p.pids[1]) && p.totalRallies > 0)
-    .sort((a, b) => b.totalRallies - a.totalRallies)
+    .filter((p) => playerMap.has(p.pids[0]) && playerMap.has(p.pids[1]) && p.overall.rallies > 0)
+    .sort((a, b) => b.overall.rallies - a.overall.rallies)
     .map((p) => ({
       p1: playerMap.get(p.pids[0])!,
       p2: playerMap.get(p.pids[1])!,
       bySide: p.bySide,
-      totalRallies: p.totalRallies,
-      totalKitchen: p.totalKitchen,
+      overall: p.overall,
     }));
 }
 
-function pct(s: SideStat) {
+function kitchenPct(s: SideStat) {
   return s.rallies > 0 ? Math.round((s.kitchen / s.rallies) * 100) : null;
 }
-
-// A pairing row with precomputed values so sorting doesn't recompute per compare.
-interface PairingRow {
-  p1: PlayerMeta;
-  p2: PlayerMeta;
-  bySide: Map<number, SideStat>;
-  totalRallies: number;
-  totalKitchen: number;
-  sidePct: Map<number, number | null>;
-  overallPct: number | null;
+function winPct(s: SideStat) {
+  return s.rallies > 0 ? Math.round((s.win / s.rallies) * 100) : null;
 }
 
 // sortKey: 'pairing' | 'overall' | `side:${n}`
 type SortKey = 'pairing' | 'overall' | `side:${number}`;
 type SortDir = 'asc' | 'desc';
+type SortMetric = 'kitchen' | 'win';
 
 // Compare with nulls always sorted last, regardless of direction.
 function cmpNullable(a: number | null, b: number | null, dir: SortDir): number {
@@ -118,10 +110,31 @@ function SortArrow({ active, dir }: { active: boolean; dir: SortDir }) {
   );
 }
 
+// Renders the Kitchen % / Win % pair for one stat cell.
+function StatPair({ s }: { s: SideStat | undefined }) {
+  if (!s || s.rallies === 0) return <span className="text-gray-300">—</span>;
+  const k = kitchenPct(s);
+  const w = winPct(s);
+  return (
+    <div className="inline-flex flex-col items-end leading-tight">
+      <div className="flex items-baseline gap-2 tabular-nums">
+        <span className="text-gray-400 text-[10px] uppercase tracking-wide">Kit</span>
+        <span className="font-semibold text-gray-800 w-9 text-right">{k}%</span>
+      </div>
+      <div className="flex items-baseline gap-2 tabular-nums">
+        <span className="text-gray-400 text-[10px] uppercase tracking-wide">Win</span>
+        <span className="font-semibold text-emerald-700 w-9 text-right">{w}%</span>
+      </div>
+      <span className="text-gray-400 text-[10px] mt-0.5">({s.rallies})</span>
+    </div>
+  );
+}
+
 export function KitchenPairingsSection({ data }: Props) {
   const pairings = buildPairings(data);
   const [sortKey, setSortKey] = useState<SortKey>('overall');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [sortMetric, setSortMetric] = useState<SortMetric>('kitchen');
 
   // Collect all side keys present across all pairings (should be 0 and 1)
   const allSides = useMemo(
@@ -129,22 +142,10 @@ export function KitchenPairingsSection({ data }: Props) {
     [pairings]
   );
 
-  const rows: PairingRow[] = useMemo(
-    () =>
-      pairings.map((p) => {
-        const sidePct = new Map<number, number | null>();
-        for (const side of allSides) {
-          const s = p.bySide.get(side);
-          sidePct.set(side, s ? pct(s) : null);
-        }
-        const overallPct = p.totalRallies > 0 ? Math.round((p.totalKitchen / p.totalRallies) * 100) : null;
-        return { ...p, sidePct, overallPct };
-      }),
-    [pairings, allSides]
-  );
-
   const sortedRows = useMemo(() => {
-    const arr = [...rows];
+    const metricPct = (s: SideStat | undefined) =>
+      !s ? null : sortMetric === 'kitchen' ? kitchenPct(s) : winPct(s);
+    const arr = [...pairings];
     arr.sort((a, b) => {
       if (sortKey === 'pairing') {
         const an = `${a.p1.name} ${a.p2.name}`.toLowerCase();
@@ -152,17 +153,13 @@ export function KitchenPairingsSection({ data }: Props) {
         const c = an.localeCompare(bn);
         return sortDir === 'asc' ? c : -c;
       }
-      if (sortKey === 'overall') {
-        const c = cmpNullable(a.overallPct, b.overallPct, sortDir);
-        return c !== 0 ? c : b.totalRallies - a.totalRallies;
-      }
-      // side:N
-      const side = Number(sortKey.slice(5));
-      const c = cmpNullable(a.sidePct.get(side) ?? null, b.sidePct.get(side) ?? null, sortDir);
-      return c !== 0 ? c : b.totalRallies - a.totalRallies;
+      const aStat = sortKey === 'overall' ? a.overall : a.bySide.get(Number(sortKey.slice(5)));
+      const bStat = sortKey === 'overall' ? b.overall : b.bySide.get(Number(sortKey.slice(5)));
+      const c = cmpNullable(metricPct(aStat), metricPct(bStat), sortDir);
+      return c !== 0 ? c : b.overall.rallies - a.overall.rallies;
     });
     return arr;
-  }, [rows, sortKey, sortDir]);
+  }, [pairings, sortKey, sortDir, sortMetric]);
 
   if (pairings.length === 0) return null;
 
@@ -179,11 +176,29 @@ export function KitchenPairingsSection({ data }: Props) {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2">
-        Serving Success by Pairing &amp; Side
-      </h2>
+      <div className="flex items-end justify-between border-b border-gray-200 pb-2 gap-3 flex-wrap">
+        <h2 className="text-xl font-bold text-gray-800">
+          Kitchen Arrival &amp; Win by Pairing &amp; Side
+        </h2>
+        {/* Which metric the sortable columns sort by */}
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-gray-400">Sort by</span>
+          {(['kitchen', 'win'] as SortMetric[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setSortMetric(m)}
+              className={`px-2 py-0.5 rounded-full font-medium transition-colors ${
+                sortMetric === m ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {m === 'kitchen' ? 'Kitchen %' : 'Win %'}
+            </button>
+          ))}
+        </div>
+      </div>
       <p className="text-sm text-gray-500 -mt-1">
-        % of serving rallies where the team reached the kitchen <em>or</em> won the point, split by which side the first player is on.
+        Serving rallies split by which side the first player is on. <strong className="text-gray-600">Kit</strong> = reached the kitchen; <strong className="text-emerald-700">Win</strong> = won the point.
       </p>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
@@ -229,7 +244,7 @@ export function KitchenPairingsSection({ data }: Props) {
           <tbody className="divide-y divide-gray-50">
             {sortedRows.map((p) => (
               <tr key={`${p.p1.pid}|${p.p2.pid}`} className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3">
+                <td className="px-5 py-3 align-top">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold flex-shrink-0"
@@ -244,38 +259,21 @@ export function KitchenPairingsSection({ data }: Props) {
                     <span className="text-gray-700 font-medium">{p.p2.name}</span>
                   </div>
                 </td>
-                {allSides.map((side) => {
-                  const s = p.bySide.get(side);
-                  const val = p.sidePct.get(side) ?? null;
-                  return (
-                    <td key={side} className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span
-                          className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0"
-                          style={{ backgroundColor: p.p1.color.bg, color: p.p1.color.text }}
-                        >{p.p1.initials}</span>
-                        <span className="text-gray-500 text-xs">{p.p1.name}</span>
-                      </div>
-                      <div className="mt-0.5">
-                        {val !== null ? (
-                          <span className="font-semibold tabular-nums text-gray-800">{val}%</span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                        {s && s.rallies > 0 && (
-                          <span className="text-gray-400 text-xs ml-1">({s.kitchen}/{s.rallies})</span>
-                        )}
-                      </div>
-                    </td>
-                  );
-                })}
-                <td className="px-4 py-3 text-right">
-                  {p.overallPct !== null ? (
-                    <span className="font-bold tabular-nums text-gray-900">{p.overallPct}%</span>
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
-                  <span className="text-gray-400 text-xs ml-1">({p.totalKitchen}/{p.totalRallies})</span>
+                {allSides.map((side) => (
+                  <td key={side} className="px-4 py-3 text-right align-top">
+                    <div className="flex items-center justify-end gap-1.5 mb-1">
+                      <span
+                        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0"
+                        style={{ backgroundColor: p.p1.color.bg, color: p.p1.color.text }}
+                      >{p.p1.initials}</span>
+                      <span className="text-gray-500 text-xs">{p.p1.name}</span>
+                    </div>
+                    <StatPair s={p.bySide.get(side)} />
+                  </td>
+                ))}
+                <td className="px-4 py-3 text-right align-top">
+                  <div className="mb-1 text-xs text-gray-400">&nbsp;</div>
+                  <StatPair s={p.overall} />
                 </td>
               </tr>
             ))}
@@ -283,7 +281,7 @@ export function KitchenPairingsSection({ data }: Props) {
         </table>
       </div>
       <p className="text-xs text-gray-400">
-        &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on when their team serves. A rally counts as a success if the team reached the kitchen or won the point. Counts show (successes / serving rallies).
+        &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on when their team serves. Count in parentheses is the number of serving rallies.
       </p>
     </section>
   );

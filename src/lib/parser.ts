@@ -353,10 +353,8 @@ export function parseMultipleNights(
                 sides[nm] = pls[pi]?.left ? 0 : 1;
               }
             }
-            // Success = the serving team reached the kitchen (hit a dink/volley)
-            // OR won the point outright. Folding in the win avoids penalizing
-            // quick winners (3rd-shot putaways, forced errors) that end the
-            // rally before the team ever needs to get to the net.
+            // Track kitchen arrival and the point outcome separately so the UI
+            // can show both. Reached = the serving team hit a dink/volley.
             const reached = shots.some((s2) => s2.st === serve.st && (s2.sht === 1 || s2.sht === 5));
             const won = rally.wt === serve.st;
             servingRallies.push({
@@ -364,7 +362,8 @@ export function parseMultipleNights(
               servingTeam: serve.st,
               servedByPid,
               sides,
-              success: reached || won,
+              reached,
+              won,
             });
           }
         }
