@@ -86,6 +86,21 @@ function pct(s: SideStat) {
 export function KitchenPairingsSection({ data }: Props) {
   const pairings = buildPairings(data);
 
+  // Temporary: log serve side distribution so we can verify ss=0/1 vs pb.vision "Left side %"
+  if (typeof window !== 'undefined' && data.servingRallies.length > 0) {
+    const dist: Record<string, { ss0: number; ss1: number }> = {};
+    for (const r of data.servingRallies) {
+      if (!dist[r.servedByPid]) dist[r.servedByPid] = { ss0: 0, ss1: 0 };
+      if (r.servedSide === 0) dist[r.servedByPid].ss0++;
+      else dist[r.servedByPid].ss1++;
+    }
+    console.log('[ss verify] Compare these against pb.vision "Left side %" for each player:');
+    for (const [pid, c] of Object.entries(dist)) {
+      const t = c.ss0 + c.ss1;
+      console.log(`  ${pid}: ss=0 → ${Math.round(c.ss0/t*100)}%  |  ss=1 → ${Math.round(c.ss1/t*100)}%  (n=${t})`);
+    }
+  }
+
   if (pairings.length === 0) return null;
 
   // Collect all side keys present across all pairings (should be 0 and 1)
