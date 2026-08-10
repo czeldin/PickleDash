@@ -246,14 +246,23 @@ export function KitchenPairingsSection({ data }: Props) {
                   const val = p.sidePct.get(side) ?? null;
                   return (
                     <td key={side} className="px-4 py-3 text-right">
-                      {val !== null ? (
-                        <span className="font-semibold tabular-nums text-gray-800">{val}%</span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                      {s && s.rallies > 0 && (
-                        <span className="text-gray-400 text-xs ml-1">({s.rallies})</span>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span
+                          className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0"
+                          style={{ backgroundColor: p.p1.color.bg, color: p.p1.color.text }}
+                        >{p.p1.initials}</span>
+                        <span className="text-gray-500 text-xs">{p.p1.name}</span>
+                      </div>
+                      <div className="mt-0.5">
+                        {val !== null ? (
+                          <span className="font-semibold tabular-nums text-gray-800">{val}%</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                        {s && s.rallies > 0 && (
+                          <span className="text-gray-400 text-xs ml-1">({s.rallies})</span>
+                        )}
+                      </div>
                     </td>
                   );
                 })}
