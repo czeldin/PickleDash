@@ -208,6 +208,38 @@ export interface DinkRow {
   dinkExcellentPct: number;   // avg q.ex for dinks * 100
 }
 
+// pb.vision's own per-player coaching flags (the `ca.advice` block)
+export interface CoachingRow {
+  pid: string;
+  items: { kind: string; value: number; relevance: number }[]; // sorted worst→best (low value = weakness)
+}
+
+// Winners hit vs points given away, per player
+export interface RallyImpactRow {
+  pid: string;
+  games: number;
+  won: number;         // clean rally-ending winners
+  lostDirect: number;  // rally-ending errors (net/out/kitchen fault)
+  setup: number;       // pop-ups immediately put away by the opponent
+}
+
+// Who attacks and who gets picked on
+export interface TargetingRow {
+  pid: string;
+  games: number;
+  attacks: number;      // speed-up / attack shots hit (sht=4)
+  fin: number;          // finishing attempts
+  pop: number;          // pop-ups given up
+  gotAttacked: number;  // this player's shot immediately followed by an opponent finish
+}
+
+// Kitchen arrival split by serving vs receiving (from role_data)
+export interface KitchenSRRow {
+  pid: string;
+  serveNum: number; serveDen: number;
+  recvNum: number; recvDen: number;
+}
+
 export interface DashboardData {
   sessions: SessionInfo[];
   highlights: HighlightRally[];
@@ -230,4 +262,8 @@ export interface DashboardData {
   kitchenByGame: KitchenByGameRow[];
   servingRallies: ServingRallyRow[];
   rallySides: RallySideRow[];
+  coaching: CoachingRow[];
+  rallyImpact: RallyImpactRow[];
+  targeting: TargetingRow[];
+  kitchenSR: KitchenSRRow[];
 }

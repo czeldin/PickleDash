@@ -4,15 +4,19 @@ import {
   HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
+  CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow,
 } from '@/types/dashboard';
 
 interface RawShot {
   pid: number; t: number[]; ss: number; st: number; sht?: number; vol?: number;
+  win?: string; fin?: number;
   q?: { ex?: number };
-  err?: { f?: { n?: number; out?: number; sh?: number }; pop?: number; uf?: number };
+  err?: { f?: { n?: number; out?: number; sh?: number; k?: number }; pop?: number; uf?: number };
 }
+type RoleSide = { total?: number; kitchen_arrival?: number };
 interface RawPd {
   name: string; team: number; shot_count: number;
+  role_data?: { serving?: { oneself?: RoleSide }; receiving?: { oneself?: RoleSide } };
   trends: {
     ratings?: { serve?: number; return?: number; offense?: number; defense?: number; agility?: number; consistency?: number; overall?: number; court_iq?: number; kitchen_game?: number; ball_control?: number; targeting?: number };
     shot_accuracy?: { in?: number; net?: number; out?: number };
@@ -27,6 +31,7 @@ interface RawSession {
   ral: { sh: RawShot[]; wt: number; pls?: { left?: number }[] }[];
   pd: RawPd[];
   gd?: { game_outcome?: number[] };
+  ca?: Record<string, { advice?: { kind: string; value: number; relevance: number }[] }>;
 }
 
 /** Returns a human-readable session label.
@@ -314,7 +319,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [] };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [], coaching: [], rallyImpact: [], targeting: [], kitchenSR: [] };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -329,6 +334,15 @@ export function parseMultipleNights(
   const kitchenByGame: KitchenByGameRow[] = [];
   const servingRallies: ServingRallyRow[] = [];
   const rallySides: RallySideRow[] = [];
+
+  // New per-player aggregates (keyed by lowercased name)
+  const riMap = new Map<string, { games: number; won: number; lostDirect: number; setup: number }>();
+  const tgtMap = new Map<string, { games: number; attacks: number; fin: number; pop: number; gotAttacked: number }>();
+  const ksMap = new Map<string, { serveNum: number; serveDen: number; recvNum: number; recvDen: number }>();
+  const coachMap = new Map<string, Map<string, { vs: number; rs: number; n: number }>>();
+  const ri = (f: string) => { let v = riMap.get(f); if (!v) { v = { games: 0, won: 0, lostDirect: 0, setup: 0 }; riMap.set(f, v); } return v; };
+  const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
+  const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
 
   for (const night of nights) {
     const rawSessions = getRawSessions(night.raw);
@@ -413,6 +427,43 @@ export function parseMultipleNights(
             }
           }
         }
+        // ── Rally impact, targeting, kitchen serve/receive, coaching ──
+        {
+          const pdx = s.pd ?? [];
+          for (let pi = 0; pi < pdx.length; pi++) {
+            const p = pdx[pi]; const f = p?.name?.trim()?.toLowerCase(); if (!f) continue;
+            ri(f).games++; tgt(f).games++;
+            const rs = p.role_data?.serving?.oneself; const rr = p.role_data?.receiving?.oneself;
+            if (rs) { const kk = ks(f); kk.serveDen += rs.total ?? 0; kk.serveNum += rs.kitchen_arrival ?? 0; }
+            if (rr) { const kk = ks(f); kk.recvDen += rr.total ?? 0; kk.recvNum += rr.kitchen_arrival ?? 0; }
+            const adv = s.ca?.[String(pi)]?.advice;
+            if (Array.isArray(adv)) {
+              let m = coachMap.get(f); if (!m) { m = new Map(); coachMap.set(f, m); }
+              for (const a of adv) { let e = m.get(a.kind); if (!e) { e = { vs: 0, rs: 0, n: 0 }; m.set(a.kind, e); } e.vs += a.value; e.rs += a.relevance; e.n++; }
+            }
+          }
+          if (Array.isArray(s.ral)) {
+            for (const rally of s.ral) {
+              const shots = rally.sh ?? []; if (!shots.length) continue;
+              if (rally.wt !== 0 && rally.wt !== 1) continue;
+              const last = shots[shots.length - 1];
+              const lf = pdx[last.pid]?.name?.trim()?.toLowerCase();
+              if (lf) { if (last.err?.f) ri(lf).lostDirect++; else ri(lf).won++; }
+              shots.forEach((sh, i) => {
+                const f = pdx[sh.pid]?.name?.trim()?.toLowerCase(); if (!f) return;
+                const tt = tgt(f);
+                if (sh.sht === 4) tt.attacks++;
+                if (sh.fin) tt.fin++;
+                if (sh.err?.pop) tt.pop++;
+                const nxt = shots[i + 1];
+                if (nxt && pdx[nxt.pid]?.team !== pdx[sh.pid]?.team && (nxt.fin || nxt.win === 'clean')) {
+                  tt.gotAttacked++;
+                  if (sh.err?.pop) ri(f).setup++;
+                }
+              });
+            }
+          }
+        }
         // Collect per-game skill ratings for the By Game breakdown tab
         if (Array.isArray(s.pd)) {
           for (const player of s.pd) {
@@ -474,7 +525,28 @@ export function parseMultipleNights(
     .slice(0, 12);
 
   const data = accumsToData(Array.from(accumMap.values()), allSessions);
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides };
+
+  const coaching: CoachingRow[] = data.players.map((p) => {
+    const m = coachMap.get(p.pid);
+    const items = m
+      ? [...m.entries()].map(([kind, e]) => ({ kind, value: e.vs / e.n, relevance: e.rs / e.n })).sort((a, b) => a.value - b.value)
+      : [];
+    return { pid: p.pid, items };
+  });
+  const rallyImpact: RallyImpactRow[] = data.players.map((p) => {
+    const v = riMap.get(p.pid) ?? { games: 0, won: 0, lostDirect: 0, setup: 0 };
+    return { pid: p.pid, ...v };
+  });
+  const targeting: TargetingRow[] = data.players.map((p) => {
+    const v = tgtMap.get(p.pid) ?? { games: 0, attacks: 0, fin: 0, pop: 0, gotAttacked: 0 };
+    return { pid: p.pid, ...v };
+  });
+  const kitchenSR: KitchenSRRow[] = data.players.map((p) => {
+    const v = ksMap.get(p.pid) ?? { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 };
+    return { pid: p.pid, ...v };
+  });
+
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR };
 }
 
 // Convenience wrapper for a single file

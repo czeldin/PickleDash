@@ -22,6 +22,7 @@ import { ErrorSection } from '@/components/sections/ErrorSection';
 import { PlayerSummarySection } from '@/components/sections/PlayerSummarySection';
 import { AttackDinkSection } from '@/components/sections/AttackDinkSection';
 import { PairingSideSection } from '@/components/sections/PairingSideSection';
+import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeReceiveSection } from '@/components/sections/NewInsightsSections';
 import { anonymizeData } from '@/lib/anonymize';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
@@ -229,6 +230,10 @@ export default function DashboardPage() {
           <ShotBreakdownSection data={visibleData} />
           <KitchenArrivalSection data={visibleData} />
           <PairingSideSection data={visibleData} />
+          <KitchenServeReceiveSection data={visibleData} />
+          <RallyImpactSection data={visibleData} />
+          <TargetingSection data={visibleData} />
+          <CoachingSection data={visibleData} />
           <ShotQualitySection data={visibleData} />
           <DepthSection data={visibleData} />
           <ErrorSection data={visibleData} />
