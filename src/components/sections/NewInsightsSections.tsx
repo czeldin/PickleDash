@@ -15,6 +15,10 @@ function Avatar({ p, sm }: { p: PlayerMeta; sm?: boolean }) {
 }
 
 function pmap(players: PlayerMeta[]) { return new Map(players.map((p) => [p.pid, p])); }
+// Only keep rows whose player is present in the (possibly filtered) player list.
+function withPlayer<T extends { pid: string }>(rows: T[], pm: Map<string, PlayerMeta>): T[] {
+  return rows.filter((r) => pm.has(r.pid));
+}
 const pct = (n: number, d: number) => (d > 0 ? Math.round((100 * n) / d) : null);
 const per = (n: number, g: number) => (g > 0 ? n / g : 0);
 
@@ -84,7 +88,7 @@ export function CoachingSection({ data }: Props) {
 export function RallyImpactSection({ data }: Props) {
   const { rallyImpact, players } = data;
   const pm = pmap(players);
-  const rows = rallyImpact.filter((r) => r.games > 0);
+  const rows = withPlayer(rallyImpact, pm).filter((r) => r.games > 0);
   if (rows.length === 0) return null;
   const sorted = [...rows].sort((a, b) => per(b.won - b.lostDirect - b.setup, b.games) - per(a.won - a.lostDirect - a.setup, a.games));
 
@@ -129,7 +133,7 @@ export function RallyImpactSection({ data }: Props) {
 export function TargetingSection({ data }: Props) {
   const { targeting, players } = data;
   const pm = pmap(players);
-  const rows = targeting.filter((r) => r.games > 0);
+  const rows = withPlayer(targeting, pm).filter((r) => r.games > 0);
   if (rows.length === 0) return null;
   const sorted = [...rows].sort((a, b) => per(b.attacks, b.games) - per(a.attacks, a.games));
 
@@ -171,7 +175,7 @@ export function TargetingSection({ data }: Props) {
 export function KitchenServeReceiveSection({ data }: Props) {
   const { kitchenSR, players } = data;
   const pm = pmap(players);
-  const rows = kitchenSR.filter((r) => r.serveDen + r.recvDen > 0);
+  const rows = withPlayer(kitchenSR, pm).filter((r) => r.serveDen + r.recvDen > 0);
   if (rows.length === 0) return null;
   const sorted = [...rows].sort((a, b) => (pct(b.serveNum, b.serveDen) ?? 0) - (pct(a.serveNum, a.serveDen) ?? 0));
 
