@@ -32,6 +32,19 @@ function ordinal(n: number) {
   return ['1st', '2nd', '3rd', '4th', '5th', '6th'][n - 1] ?? `${n}th`;
 }
 
+// pb.vision current skill schema (older exports also carry serve/return/agility/consistency)
+const SUMMARY_SKILLS = ['courtIq', 'kitchenGame', 'ballControl', 'targeting', 'offense', 'defense'] as const;
+const SKILL_NAME: Record<string, string> = {
+  courtIq: 'court IQ', kitchenGame: 'the kitchen game', ballControl: 'ball control',
+  targeting: 'targeting', offense: 'offense', defense: 'defense',
+  serve: 'serving', return: 'returns', agility: 'agility', consistency: 'consistency',
+};
+function formatList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
 function buildSummary(pid: string, data: DashboardData): Summary {
   const { skillRatings, errors, kitchenArrival, thirdShot, shotQuality, returnDepth, serveSpeed, driveSpeed, hero } = data;
   const n = data.players.length;
@@ -93,20 +106,18 @@ function buildSummary(pid: string, data: DashboardData): Summary {
   const summaryParts: string[] = [];
 
   if (sr) {
-    const skills = ['serve', 'return', 'offense', 'defense', 'agility', 'consistency'] as const;
-    const ranked = skills
+    const ranked = SUMMARY_SKILLS
       .map((s) => ({ skill: s, val: sr[s], rk: rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r[s] }))) }))
       .filter((x) => x.val > 0)
       .sort((a, b) => a.rk - b.rk);
     const top = ranked.filter((x) => x.rk === 1);
     const top2 = ranked.slice(0, 2);
-    const overall = ((sr.offense + sr.defense + sr.return + sr.serve + sr.agility + sr.consistency) / 6).toFixed(2);
-    summaryParts.push(`Rated ${overall} across skill categories.`);
+    if (sr.overall > 0) summaryParts.push(`Rated ${sr.overall.toFixed(2)} overall by pb.vision.`);
     if (top.length > 0) {
-      const names = top.map((x) => x.skill).join(' and ');
+      const names = formatList(top.map((x) => SKILL_NAME[x.skill] ?? x.skill));
       summaryParts.push(`Leads the group in ${names}.`);
-    } else {
-      const names = top2.map((x) => x.skill).join(' and ');
+    } else if (top2.length > 0) {
+      const names = formatList(top2.map((x) => SKILL_NAME[x.skill] ?? x.skill));
       summaryParts.push(`Strongest in ${names}.`);
     }
   }
@@ -194,21 +205,21 @@ function buildSummary(pid: string, data: DashboardData): Summary {
 
   // Skill ratings
   if (sr) {
-    const skills = ['serve', 'return', 'offense', 'defense', 'agility', 'consistency'] as const;
-    for (const skill of skills) {
+    for (const skill of SUMMARY_SKILLS) {
       const allVals = skillRatings.map((r) => r[skill]);
       const m = margin(sr[skill], allVals);
       const rk = rankDesc(pid, skillRatings.map((r) => ({ pid: r.pid, val: r[skill] })));
       if (rk === 1 && m > 0.05) {
+        const v = sr[skill].toFixed(2);
         const descriptions: Record<string, string> = {
-          offense: `Best offensive rating on the team (${sr.offense.toFixed(2)}). They create pressure and put opponents in tough spots more than anyone else.`,
-          defense: `Top defensive rating (${sr.defense.toFixed(2)}). They get to difficult balls and keep rallies alive when others would pop it up or net it.`,
-          return: `Best return game on the team (${sr.return.toFixed(2)}). Strong returns set up the whole point — they're starting rallies on the front foot.`,
-          serve: `Sharpest serve in the group (${sr.serve.toFixed(2)}). Consistent serving under pressure gives them a reliable platform for every point.`,
-          agility: `Most agile player on the team (${sr.agility.toFixed(2)}). They cover more court and recover faster, making them hard to exploit positionally.`,
-          consistency: `Most consistent player on the team (${sr.consistency.toFixed(2)}). They rarely give away cheap points and keep opponents grinding.`,
+          courtIq: `Highest court IQ on the team (${v}). Reads the game a step ahead — right shot, right time, few forced errors.`,
+          kitchenGame: `Best kitchen game in the group (${v}). Wins the dink-and-volley battles at the net where most points are decided.`,
+          ballControl: `Top ball control on the team (${v}). Places the ball where they want it — the platform for everything else.`,
+          targeting: `Best at targeting (${v}). Picks apart the weaker opponent and finds the open court more than anyone.`,
+          offense: `Best offensive rating on the team (${v}). They create pressure and put opponents in tough spots more than anyone else.`,
+          defense: `Top defensive rating (${v}). They get to difficult balls and keep rallies alive when others would pop it up or net it.`,
         };
-        candidates.push({ score: m * 12, text: descriptions[skill] });
+        if (descriptions[skill]) candidates.push({ score: m * 12, text: descriptions[skill] });
       }
     }
   }
