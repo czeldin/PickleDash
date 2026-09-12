@@ -49,10 +49,17 @@ export interface HighlightRally {
 
 export interface SkillRatingsRow {
   pid: string;
-  serve: number;
-  return: number;
+  overall: number;      // pb.vision's own overall rating (authoritative)
+  // current pb.vision schema
+  courtIq: number;
+  kitchenGame: number;
+  ballControl: number;
+  targeting: number;
   offense: number;
   defense: number;
+  // legacy schema (older exports) — 0 when absent
+  serve: number;
+  return: number;
   agility: number;
   consistency: number;
 }
@@ -64,10 +71,15 @@ export interface SkillRatingsByGameRow {
   nightLabel: string;
   timestamp: number; // Unix seconds (ge), 0 if unavailable
   team: number;      // team index (0 or 1) within the session
-  serve: number;
-  return: number;
+  overall: number;
+  courtIq: number;
+  kitchenGame: number;
+  ballControl: number;
+  targeting: number;
   offense: number;
   defense: number;
+  serve: number;
+  return: number;
   agility: number;
   consistency: number;
   shotCount: number;

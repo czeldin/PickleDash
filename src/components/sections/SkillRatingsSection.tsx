@@ -9,13 +9,16 @@ interface Props {
   data: DashboardData;
 }
 
-const SKILLS: (keyof Omit<SkillRatingsRow, 'pid'>)[] = [
-  'serve', 'return', 'offense', 'defense', 'agility', 'consistency',
-];
+// pb.vision's current skill schema. "Overall" is its own authoritative rating
+// (row.overall), NOT an average of these — the two disagree, so we never re-derive it.
+const SKILLS = ['courtIq', 'kitchenGame', 'ballControl', 'targeting', 'offense', 'defense'] as const;
+const SKILL_LABELS: Record<string, string> = {
+  courtIq: 'Court IQ', kitchenGame: 'Kitchen', ballControl: 'Ball Ctrl',
+  targeting: 'Targeting', offense: 'Offense', defense: 'Defense',
+};
 
-function overallScore(row: Pick<SkillRatingsRow, 'serve' | 'return' | 'offense' | 'defense' | 'agility' | 'consistency'>): number {
-  const vals = [row.serve, row.return, row.offense, row.defense, row.agility, row.consistency].filter((v) => v > 0);
-  return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+function getOverall(row: { overall?: number }): number {
+  return row.overall ?? 0;
 }
 
 function colorPill(value: number, isMax: boolean, isMin: boolean) {
@@ -40,7 +43,7 @@ function colorPill(value: number, isMax: boolean, isMin: boolean) {
 export function SkillRatingsSection({ data }: Props) {
   const { skillRatings, players } = data;
 
-  const overallVals = skillRatings.map(overallScore).filter((v) => v > 0);
+  const overallVals = skillRatings.map(getOverall).filter((v) => v > 0);
   const overallMax = overallVals.length ? Math.max(...overallVals) : -1;
   const overallMin = overallVals.length ? Math.min(...overallVals) : -1;
 
@@ -56,15 +59,15 @@ export function SkillRatingsSection({ data }: Props) {
     {
       key: 'overall',
       header: 'Overall',
-      getValue: (row) => overallScore(row),
+      getValue: (row) => getOverall(row),
       render: (row) => {
-        const v = overallScore(row);
+        const v = getOverall(row);
         return colorPill(v, v === overallMax && overallMax > 0, v === overallMin && overallMin > 0);
       },
     },
     ...SKILLS.map((skill) => ({
       key: skill,
-      header: skill.charAt(0).toUpperCase() + skill.slice(1),
+      header: SKILL_LABELS[skill],
       getValue: (row: SkillRatingsRow) => row[skill],
       render: (row: SkillRatingsRow) =>
         colorPill(
@@ -128,6 +131,7 @@ function weightedAvg(rows: SkillRatingsByGameRow[], skill: string): number {
 function buildAvgRow(rows: SkillRatingsByGameRow[]): Record<string, number> {
   const avg: Record<string, number> = {};
   for (const skill of SKILLS) avg[skill] = weightedAvg(rows, skill);
+  avg.overall = weightedAvg(rows, 'overall');
   return avg;
 }
 
@@ -159,8 +163,8 @@ function PlayerTable({ player, rows, multiNight }: {
     let av = 0, bv = 0;
     if (sortCol === 'time') { av = a.timestamp; bv = b.timestamp; }
     else if (sortCol === 'overall') {
-      av = overallScore(a as unknown as SkillRatingsRow);
-      bv = overallScore(b as unknown as SkillRatingsRow);
+      av = getOverall(a);
+      bv = getOverall(b);
     } else {
       av = a[sortCol as keyof SkillRatingsByGameRow] as number;
       bv = b[sortCol as keyof SkillRatingsByGameRow] as number;
@@ -169,7 +173,7 @@ function PlayerTable({ player, rows, multiNight }: {
   });
 
   const avgRow = buildAvgRow(rows);
-  const avgOverall = overallScore(avgRow as unknown as SkillRatingsRow);
+  const avgOverall = avgRow.overall;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -190,14 +194,14 @@ function PlayerTable({ player, rows, multiNight }: {
               <SortableHeader label="Game" col="time" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} left />
               <SortableHeader label="Overall" col="overall" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
               {SKILLS.map((s) => (
-                <SortableHeader key={s} label={s.charAt(0).toUpperCase() + s.slice(1)} col={s} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader key={s} label={SKILL_LABELS[s]} col={s} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {sorted.map((row) => {
               const label = multiNight ? `${row.nightLabel} · ${row.sessionName}` : row.sessionName;
-              const ov = overallScore(row as unknown as SkillRatingsRow);
+              const ov = getOverall(row);
               return (
                 <tr key={row.sessionKey} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 md:px-5 py-2 text-gray-500 whitespace-nowrap">{label}</td>
@@ -304,9 +308,9 @@ function PartnerEffectSection({ data, sessionTeams }: {
           const allAvg = buildAvgRow(allRows);
           const withAvg = buildAvgRow(withRows);
           const withoutAvg = withoutRows.length > 0 ? buildAvgRow(withoutRows) : null;
-          const allOverall = overallScore(allAvg as unknown as SkillRatingsRow);
-          const withOverall = overallScore(withAvg as unknown as SkillRatingsRow);
-          const withoutOverall = withoutAvg ? overallScore(withoutAvg as unknown as SkillRatingsRow) : 0;
+          const allOverall = allAvg.overall;
+          const withOverall = withAvg.overall;
+          const withoutOverall = withoutAvg ? withoutAvg.overall : 0;
 
           return (
             <div key={player.pid} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -330,7 +334,7 @@ function PartnerEffectSection({ data, sessionTeams }: {
                       <th className="text-left px-4 md:px-5 py-2 text-gray-500 font-medium w-36"></th>
                       <th className="text-right px-3 py-2 text-gray-500 font-medium">Overall</th>
                       {SKILLS.map((s) => (
-                        <th key={s} className="text-right px-3 py-2 text-gray-500 font-medium capitalize">{s}</th>
+                        <th key={s} className="text-right px-3 py-2 text-gray-500 font-medium">{SKILL_LABELS[s]}</th>
                       ))}
                     </tr>
                   </thead>
