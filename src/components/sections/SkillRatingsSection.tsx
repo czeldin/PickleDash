@@ -9,16 +9,51 @@ interface Props {
   data: DashboardData;
 }
 
-// pb.vision's current skill schema. "Overall" is its own authoritative rating
-// (row.overall), NOT an average of these — the two disagree, so we never re-derive it.
-const SKILLS = ['courtIq', 'kitchenGame', 'ballControl', 'targeting', 'offense', 'defense'] as const;
+// All skills pb.vision has ever sent. Newer exports use court IQ / kitchen /
+// ball control / targeting; older ones use serve / return / agility / consistency;
+// offense, defense and overall appear in both. Columns with no data in the current
+// view are hidden, and a coverage badge flags columns backed by only some nights.
+// "Overall" is pb.vision's own authoritative rating (row.overall), never re-derived.
+const ALL_SKILLS = ['courtIq', 'kitchenGame', 'ballControl', 'targeting', 'offense', 'defense', 'serve', 'return', 'agility', 'consistency'] as const;
+type SkillKey = typeof ALL_SKILLS[number];
 const SKILL_LABELS: Record<string, string> = {
-  courtIq: 'Court IQ', kitchenGame: 'Kitchen', ballControl: 'Ball Ctrl',
-  targeting: 'Targeting', offense: 'Offense', defense: 'Defense',
+  courtIq: 'Court IQ', kitchenGame: 'Kitchen', ballControl: 'Ball Ctrl', targeting: 'Targeting',
+  offense: 'Offense', defense: 'Defense',
+  serve: 'Serve', return: 'Return', agility: 'Agility', consistency: 'Consist',
 };
 
 function getOverall(row: { overall?: number }): number {
   return row.overall ?? 0;
+}
+
+// Per-skill night coverage from the by-game rows: how many distinct nights carry
+// a value for each skill, and the total nights in view.
+function skillNightCoverage(byGame: SkillRatingsByGameRow[]) {
+  const total = new Set(byGame.map((r) => r.nightLabel)).size;
+  const nights: Record<string, Set<string>> = {};
+  for (const r of byGame) {
+    for (const s of ALL_SKILLS) {
+      if ((r[s] ?? 0) > 0) { (nights[s] ??= new Set()).add(r.nightLabel); }
+    }
+  }
+  const counts: Record<string, number> = {};
+  for (const s of ALL_SKILLS) counts[s] = nights[s]?.size ?? 0;
+  return { total, counts };
+}
+
+function CoverageHeader({ label, nights, total }: { label: string; nights: number; total: number }) {
+  const partial = total > 0 && nights > 0 && nights < total;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      {partial && (
+        <span
+          title={`Based on ${nights} of ${total} night${total !== 1 ? 's' : ''} — this skill only appears in newer pb.vision exports`}
+          className="text-[9px] font-normal text-amber-600 border border-amber-200 rounded px-1 leading-tight normal-case"
+        >{nights}n</span>
+      )}
+    </span>
+  );
 }
 
 function colorPill(value: number, isMax: boolean, isMin: boolean) {
@@ -41,15 +76,20 @@ function colorPill(value: number, isMax: boolean, isMin: boolean) {
 }
 
 export function SkillRatingsSection({ data }: Props) {
-  const { skillRatings, players } = data;
+  const { skillRatings, players, skillRatingsByGame } = data;
 
   const overallVals = skillRatings.map(getOverall).filter((v) => v > 0);
   const overallMax = overallVals.length ? Math.max(...overallVals) : -1;
   const overallMin = overallVals.length ? Math.min(...overallVals) : -1;
 
+  // Only show skills that have data in the current view; badge those with partial night coverage.
+  const visibleSkills = ALL_SKILLS.filter((s) => skillRatings.some((r) => (r[s] ?? 0) > 0));
+  const { total: totalNights, counts: nightCounts } = skillNightCoverage(skillRatingsByGame);
+  const anyPartial = visibleSkills.some((s) => nightCounts[s] > 0 && nightCounts[s] < totalNights);
+
   const skillMins: Record<string, number> = {};
   const skillMaxs: Record<string, number> = {};
-  for (const skill of SKILLS) {
+  for (const skill of visibleSkills) {
     const vals = skillRatings.map((r) => r[skill]).filter((v) => v > 0);
     skillMins[skill] = vals.length ? Math.min(...vals) : -1;
     skillMaxs[skill] = vals.length ? Math.max(...vals) : -1;
@@ -65,9 +105,9 @@ export function SkillRatingsSection({ data }: Props) {
         return colorPill(v, v === overallMax && overallMax > 0, v === overallMin && overallMin > 0);
       },
     },
-    ...SKILLS.map((skill) => ({
+    ...visibleSkills.map((skill: SkillKey) => ({
       key: skill,
-      header: SKILL_LABELS[skill],
+      header: <CoverageHeader label={SKILL_LABELS[skill]} nights={nightCounts[skill]} total={totalNights} />,
       getValue: (row: SkillRatingsRow) => row[skill],
       render: (row: SkillRatingsRow) =>
         colorPill(
@@ -86,6 +126,11 @@ export function SkillRatingsSection({ data }: Props) {
         players={players}
         defaultSortKey="overall"
       />
+      {anyPartial && (
+        <p className="text-xs text-gray-400 mt-3">
+          The amber <span className="text-amber-600 border border-amber-200 rounded px-1">Nn</span> badge shows how many of your {totalNights} nights back that column — some skills only appear in newer pb.vision exports, so they cover fewer nights than Offense/Defense/Overall.
+        </p>
+      )}
     </SectionCard>
   );
 }
@@ -99,7 +144,12 @@ function skillColor(value: number): string {
   return 'text-red-600';
 }
 
-type SortCol = 'time' | 'overall' | typeof SKILLS[number];
+type SortCol = 'time' | 'overall' | SkillKey;
+
+// Which skills have any data across these rows (to hide empty columns).
+function visibleSkillsFor(rows: SkillRatingsByGameRow[]): SkillKey[] {
+  return ALL_SKILLS.filter((s) => rows.some((r) => (r[s] ?? 0) > 0));
+}
 type SortDir = 'asc' | 'desc';
 
 function SortableHeader({
@@ -130,7 +180,7 @@ function weightedAvg(rows: SkillRatingsByGameRow[], skill: string): number {
 
 function buildAvgRow(rows: SkillRatingsByGameRow[]): Record<string, number> {
   const avg: Record<string, number> = {};
-  for (const skill of SKILLS) avg[skill] = weightedAvg(rows, skill);
+  for (const skill of ALL_SKILLS) avg[skill] = weightedAvg(rows, skill);
   avg.overall = weightedAvg(rows, 'overall');
   return avg;
 }
@@ -174,6 +224,7 @@ function PlayerTable({ player, rows, multiNight }: {
 
   const avgRow = buildAvgRow(rows);
   const avgOverall = avgRow.overall;
+  const visible = visibleSkillsFor(rows);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -193,7 +244,7 @@ function PlayerTable({ player, rows, multiNight }: {
             <tr className="bg-gray-50 border-b border-gray-100">
               <SortableHeader label="Game" col="time" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} left />
               <SortableHeader label="Overall" col="overall" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-              {SKILLS.map((s) => (
+              {visible.map((s) => (
                 <SortableHeader key={s} label={SKILL_LABELS[s]} col={s} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
               ))}
             </tr>
@@ -208,7 +259,7 @@ function PlayerTable({ player, rows, multiNight }: {
                   <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(ov)}`}>
                     {ov > 0 ? ov.toFixed(2) : '—'}
                   </td>
-                  {SKILLS.map((skill) => {
+                  {visible.map((skill) => {
                     const v = row[skill as keyof SkillRatingsByGameRow] as number;
                     return (
                       <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(v)}`}>
@@ -225,7 +276,7 @@ function PlayerTable({ player, rows, multiNight }: {
                 <td className={`px-3 py-2 text-right tabular-nums ${skillColor(avgOverall)}`}>
                   {avgOverall > 0 ? avgOverall.toFixed(2) : '—'}
                 </td>
-                {SKILLS.map((skill) => (
+                {visible.map((skill) => (
                   <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(avgRow[skill])}`}>
                     {avgRow[skill] > 0 ? avgRow[skill].toFixed(2) : '—'}
                   </td>
@@ -311,6 +362,7 @@ function PartnerEffectSection({ data, sessionTeams }: {
           const allOverall = allAvg.overall;
           const withOverall = withAvg.overall;
           const withoutOverall = withoutAvg ? withoutAvg.overall : 0;
+          const visible = visibleSkillsFor(allRows);
 
           return (
             <div key={player.pid} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -333,7 +385,7 @@ function PartnerEffectSection({ data, sessionTeams }: {
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="text-left px-4 md:px-5 py-2 text-gray-500 font-medium w-36"></th>
                       <th className="text-right px-3 py-2 text-gray-500 font-medium">Overall</th>
-                      {SKILLS.map((s) => (
+                      {visible.map((s) => (
                         <th key={s} className="text-right px-3 py-2 text-gray-500 font-medium">{SKILL_LABELS[s]}</th>
                       ))}
                     </tr>
@@ -349,7 +401,7 @@ function PartnerEffectSection({ data, sessionTeams }: {
                         {withOverall > 0 ? withOverall.toFixed(2) : '—'}
                         <Delta val={withOverall} base={allOverall} />
                       </td>
-                      {SKILLS.map((skill) => (
+                      {visible.map((skill) => (
                         <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(withAvg[skill])}`}>
                           {withAvg[skill] > 0 ? withAvg[skill].toFixed(2) : '—'}
                           <Delta val={withAvg[skill]} base={allAvg[skill]} />
@@ -368,7 +420,7 @@ function PartnerEffectSection({ data, sessionTeams }: {
                           {withoutOverall > 0 ? withoutOverall.toFixed(2) : '—'}
                           <Delta val={withoutOverall} base={allOverall} />
                         </td>
-                        {SKILLS.map((skill) => (
+                        {visible.map((skill) => (
                           <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(withoutAvg[skill])}`}>
                             {withoutAvg[skill] > 0 ? withoutAvg[skill].toFixed(2) : '—'}
                             <Delta val={withoutAvg[skill]} base={allAvg[skill]} />
@@ -383,7 +435,7 @@ function PartnerEffectSection({ data, sessionTeams }: {
                       <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(allOverall)}`}>
                         {allOverall > 0 ? allOverall.toFixed(2) : '—'}
                       </td>
-                      {SKILLS.map((skill) => (
+                      {visible.map((skill) => (
                         <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(allAvg[skill])}`}>
                           {allAvg[skill] > 0 ? allAvg[skill].toFixed(2) : '—'}
                         </td>

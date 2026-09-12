@@ -12,7 +12,7 @@ import { PlayerAvatar } from './PlayerAvatar';
 
 export interface ColumnDef<T> {
   key: string;
-  header: string;
+  header: ReactNode;
   sortable?: boolean;
   render: (row: T, player: PlayerMeta) => ReactNode;
   getValue?: (row: T) => number;
