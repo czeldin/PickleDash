@@ -100,7 +100,10 @@ function reachedKitchen(shots: RawShot[], pd: RawPd[], team: number, afterIdx: n
 interface PlayerAccum {
   name: string; sessionCount: number; totalShots: number;
   overallSum: number; overallW: number;
-  skillSums: { serve: number; return: number; offense: number; defense: number; agility: number; consistency: number; courtIq: number; kitchenGame: number; ballControl: number; targeting: number }; skillW: number;
+  skillSums: { serve: number; return: number; offense: number; defense: number; agility: number; consistency: number; courtIq: number; kitchenGame: number; ballControl: number; targeting: number };
+  // Per-skill shot-count weight — only counts sessions where that skill is present,
+  // so skills missing from older exports aren't diluted by zeros.
+  skillWeights: { serve: number; return: number; offense: number; defense: number; agility: number; consistency: number; courtIq: number; kitchenGame: number; ballControl: number; targeting: number };
   accInSum: number; accNetSum: number; accOutSum: number; accW: number;
   ssFreacs: number[]; ssW: number;
   driveSpeeds: number[];
@@ -119,7 +122,8 @@ interface PlayerAccum {
 function makeAccum(name: string): PlayerAccum {
   return {
     name, sessionCount: 0, totalShots: 0, overallSum: 0, overallW: 0,
-    skillSums: { serve: 0, return: 0, offense: 0, defense: 0, agility: 0, consistency: 0, courtIq: 0, kitchenGame: 0, ballControl: 0, targeting: 0 }, skillW: 0,
+    skillSums: { serve: 0, return: 0, offense: 0, defense: 0, agility: 0, consistency: 0, courtIq: 0, kitchenGame: 0, ballControl: 0, targeting: 0 },
+    skillWeights: { serve: 0, return: 0, offense: 0, defense: 0, agility: 0, consistency: 0, courtIq: 0, kitchenGame: 0, ballControl: 0, targeting: 0 },
     accInSum: 0, accNetSum: 0, accOutSum: 0, accW: 0,
     ssFreacs: new Array(17).fill(0), ssW: 0, driveSpeeds: [],
     k3Drop: [0, 0], k3Drive: [0, 0], k5Drop: [0, 0], k5Drive: [0, 0],
@@ -222,15 +226,16 @@ function processSession(session: RawSession, accumMap: Map<string, PlayerAccum>)
     if (t.ratings?.overall != null) { acc.overallSum += t.ratings.overall * sc; acc.overallW += sc; }
     if (t.ratings && sc > 0) {
       const r = t.ratings;
-      // legacy schema (older exports)
-      acc.skillSums.serve += (r.serve ?? 0) * sc; acc.skillSums.return += (r.return ?? 0) * sc;
-      acc.skillSums.agility += (r.agility ?? 0) * sc; acc.skillSums.consistency += (r.consistency ?? 0) * sc;
-      // shared
-      acc.skillSums.offense += (r.offense ?? 0) * sc; acc.skillSums.defense += (r.defense ?? 0) * sc;
-      // current schema (kitchen_game, ball_control, court_iq, targeting)
-      acc.skillSums.courtIq += (r.court_iq ?? 0) * sc; acc.skillSums.kitchenGame += (r.kitchen_game ?? 0) * sc;
-      acc.skillSums.ballControl += (r.ball_control ?? 0) * sc; acc.skillSums.targeting += (r.targeting ?? 0) * sc;
-      acc.skillW += sc;
+      // Accumulate each skill only for sessions that actually have it, so a skill
+      // absent from older exports isn't averaged against zeros.
+      const addSkill = (key: keyof PlayerAccum['skillSums'], val: number | undefined) => {
+        if (val != null) { acc.skillSums[key] += val * sc; acc.skillWeights[key] += sc; }
+      };
+      addSkill('serve', r.serve); addSkill('return', r.return);
+      addSkill('agility', r.agility); addSkill('consistency', r.consistency);
+      addSkill('offense', r.offense); addSkill('defense', r.defense);
+      addSkill('courtIq', r.court_iq); addSkill('kitchenGame', r.kitchen_game);
+      addSkill('ballControl', r.ball_control); addSkill('targeting', r.targeting);
     }
     if (t.shot_accuracy && sc > 0) {
       const sa = t.shot_accuracy;
@@ -294,7 +299,16 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
   }));
   function pct(h: number, t: number) { return t > 0 ? (h / t) * 100 : 0; }
   const hero: HeroStats[] = accums.map((acc, i) => ({ pid: players[i].pid, dupr: acc.overallW > 0 ? acc.overallSum / acc.overallW : 0, duprDelta: 0, gamesPlayed: acc.sessionCount, totalShots: acc.totalShots, wins: acc.wins, losses: acc.losses }));
-  const skillRatings: SkillRatingsRow[] = accums.map((acc, i) => { const w = acc.skillW || 1; return { pid: players[i].pid, overall: acc.overallW > 0 ? acc.overallSum / acc.overallW : 0, serve: acc.skillSums.serve / w, return: acc.skillSums.return / w, offense: acc.skillSums.offense / w, defense: acc.skillSums.defense / w, agility: acc.skillSums.agility / w, consistency: acc.skillSums.consistency / w, courtIq: acc.skillSums.courtIq / w, kitchenGame: acc.skillSums.kitchenGame / w, ballControl: acc.skillSums.ballControl / w, targeting: acc.skillSums.targeting / w }; });
+  const skillRatings: SkillRatingsRow[] = accums.map((acc, i) => {
+    const avg = (key: keyof PlayerAccum['skillSums']) => { const w = acc.skillWeights[key]; return w > 0 ? acc.skillSums[key] / w : 0; };
+    return {
+      pid: players[i].pid,
+      overall: acc.overallW > 0 ? acc.overallSum / acc.overallW : 0,
+      serve: avg('serve'), return: avg('return'), offense: avg('offense'), defense: avg('defense'),
+      agility: avg('agility'), consistency: avg('consistency'), courtIq: avg('courtIq'),
+      kitchenGame: avg('kitchenGame'), ballControl: avg('ballControl'), targeting: avg('targeting'),
+    };
+  });
   const shotAccuracy: ShotAccuracyRow[] = accums.map((acc, i) => { const w = acc.accW || 1; const inF = acc.accInSum / w, netF = acc.accNetSum / w, outF = acc.accOutSum / w; return { pid: players[i].pid, inShots: Math.round(inF * acc.totalShots), netShots: Math.round(netF * acc.totalShots), outShots: Math.round(outF * acc.totalShots), totalShots: acc.totalShots, inPct: inF, netPct: netF, outPct: outF }; });
   const serveSpeed: SpeedRow[] = accums.map((acc, i) => { const w = acc.ssW; const norm = acc.ssFreacs.map((v) => (w > 0 ? v / w : 0)); return { pid: players[i].pid, avgMph: serveSpeedAvg(norm), topMph: serveSpeedTop(norm) }; });
   const driveSpeed: SpeedRow[] = accums.map((acc, i) => { const sp = acc.driveSpeeds; return { pid: players[i].pid, avgMph: sp.length > 0 ? sp.reduce((a, b) => a + b, 0) / sp.length : 0, topMph: sp.length > 0 ? Math.max(...sp) : 0 }; });
