@@ -114,6 +114,18 @@ function buildStatsContext(data: DashboardData): string {
   sb(data.thirdShot, '3rd shot');
   sb(data.fifthShot, '5th shot');
 
+  // Drive-and-drop analysis (per player's own 3rd shots)
+  if (data.driveDrop.some((r) => r.dropN + r.driveN > 0)) {
+    out.push('### Drive-and-drop (own 3rd shots): win rates by path');
+    out.push('name | 3rd-drop win% (n) | drive-and-drop win% (n) | drive->offense win% (n) | 5th pop-up%');
+    for (const r of data.driveDrop) {
+      if (r.dropN + r.driveN === 0) continue;
+      const w = (won: number, n: number) => (n > 0 ? `${Math.round((100 * won) / n)}% (${n})` : '—');
+      out.push(`${name(r.pid)} | ${w(r.dropWon, r.dropN)} | ${w(r.dndWon, r.dndN)} | ${w(r.offWon, r.offN)} | ${r.dndN > 0 ? Math.round((100 * r.dndPop) / r.dndN) + '%' : '—'}`);
+    }
+    out.push('');
+  }
+
   // Kitchen arrival by shot type (drop vs drive vs either)
   if (data.kitchenArrival.some((r) => r.third_total + r.fifth_total > 0)) {
     out.push('### Kitchen arrival by shot type (reached kitchen after that shot)');

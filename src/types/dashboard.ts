@@ -238,6 +238,15 @@ export interface TargetingRow {
   gotAttacked: number;  // this player's shot immediately followed by an opponent finish
 }
 
+// 3rd-shot drive-and-drop analysis (per the shot's hitter)
+export interface DriveDropRow {
+  pid: string;
+  dropN: number; dropWon: number; dropReached: number;   // 3rd-shot drop
+  driveN: number; driveWon: number;                        // 3rd-shot drive (all)
+  dndN: number; dndWon: number; dndPop: number;            // drive → 5th drop (drive-and-drop), pop-ups on the 5th
+  offN: number; offWon: number;                            // drive → 5th drive/attack (stayed on offense)
+}
+
 // Kitchen arrival split by serving vs receiving (from role_data)
 export interface KitchenSRRow {
   pid: string;
@@ -271,4 +280,5 @@ export interface DashboardData {
   rallyImpact: RallyImpactRow[];
   targeting: TargetingRow[];
   kitchenSR: KitchenSRRow[];
+  driveDrop: DriveDropRow[];
 }

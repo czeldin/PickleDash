@@ -4,7 +4,7 @@ import {
   HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
-  CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow,
+  CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow, DriveDropRow,
 } from '@/types/dashboard';
 
 interface RawShot {
@@ -333,7 +333,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [], coaching: [], rallyImpact: [], targeting: [], kitchenSR: [] };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [], coaching: [], rallyImpact: [], targeting: [], kitchenSR: [], driveDrop: [] };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -354,6 +354,8 @@ export function parseMultipleNights(
   const tgtMap = new Map<string, { games: number; attacks: number; fin: number; pop: number; gotAttacked: number }>();
   const ksMap = new Map<string, { serveNum: number; serveDen: number; recvNum: number; recvDen: number }>();
   const coachMap = new Map<string, Map<string, { vs: number; rs: number; n: number }>>();
+  const ddMap = new Map<string, { dropN: number; dropWon: number; dropReached: number; driveN: number; driveWon: number; dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number }>();
+  const dd = (f: string) => { let v = ddMap.get(f); if (!v) { v = { dropN: 0, dropWon: 0, dropReached: 0, driveN: 0, driveWon: 0, dndN: 0, dndWon: 0, dndPop: 0, offN: 0, offWon: 0 }; ddMap.set(f, v); } return v; };
   const ri = (f: string) => { let v = riMap.get(f); if (!v) { v = { games: 0, won: 0, lostDirect: 0, setup: 0 }; riMap.set(f, v); } return v; };
   const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
@@ -475,6 +477,27 @@ export function parseMultipleNights(
                   if (sh.err?.pop) ri(f).setup++;
                 }
               });
+
+              // Drive-and-drop: attribute the serving team's 3rd shot to its hitter.
+              const st = pdx[shots[0].pid]?.team;
+              if (st !== undefined) {
+                const team = shots.filter((x) => pdx[x.pid]?.team === st);
+                const t3 = team[1];
+                const f3 = t3 && pdx[t3.pid]?.name?.trim()?.toLowerCase();
+                if (t3 && f3) {
+                  const won = rally.wt === st;
+                  const d = dd(f3);
+                  if (t3.sht === 2) {
+                    d.dropN++; if (won) d.dropWon++;
+                    if (reachedKitchen(shots, pdx, st, shots.indexOf(t3))) d.dropReached++;
+                  } else if (t3.sht === 0) {
+                    d.driveN++; if (won) d.driveWon++;
+                    const t5 = team[2];
+                    if (t5 && t5.sht === 2) { d.dndN++; if (won) d.dndWon++; if (t5.err?.pop) d.dndPop++; }
+                    else if (t5 && (t5.sht === 0 || t5.sht === 4)) { d.offN++; if (won) d.offWon++; }
+                  }
+                }
+              }
             }
           }
         }
@@ -559,8 +582,12 @@ export function parseMultipleNights(
     const v = ksMap.get(p.pid) ?? { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 };
     return { pid: p.pid, ...v };
   });
+  const driveDrop: DriveDropRow[] = data.players.map((p) => {
+    const v = ddMap.get(p.pid) ?? { dropN: 0, dropWon: 0, dropReached: 0, driveN: 0, driveWon: 0, dndN: 0, dndWon: 0, dndPop: 0, offN: 0, offWon: 0 };
+    return { pid: p.pid, ...v };
+  });
 
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR };
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop };
 }
 
 // Convenience wrapper for a single file

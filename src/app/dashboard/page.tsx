@@ -24,6 +24,7 @@ import { AttackDinkSection } from '@/components/sections/AttackDinkSection';
 import { PairingSideSection } from '@/components/sections/PairingSideSection';
 import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeReceiveSection } from '@/components/sections/NewInsightsSections';
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
+import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { anonymizeData } from '@/lib/anonymize';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
@@ -52,6 +53,7 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     rallyImpact: data.rallyImpact.filter((r) => pids.has(r.pid)),
     targeting: data.targeting.filter((r) => pids.has(r.pid)),
     kitchenSR: data.kitchenSR.filter((r) => pids.has(r.pid)),
+    driveDrop: data.driveDrop.filter((r) => pids.has(r.pid)),
   };
 }
 
@@ -235,6 +237,7 @@ export default function DashboardPage() {
           <SpeedSection data={visibleData} />
           <ShotBreakdownSection data={visibleData} />
           <KitchenArrivalSection data={visibleData} />
+          <DriveDropSection data={visibleData} />
           <PairingSideSection data={visibleData} />
           <KitchenServeReceiveSection data={visibleData} />
           <RallyImpactSection data={visibleData} />
