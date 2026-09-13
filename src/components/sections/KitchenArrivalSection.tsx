@@ -8,12 +8,14 @@ interface Props {
   data: DashboardData;
 }
 
-type ColKey = 'third_drop_kitchen_pct' | 'third_drive_kitchen_pct' | 'fifth_drop_kitchen_pct' | 'fifth_drive_kitchen_pct';
+type ColKey = 'third_drop_kitchen_pct' | 'third_drive_kitchen_pct' | 'third_kitchen_pct' | 'fifth_drop_kitchen_pct' | 'fifth_drive_kitchen_pct' | 'fifth_kitchen_pct';
 const totalKeys: Record<ColKey, keyof KitchenArrivalRow> = {
   third_drop_kitchen_pct: 'third_drop_total',
   third_drive_kitchen_pct: 'third_drive_total',
+  third_kitchen_pct: 'third_total',
   fifth_drop_kitchen_pct: 'fifth_drop_total',
   fifth_drive_kitchen_pct: 'fifth_drive_total',
+  fifth_kitchen_pct: 'fifth_total',
 };
 
 function buildHighlights(kitchenArrival: KitchenArrivalRow[], keys: ColKey[]) {
@@ -48,8 +50,8 @@ function pctCell(pct: number, total: number, key: ColKey, highlights: Record<Col
 export function KitchenArrivalSection({ data }: Props) {
   const { kitchenArrival, players } = data;
 
-  const thirdKeys: ColKey[] = ['third_drop_kitchen_pct', 'third_drive_kitchen_pct'];
-  const fifthKeys: ColKey[] = ['fifth_drop_kitchen_pct', 'fifth_drive_kitchen_pct'];
+  const thirdKeys: ColKey[] = ['third_drop_kitchen_pct', 'third_drive_kitchen_pct', 'third_kitchen_pct'];
+  const fifthKeys: ColKey[] = ['fifth_drop_kitchen_pct', 'fifth_drive_kitchen_pct', 'fifth_kitchen_pct'];
   const thirdHL = buildHighlights(kitchenArrival, thirdKeys);
   const fifthHL = buildHighlights(kitchenArrival, fifthKeys);
 
@@ -66,6 +68,12 @@ export function KitchenArrivalSection({ data }: Props) {
       getValue: (r) => r.third_drive_kitchen_pct,
       render: (r) => pctCell(r.third_drive_kitchen_pct, r.third_drive_total, 'third_drive_kitchen_pct', thirdHL),
     },
+    {
+      key: 'third_kitchen_pct',
+      header: 'Either → Kitchen',
+      getValue: (r) => r.third_kitchen_pct,
+      render: (r) => pctCell(r.third_kitchen_pct, r.third_total, 'third_kitchen_pct', thirdHL),
+    },
   ];
 
   const fifthColumns: ColumnDef<KitchenArrivalRow>[] = [
@@ -80,6 +88,12 @@ export function KitchenArrivalSection({ data }: Props) {
       header: 'Drive → Kitchen',
       getValue: (r) => r.fifth_drive_kitchen_pct,
       render: (r) => pctCell(r.fifth_drive_kitchen_pct, r.fifth_drive_total, 'fifth_drive_kitchen_pct', fifthHL),
+    },
+    {
+      key: 'fifth_kitchen_pct',
+      header: 'Either → Kitchen',
+      getValue: (r) => r.fifth_kitchen_pct,
+      render: (r) => pctCell(r.fifth_kitchen_pct, r.fifth_total, 'fifth_kitchen_pct', fifthHL),
     },
   ];
 

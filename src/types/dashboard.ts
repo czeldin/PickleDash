@@ -112,6 +112,11 @@ export interface KitchenArrivalRow {
   third_drive_total: number;
   fifth_drop_total: number;
   fifth_drive_total: number;
+  // Combined: reached the kitchen on the 3rd/5th shot whether it was a drop OR a drive
+  third_kitchen_pct: number;
+  third_total: number;
+  fifth_kitchen_pct: number;
+  fifth_total: number;
 }
 
 export interface ShotBreakdownRow {

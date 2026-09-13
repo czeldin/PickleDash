@@ -114,6 +114,17 @@ function buildStatsContext(data: DashboardData): string {
   sb(data.thirdShot, '3rd shot');
   sb(data.fifthShot, '5th shot');
 
+  // Kitchen arrival by shot type (drop vs drive vs either)
+  if (data.kitchenArrival.some((r) => r.third_total + r.fifth_total > 0)) {
+    out.push('### Kitchen arrival by shot type (reached kitchen after that shot)');
+    out.push('name | 3rd drop% (n) | 3rd drive% (n) | 3rd either% (n) | 5th either% (n)');
+    for (const r of data.kitchenArrival) {
+      const c = (p: number, t: number) => (t > 0 ? `${Math.round(p)}% (${t})` : '—');
+      out.push(`${name(r.pid)} | ${c(r.third_drop_kitchen_pct, r.third_drop_total)} | ${c(r.third_drive_kitchen_pct, r.third_drive_total)} | ${c(r.third_kitchen_pct, r.third_total)} | ${c(r.fifth_kitchen_pct, r.fifth_total)}`);
+    }
+    out.push('');
+  }
+
   return out.join('\n');
 }
 
