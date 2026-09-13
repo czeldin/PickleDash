@@ -132,6 +132,7 @@ export function PairingSideSection({ data }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [scope, setScope] = useState<Scope>('serving');
   const [sortMetric, setSortMetric] = useState<Metric>('won');
+  const [open, setOpen] = useState(false);
 
   const allSides = useMemo(
     () => [...new Set(pairings.flatMap((p) => [...p.bySide.keys()]))].sort(),
@@ -173,8 +174,13 @@ export function PairingSideSection({ data }: Props) {
   return (
     <section className="space-y-4">
       <div className="flex items-end justify-between border-b border-gray-200 pb-2 gap-3 flex-wrap">
-        <h2 className="text-xl font-bold text-gray-800">Kitchen &amp; Win by Court Side</h2>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 text-xl font-bold text-gray-800 hover:text-gray-600 transition-colors">
+          <span className={`text-gray-400 text-base transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
+          Kitchen &amp; Win by Court Side
+          {!open && <span className="text-xs font-normal text-gray-400">({pairings.length} pairings — tap to expand)</span>}
+        </button>
         {/* Scope tabs */}
+        {open && (
         <div className="inline-flex rounded-lg bg-gray-100 p-0.5 text-xs">
           {SCOPES.map((s) => (
             <button
@@ -189,7 +195,9 @@ export function PairingSideSection({ data }: Props) {
             </button>
           ))}
         </div>
+        )}
       </div>
+      {open && (<>
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-1">
         <p className="text-sm text-gray-500">
           <strong className="text-gray-700">Kit</strong> = reached the kitchen · <strong className="text-amber-600">Early</strong> = won before the kitchen · <strong className="text-emerald-700">Win</strong> = won overall. Split by which side the first player is on.
@@ -269,6 +277,8 @@ export function PairingSideSection({ data }: Props) {
       <p className="text-xs text-gray-400">
         &ldquo;P1&rdquo; is the first player listed (alphabetical). Left/Right reflects which side P1 is standing on that rally. Count in parentheses is the number of rallies in the selected scope.
       </p>
+      </>
+      )}
     </section>
   );
 }
