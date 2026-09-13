@@ -132,22 +132,26 @@ export default function DashboardPage() {
     setDashboardData(withSessions);
   }, [allNights]);
 
-  const reparse = useCallback((gameKeys: Set<string>, currentNight: Night | null) => {
-    if (!currentNight) return;
-    const allData = parseMultipleNights([currentNight]);
-    const validKeys = new Set(allData.sessions.map((s) => s.key));
+  const reparse = useCallback((gameKeys: Set<string>) => {
+    // Nights currently loaded for viewing (single night, or the selected nights in all-nights mode).
+    const nights = isAll ? allNights.filter((n) => selectedNightIds.includes(n.id)) : (night ? [night] : []);
+    if (nights.length === 0) return;
+    const base = parseMultipleNights(nights);
+    const validKeys = new Set(base.sessions.map((s) => s.key));
     const filteredKeys = new Set([...gameKeys].filter((k) => validKeys.has(k)));
     const allSelected = filteredKeys.size === validKeys.size;
-    const newData = parseMultipleNights([currentNight], allSelected ? undefined : filteredKeys);
-    const withSessions = { ...newData, sessions: allData.sessions };
+    const newData = parseMultipleNights(nights, allSelected ? undefined : filteredKeys);
+    // Keep the full session list so the game-filter dropdown still shows every game.
+    const fullSessions = availableSessions.length ? availableSessions : base.sessions;
+    const withSessions = { ...newData, sessions: fullSessions };
     setSelectedPids(new Set(withSessions.players.map((p) => p.pid)));
     setData(withSessions);
     setDashboardData(withSessions);
-  }, []);
+  }, [isAll, allNights, selectedNightIds, night, availableSessions]);
 
   function handleGameChange(keys: Set<string>) {
     setSelectedGameKeys(keys);
-    reparse(keys, night);
+    reparse(keys);
   }
 
   if (loadError) {
