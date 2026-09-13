@@ -351,13 +351,13 @@ export function parseMultipleNights(
 
   // New per-player aggregates (keyed by lowercased name)
   const riMap = new Map<string, { games: number; won: number; lostDirect: number; setup: number }>();
-  const tgtMap = new Map<string, { games: number; attacks: number; fin: number; pop: number; gotAttacked: number }>();
+  const tgtMap = new Map<string, { games: number; attacks: number; fin: number; clean: number; pop: number; gotAttacked: number }>();
   const ksMap = new Map<string, { serveNum: number; serveDen: number; recvNum: number; recvDen: number }>();
   const coachMap = new Map<string, Map<string, { vs: number; rs: number; n: number }>>();
   const ddMap = new Map<string, { dropN: number; dropWon: number; dropReached: number; driveN: number; driveWon: number; dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number }>();
   const dd = (f: string) => { let v = ddMap.get(f); if (!v) { v = { dropN: 0, dropWon: 0, dropReached: 0, driveN: 0, driveWon: 0, dndN: 0, dndWon: 0, dndPop: 0, offN: 0, offWon: 0 }; ddMap.set(f, v); } return v; };
   const ri = (f: string) => { let v = riMap.get(f); if (!v) { v = { games: 0, won: 0, lostDirect: 0, setup: 0 }; riMap.set(f, v); } return v; };
-  const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
+  const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
 
   for (const night of nights) {
@@ -470,6 +470,7 @@ export function parseMultipleNights(
                 const tt = tgt(f);
                 if (sh.sht === 4) tt.attacks++;
                 if (sh.fin) tt.fin++;
+                if (sh.win === 'clean') tt.clean++;
                 if (sh.err?.pop) tt.pop++;
                 const nxt = shots[i + 1];
                 if (nxt && pdx[nxt.pid]?.team !== pdx[sh.pid]?.team && (nxt.fin || nxt.win === 'clean')) {
@@ -575,7 +576,7 @@ export function parseMultipleNights(
     return { pid: p.pid, ...v };
   });
   const targeting: TargetingRow[] = data.players.map((p) => {
-    const v = tgtMap.get(p.pid) ?? { games: 0, attacks: 0, fin: 0, pop: 0, gotAttacked: 0 };
+    const v = tgtMap.get(p.pid) ?? { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 };
     return { pid: p.pid, ...v };
   });
   const kitchenSR: KitchenSRRow[] = data.players.map((p) => {

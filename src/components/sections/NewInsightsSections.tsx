@@ -120,7 +120,11 @@ export function TargetingSection({ data }: Props) {
 
   const columns: ColumnDef<TargetingRow>[] = [
     { key: 'attacks', header: 'Attacks/g', getValue: (r) => per(r.attacks, r.games), render: (r) => <span className="tabular-nums font-semibold text-gray-800">{per(r.attacks, r.games).toFixed(1)}</span> },
-    { key: 'fin', header: 'Finish/g', getValue: (r) => per(r.fin, r.games), render: (r) => num(per(r.fin, r.games)) },
+    { key: 'clean', header: 'Winners/g', getValue: (r) => per(r.clean, r.games), render: (r) => <span className="tabular-nums text-emerald-700">{per(r.clean, r.games).toFixed(1)}</span> },
+    {
+      key: 'convert', header: 'Finish win %', getValue: (r) => pct(r.clean, r.fin) ?? -1,
+      render: (r) => { const v = pct(r.clean, r.fin); if (v === null) return <span className="text-gray-300">—</span>; const c = v >= 42 ? 'text-emerald-700' : v >= 37 ? 'text-gray-800' : 'text-red-600'; return <span className={`tabular-nums font-semibold ${c}`}>{v}%</span>; },
+    },
     { key: 'pop', header: 'Pop-ups/g', getValue: (r) => per(r.pop, r.games), render: (r) => num(per(r.pop, r.games)) },
     { key: 'gotAttacked', header: 'Got attacked/g', getValue: (r) => per(r.gotAttacked, r.games), render: (r) => <span className="tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</span> },
   ];
@@ -128,7 +132,7 @@ export function TargetingSection({ data }: Props) {
   return (
     <SectionCard title="Targeting — Who Attacks, Who Gets Picked On">
       <p className="text-sm text-gray-500 -mt-2 mb-4">
-        Per game. <strong className="text-gray-600">Attacks/Finish</strong> = how much you go on offense. <strong className="text-gray-600">Pop-ups</strong> and <strong className="text-gray-600">Got attacked</strong> = how often you give the opponent a ball to put away.
+        Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-emerald-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups / Got attacked</strong> = how often you give the opponent a ball to put away.
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="attacks" />
     </SectionCard>

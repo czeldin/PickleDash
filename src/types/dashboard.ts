@@ -234,6 +234,7 @@ export interface TargetingRow {
   games: number;
   attacks: number;      // speed-up / attack shots hit (sht=4)
   fin: number;          // finishing attempts
+  clean: number;        // clean winners hit (win === 'clean')
   pop: number;          // pop-ups given up
   gotAttacked: number;  // this player's shot immediately followed by an opponent finish
 }
