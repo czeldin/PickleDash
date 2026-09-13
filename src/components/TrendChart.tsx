@@ -1,19 +1,20 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DashboardData, NightTrendRow, PlayerMeta } from '@/types/dashboard';
+import { PlayerMeta } from '@/types/dashboard';
 
-export interface MetricDef {
+export interface TrendRow { pid: string; night: string; ts: number }
+export interface MetricDef<T extends TrendRow = TrendRow> {
   key: string;
   label: string;
-  value: (r: NightTrendRow) => number | null;
+  value: (r: T) => number | null;
   pct: boolean;
 }
 
 const shortNight = (n: string) => { const m = n.match(/^(\d+)\/(\d+)/); return m ? `${m[1]}/${m[2]}` : n; };
 
-function Chart({ nightTrends, players, metrics, selectedPids }: {
-  nightTrends: NightTrendRow[]; players: PlayerMeta[]; metrics: MetricDef[]; selectedPids: Set<string>;
+function Chart<T extends TrendRow>({ nightTrends, players, metrics, selectedPids }: {
+  nightTrends: T[]; players: PlayerMeta[]; metrics: MetricDef<T>[]; selectedPids: Set<string>;
 }) {
   const [metricKey, setMetricKey] = useState(metrics[0].key);
   const metric = metrics.find((m) => m.key === metricKey) ?? metrics[0];
@@ -23,7 +24,7 @@ function Chart({ nightTrends, players, metrics, selectedPids }: {
     for (const r of nightTrends) if (!m.has(r.night)) m.set(r.night, r.ts);
     return [...m.entries()].sort((a, b) => a[1] - b[1]).map(([night]) => night);
   }, [nightTrends]);
-  const rowMap = useMemo(() => { const m = new Map<string, NightTrendRow>(); for (const r of nightTrends) m.set(`${r.pid}|${r.night}`, r); return m; }, [nightTrends]);
+  const rowMap = useMemo(() => { const m = new Map<string, T>(); for (const r of nightTrends) m.set(`${r.pid}|${r.night}`, r); return m; }, [nightTrends]);
 
   const series = players.filter((p) => selectedPids.has(p.pid)).map((p) => ({
     p,
@@ -84,11 +85,11 @@ function Chart({ nightTrends, players, metrics, selectedPids }: {
   );
 }
 
-export function TrendButton({ title, metrics, data }: { title: string; metrics: MetricDef[]; data: DashboardData }) {
+export function TrendButton<T extends TrendRow>({ title, metrics, rows, players: allPlayers }: { title: string; metrics: MetricDef<T>[]; rows: T[]; players: PlayerMeta[] }) {
   const [open, setOpen] = useState(false);
   // players that actually have any night-trend data
-  const havePids = useMemo(() => new Set(data.nightTrends.map((r) => r.pid)), [data.nightTrends]);
-  const players = data.players.filter((p) => havePids.has(p.pid));
+  const havePids = useMemo(() => new Set(rows.map((r) => r.pid)), [rows]);
+  const players = allPlayers.filter((p) => havePids.has(p.pid));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // initialise selection to all when first opened
   function openModal() { if (selected.size === 0) setSelected(new Set(players.map((p) => p.pid))); setOpen(true); }
@@ -112,7 +113,7 @@ export function TrendButton({ title, metrics, data }: { title: string; metrics: 
             </div>
             <p className="text-xs text-gray-400 mb-3">Each point is one night. Pick metrics above the chart and players below.</p>
 
-            <Chart nightTrends={data.nightTrends} players={players} metrics={metrics} selectedPids={selected} />
+            <Chart nightTrends={rows} players={players} metrics={metrics} selectedPids={selected} />
 
             <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-100">
               <span className="text-xs text-gray-400 self-center mr-1">Players:</span>

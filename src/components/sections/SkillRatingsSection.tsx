@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DashboardData, SkillRatingsRow, SkillRatingsByGameRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton, MetricDef, TrendRow } from '@/components/TrendChart';
 
 interface Props {
   data: DashboardData;
@@ -25,6 +26,28 @@ const SKILL_LABELS: Record<string, string> = {
 function getOverall(row: { overall?: number }): number {
   return row.overall ?? 0;
 }
+
+// ── Per-night skill rollup for the trend chart ──
+type SkillNightRow = TrendRow & Record<'overall' | SkillKey, number>;
+function buildSkillNightRows(byGame: SkillRatingsByGameRow[]): SkillNightRow[] {
+  const KEYS: (SkillKey | 'overall')[] = ['overall', ...ALL_SKILLS];
+  const m = new Map<string, { pid: string; night: string; ts: number; sums: Record<string, number>; ws: Record<string, number> }>();
+  for (const r of byGame) {
+    const key = `${r.pid}|${r.nightLabel}`;
+    let e = m.get(key);
+    if (!e) { e = { pid: r.pid, night: r.nightLabel, ts: r.timestamp, sums: {}, ws: {} }; m.set(key, e); }
+    for (const k of KEYS) { const v = r[k] ?? 0; if (v > 0) { e.sums[k] = (e.sums[k] ?? 0) + v * r.shotCount; e.ws[k] = (e.ws[k] ?? 0) + r.shotCount; } }
+  }
+  return [...m.values()].map((e) => {
+    const o = { pid: e.pid, night: e.night, ts: e.ts } as SkillNightRow;
+    for (const k of KEYS) o[k] = e.ws[k] ? e.sums[k] / e.ws[k] : 0;
+    return o;
+  });
+}
+const SKILL_TREND_METRICS: MetricDef<SkillNightRow>[] = [
+  { key: 'overall', label: 'Overall', value: (r) => (r.overall > 0 ? r.overall : null), pct: false },
+  ...ALL_SKILLS.map((s): MetricDef<SkillNightRow> => ({ key: s, label: SKILL_LABELS[s], value: (r) => (r[s] > 0 ? r[s] : null), pct: false })),
+];
 
 // Per-skill night coverage from the by-game rows: how many distinct nights carry
 // a value for each skill, and the total nights in view.
@@ -77,6 +100,7 @@ function colorPill(value: number, isMax: boolean, isMin: boolean) {
 
 export function SkillRatingsSection({ data }: Props) {
   const { skillRatings, players, skillRatingsByGame } = data;
+  const skillNightRows = useMemo(() => buildSkillNightRows(skillRatingsByGame), [skillRatingsByGame]);
 
   const overallVals = skillRatings.map(getOverall).filter((v) => v > 0);
   const overallMax = overallVals.length ? Math.max(...overallVals) : -1;
@@ -119,7 +143,7 @@ export function SkillRatingsSection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Skill Ratings Breakdown">
+    <SectionCard title="Skill Ratings Breakdown" action={<TrendButton title="Skill ratings" metrics={SKILL_TREND_METRICS} rows={skillNightRows} players={players} />}>
       <SortableTable
         rows={skillRatings}
         columns={columns}
