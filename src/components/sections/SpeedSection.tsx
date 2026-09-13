@@ -2,6 +2,8 @@
 
 import { DashboardData, SpeedRow, PlayerMeta } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton } from '@/components/TrendChart';
+import { SPEED_METRICS } from '@/components/trendMetrics';
 import {
   BarChart,
   Bar,
@@ -99,7 +101,7 @@ export function SpeedSection({ data }: Props) {
   const { serveSpeed, driveSpeed, players } = data;
 
   return (
-    <SectionCard title="Speed">
+    <SectionCard title="Speed" action={<TrendButton title="Speed" metrics={SPEED_METRICS} rows={data.nightTrends} players={data.players} />}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <SpeedChart rows={serveSpeed} players={players} title="Serve Speed" />
         <SpeedChart rows={driveSpeed} players={players} title="Drive Speed" />

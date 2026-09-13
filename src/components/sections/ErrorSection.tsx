@@ -3,6 +3,8 @@
 import { DashboardData, ErrorRow, PlayerMeta } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton } from '@/components/TrendChart';
+import { ERROR_METRICS } from '@/components/trendMetrics';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 
 interface Props {
@@ -97,7 +99,7 @@ export function ErrorSection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Error Breakdown">
+    <SectionCard title="Error Breakdown" action={<TrendButton title="Errors" metrics={ERROR_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-xs text-gray-400 -mt-2 mb-4">
         All values normalized per game. Popups (amber) = ball stayed in but set up the opponent.
       </p>

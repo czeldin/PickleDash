@@ -357,9 +357,9 @@ export function parseMultipleNights(
   const coachMap = new Map<string, Map<string, { vs: number; rs: number; n: number }>>();
   const ddMap = new Map<string, { dropN: number; dropWon: number; dropReached: number; driveN: number; driveWon: number; dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number }>();
   const dd = (f: string) => { let v = ddMap.get(f); if (!v) { v = { dropN: 0, dropWon: 0, dropReached: 0, driveN: 0, driveWon: 0, dndN: 0, dndWon: 0, dndPop: 0, offN: 0, offWon: 0 }; ddMap.set(f, v); } return v; };
-  type NT = { pid: string; night: string; ts: number; gp: number; gw: number; rS: number; rW: number; ksN: number; ksD: number; krN: number; krD: number; dropN: number; driveN: number; dropK: number; driveK: number; dropW: number; dndN: number; dndW: number; dndP: number; offN: number; offW: number; finA: number; finC: number; atk: number; pop: number; got: number; riW: number; riL: number; riS: number };
+  type NT = { pid: string; night: string; ts: number; gp: number; gw: number; rS: number; rW: number; ksN: number; ksD: number; krN: number; krD: number; dropN: number; driveN: number; dropK: number; driveK: number; dropW: number; dndN: number; dndW: number; dndP: number; offN: number; offW: number; finA: number; finC: number; atk: number; atkW: number; pop: number; got: number; riW: number; riL: number; riS: number; accIn: number; accNet: number; accOut: number; accW: number; sqEx: number; sqW: number; sdDeep: number; sdW: number; rdDeep: number; rdW: number; ssSum: number; ssW2: number; dvSum: number; dvN: number; errTot: number; errNet: number; errOut: number; errUf: number; dinkN: number; dinkEx: number };
   const ntMap = new Map<string, NT>();
-  const nt = (pid: string, night: string, ts: number) => { const k = pid + '|' + night; let v = ntMap.get(k); if (!v) { v = { pid, night, ts, gp: 0, gw: 0, rS: 0, rW: 0, ksN: 0, ksD: 0, krN: 0, krD: 0, dropN: 0, driveN: 0, dropK: 0, driveK: 0, dropW: 0, dndN: 0, dndW: 0, dndP: 0, offN: 0, offW: 0, finA: 0, finC: 0, atk: 0, pop: 0, got: 0, riW: 0, riL: 0, riS: 0 }; ntMap.set(k, v); } return v; };
+  const nt = (pid: string, night: string, ts: number) => { const k = pid + '|' + night; let v = ntMap.get(k); if (!v) { v = { pid, night, ts, gp: 0, gw: 0, rS: 0, rW: 0, ksN: 0, ksD: 0, krN: 0, krD: 0, dropN: 0, driveN: 0, dropK: 0, driveK: 0, dropW: 0, dndN: 0, dndW: 0, dndP: 0, offN: 0, offW: 0, finA: 0, finC: 0, atk: 0, atkW: 0, pop: 0, got: 0, riW: 0, riL: 0, riS: 0, accIn: 0, accNet: 0, accOut: 0, accW: 0, sqEx: 0, sqW: 0, sdDeep: 0, sdW: 0, rdDeep: 0, rdW: 0, ssSum: 0, ssW2: 0, dvSum: 0, dvN: 0, errTot: 0, errNet: 0, errOut: 0, errUf: 0, dinkN: 0, dinkEx: 0 }; ntMap.set(k, v); } return v; };
   const ri = (f: string) => { let v = riMap.get(f); if (!v) { v = { games: 0, won: 0, lostDirect: 0, setup: 0 }; riMap.set(f, v); } return v; };
   const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
@@ -518,6 +518,11 @@ export function parseMultipleNights(
             if (ov != null && sc > 0) { v.rS += ov * sc; v.rW += sc; }
             const rs = p.role_data?.serving?.oneself; if (rs) { v.ksD += rs.total ?? 0; v.ksN += rs.kitchen_arrival ?? 0; }
             const rr = p.role_data?.receiving?.oneself; if (rr) { v.krD += rr.total ?? 0; v.krN += rr.kitchen_arrival ?? 0; }
+            const ac = p.trends?.shot_accuracy; if (ac && sc > 0) { v.accW += sc; v.accIn += (ac.in ?? 0) * sc; v.accNet += (ac.net ?? 0) * sc; v.accOut += (ac.out ?? 0) * sc; }
+            const sq = p.trends?.shot_quality; if (sq && sc > 0) { v.sqW += sc; v.sqEx += (sq.excellent ?? 0) * sc; }
+            const sd = p.trends?.serve_depth; if (sd && sc > 0) { v.sdW += sc; v.sdDeep += (sd.deep ?? 0) * sc; }
+            const rd = p.trends?.return_depth; if (rd && sc > 0) { v.rdW += sc; v.rdDeep += (rd.deep ?? 0) * sc; }
+            const spf = p.trends?.serve_speed; if (Array.isArray(spf) && sc > 0) { const avg = serveSpeedAvg(spf); if (avg > 0) { v.ssSum += avg * sc; v.ssW2 += sc; } }
           }
           if (Array.isArray(s.ral)) {
             for (const rally of s.ral) {
@@ -526,7 +531,11 @@ export function parseMultipleNights(
               shots.forEach((sh, i) => {
                 const f = pdn[sh.pid]?.name?.trim()?.toLowerCase(); if (!f) return; const v = nt(f, nl, ts);
                 if (sh.fin) v.finA++; if (sh.win === 'clean') v.finC++;
-                if (sh.sht === 4) v.atk++; if (sh.err?.pop) v.pop++;
+                if (sh.sht === 4) { v.atk++; if ((rally.wt === 0 || rally.wt === 1) && rally.wt === pdn[sh.pid]?.team) v.atkW++; }
+                if (sh.err?.pop) v.pop++;
+                if (sh.err?.f) { v.errTot++; if (sh.err.f.n) v.errNet++; if (sh.err.f.out) v.errOut++; if (sh.err.uf) v.errUf++; }
+                if (sh.sht === 1) { v.dinkN++; v.dinkEx += sh.q?.ex ?? 0; }
+                if (i >= 2 && sh.sht === 0 && (sh.t?.length ?? 0) >= 2) { const spd = driveSpeedMph(sh.t[0], sh.t[1]); if (spd !== null) { v.dvSum += spd; v.dvN++; } }
                 const nx = shots[i + 1];
                 if (nx && pdn[nx.pid]?.team !== pdn[sh.pid]?.team && (nx.fin || nx.win === 'clean')) v.got++;
               });
@@ -646,8 +655,12 @@ export function parseMultipleNights(
       kServeNum: v.ksN, kServeDen: v.ksD, kRecvNum: v.krN, kRecvDen: v.krD,
       dropN: v.dropN, driveN: v.driveN, dropKitchen: v.dropK, driveKitchen: v.driveK, dropWon: v.dropW,
       dndN: v.dndN, dndWon: v.dndW, dndPop: v.dndP, offN: v.offN, offWon: v.offW,
-      finAtt: v.finA, finClean: v.finC, attacks: v.atk, pop: v.pop, gotAttacked: v.got,
+      finAtt: v.finA, finClean: v.finC, attacks: v.atk, attackWins: v.atkW, pop: v.pop, gotAttacked: v.got,
       riWon: v.riW, riLost: v.riL, riSetup: v.riS,
+      accIn: v.accIn, accNet: v.accNet, accOut: v.accOut, accW: v.accW,
+      sqEx: v.sqEx, sqW: v.sqW, sdDeep: v.sdDeep, sdW: v.sdW, rdDeep: v.rdDeep, rdW: v.rdW,
+      ssSum: v.ssSum, ssW: v.ssW2, dvSum: v.dvSum, dvN: v.dvN,
+      errTot: v.errTot, errNet: v.errNet, errOut: v.errOut, errUf: v.errUf, dinkN: v.dinkN, dinkEx: v.dinkEx,
     }));
 
   return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends };

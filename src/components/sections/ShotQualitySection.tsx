@@ -3,6 +3,8 @@
 import { DashboardData, ShotQualityRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton } from '@/components/TrendChart';
+import { SHOT_QUALITY_METRICS } from '@/components/trendMetrics';
 
 interface Props {
   data: DashboardData;
@@ -71,7 +73,7 @@ export function ShotQualitySection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Shot Quality">
+    <SectionCard title="Shot Quality" action={<TrendButton title="Shot quality" metrics={SHOT_QUALITY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <div className="flex gap-3 text-xs mb-2">
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-400 inline-block" />Excellent</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-200 inline-block border border-gray-300" />Other</span>

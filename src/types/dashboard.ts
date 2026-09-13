@@ -250,8 +250,14 @@ export interface NightTrendRow {
   dropN: number; driveN: number; dropKitchen: number; driveKitchen: number; dropWon: number;      // 3rd-shot
   dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number; // drive-and-drop
   finAtt: number; finClean: number;                            // finishing
-  attacks: number; pop: number; gotAttacked: number;           // targeting
+  attacks: number; attackWins: number; pop: number; gotAttacked: number; // targeting / attacks
   riWon: number; riLost: number; riSetup: number;              // rally impact
+  accIn: number; accNet: number; accOut: number; accW: number; // shot accuracy (shot-weighted)
+  sqEx: number; sqW: number;                                   // shot quality (excellent)
+  sdDeep: number; sdW: number; rdDeep: number; rdW: number;    // serve/return depth (deep)
+  ssSum: number; ssW: number; dvSum: number; dvN: number;      // serve/drive speed
+  errTot: number; errNet: number; errOut: number; errUf: number; // errors
+  dinkN: number; dinkEx: number;                               // dinks
 }
 
 // 3rd-shot drive-and-drop analysis (per the shot's hitter)

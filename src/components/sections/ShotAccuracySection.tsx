@@ -3,6 +3,8 @@
 import { DashboardData, ShotAccuracyRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton } from '@/components/TrendChart';
+import { SHOT_ACCURACY_METRICS } from '@/components/trendMetrics';
 
 interface Props {
   data: DashboardData;
@@ -70,7 +72,7 @@ export function ShotAccuracySection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Shot Accuracy">
+    <SectionCard title="Shot Accuracy" action={<TrendButton title="Shot accuracy" metrics={SHOT_ACCURACY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <div className="flex gap-3 text-xs mb-2">
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-400 inline-block" />In</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-400 inline-block" />Net</span>

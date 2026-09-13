@@ -3,6 +3,8 @@
 import { DashboardData, AttackRow, DinkRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton } from '@/components/TrendChart';
+import { ATTACK_DINK_METRICS } from '@/components/trendMetrics';
 
 interface Props {
   data: DashboardData;
@@ -119,7 +121,7 @@ export function AttackDinkSection({ data }: Props) {
   if (validAttacks.length === 0 && validDinks.length === 0) return null;
 
   return (
-    <SectionCard title="Attacking & Dinking">
+    <SectionCard title="Attacking & Dinking" action={<TrendButton title="Attacking & dinking" metrics={ATTACK_DINK_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-xs text-gray-400 -mt-2 mb-4">
         Attacks are speed-ups and overheads (sht=4). Win Rate = team won the rally on that attack. Quality = % rated excellent. Green = best · Red = lowest.
       </p>

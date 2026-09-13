@@ -3,6 +3,8 @@
 import { DashboardData, DepthRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton } from '@/components/TrendChart';
+import { DEPTH_METRICS } from '@/components/trendMetrics';
 
 interface Props {
   data: DashboardData;
@@ -65,7 +67,7 @@ export function DepthSection({ data }: Props) {
   const { serveDepth, returnDepth, players } = data;
 
   return (
-    <SectionCard title="Serve Depth &amp; Return Depth">
+    <SectionCard title="Serve Depth &amp; Return Depth" action={<TrendButton title="Depth" metrics={DEPTH_METRICS} rows={data.nightTrends} players={data.players} />}>
       <div className="flex gap-4 text-xs mb-2">
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />Deep</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-300 inline-block" />Med</span>
