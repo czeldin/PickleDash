@@ -109,7 +109,7 @@ export function KitchenArrivalSection({ data }: Props) {
             rows={kitchenArrival}
             columns={thirdColumns}
             players={players}
-            defaultSortKey="third_drop_kitchen_pct"
+            defaultSortKey="third_kitchen_pct"
           />
         </div>
         <div className="space-y-2">
@@ -118,7 +118,7 @@ export function KitchenArrivalSection({ data }: Props) {
             rows={kitchenArrival}
             columns={fifthColumns}
             players={players}
-            defaultSortKey="fifth_drop_kitchen_pct"
+            defaultSortKey="fifth_kitchen_pct"
           />
         </div>
       </div>
