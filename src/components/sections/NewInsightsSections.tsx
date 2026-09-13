@@ -1,28 +1,21 @@
 'use client';
 
-import { DashboardData, PlayerMeta } from '@/types/dashboard';
+import { DashboardData, PlayerMeta, RallyImpactRow, TargetingRow, KitchenSRRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
+import { SortableTable, ColumnDef } from '@/components/SortableTable';
 
 interface Props { data: DashboardData; }
 
-function Avatar({ p, sm }: { p: PlayerMeta; sm?: boolean }) {
-  return (
-    <span
-      className={`inline-flex items-center justify-center rounded-full font-bold flex-shrink-0 ${sm ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-[11px]'}`}
-      style={{ backgroundColor: p.color.bg, color: p.color.text }}
-    >{p.initials}</span>
-  );
-}
+const pct = (n: number, d: number) => (d > 0 ? Math.round((100 * n) / d) : null);
+const per = (n: number, g: number) => (g > 0 ? n / g : 0);
+const num = (v: number, d = 1) => <span className="tabular-nums text-gray-800">{v.toFixed(d)}</span>;
 
 function pmap(players: PlayerMeta[]) { return new Map(players.map((p) => [p.pid, p])); }
-// Only keep rows whose player is present in the (possibly filtered) player list.
 function withPlayer<T extends { pid: string }>(rows: T[], pm: Map<string, PlayerMeta>): T[] {
   return rows.filter((r) => pm.has(r.pid));
 }
-const pct = (n: number, d: number) => (d > 0 ? Math.round((100 * n) / d) : null);
-const per = (n: number, g: number) => (g > 0 ? n / g : 0);
 
-// ─── Areas for Improvement (pb.vision coaching flags) ──────────────────────────
+// ─── Areas for Improvement (pb.vision coaching flags) — card grid, not a table ──
 
 const KIND_LABELS: Record<string, string> = {
   kitchen_arrival_percentage_on_serve: 'Kitchen arrival on serve',
@@ -38,11 +31,17 @@ const KIND_LABELS: Record<string, string> = {
 };
 const label = (k: string) => KIND_LABELS[k] ?? k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
+function Avatar({ p }: { p: PlayerMeta }) {
+  return (
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold flex-shrink-0"
+      style={{ backgroundColor: p.color.bg, color: p.color.text }}>{p.initials}</span>
+  );
+}
+
 export function CoachingSection({ data }: Props) {
   const { coaching, players } = data;
   const pm = pmap(players);
-  const withData = coaching.filter((c) => c.items.length > 0);
-  if (withData.length === 0) return null;
+  if (coaching.filter((c) => c.items.length > 0).length === 0) return null;
 
   return (
     <SectionCard title="Areas for Improvement">
@@ -53,7 +52,6 @@ export function CoachingSection({ data }: Props) {
         {players.map((p) => {
           const c = coaching.find((x) => x.pid === p.pid);
           if (!c || c.items.length === 0) return null;
-          const worst = c.items.slice(0, 4);
           return (
             <div key={p.pid} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <div className="flex items-center gap-2 mb-3">
@@ -61,7 +59,7 @@ export function CoachingSection({ data }: Props) {
                 <span className="font-semibold text-gray-800">{p.name}</span>
               </div>
               <div className="space-y-2">
-                {worst.map((it) => {
+                {c.items.slice(0, 4).map((it) => {
                   const v = Math.round(it.value * 100);
                   const color = v < 55 ? 'text-red-600' : v < 75 ? 'text-amber-600' : 'text-gray-700';
                   return (
@@ -83,89 +81,56 @@ export function CoachingSection({ data }: Props) {
   );
 }
 
-// ─── Rally Impact (clutch vs liability) ────────────────────────────────────────
+// ─── Rally Impact ──────────────────────────────────────────────────────────────
 
 export function RallyImpactSection({ data }: Props) {
   const { rallyImpact, players } = data;
   const pm = pmap(players);
   const rows = withPlayer(rallyImpact, pm).filter((r) => r.games > 0);
   if (rows.length === 0) return null;
-  const sorted = [...rows].sort((a, b) => per(b.won - b.lostDirect - b.setup, b.games) - per(a.won - a.lostDirect - a.setup, a.games));
+
+  const columns: ColumnDef<RallyImpactRow>[] = [
+    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => <span className="tabular-nums font-semibold text-emerald-700">{per(r.won, r.games).toFixed(1)}</span> },
+    { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => num(per(r.lostDirect, r.games)) },
+    { key: 'setup', header: 'Set up opp/g', getValue: (r) => per(r.setup, r.games), render: (r) => num(per(r.setup, r.games)) },
+    {
+      key: 'net', header: 'Net/g',
+      getValue: (r) => per(r.won - r.lostDirect - r.setup, r.games),
+      render: (r) => { const n = per(r.won - r.lostDirect - r.setup, r.games); return <span className={`tabular-nums font-bold ${n >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{n > 0 ? '+' : ''}{n.toFixed(1)}</span>; },
+    },
+  ];
 
   return (
     <SectionCard title="Rally Impact — Winners vs Points Given Away">
       <p className="text-sm text-gray-500 -mt-2 mb-4">
         Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your rally-ending errors; <strong className="text-gray-600">Set up</strong> = your pop-ups the opponent put away. Net = winners − both.
       </p>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-medium">
-              <th className="text-left px-5 py-3">Player</th>
-              <th className="text-right px-4 py-3">Winners/g</th>
-              <th className="text-right px-4 py-3">Lost/g</th>
-              <th className="text-right px-4 py-3">Set up opp/g</th>
-              <th className="text-right px-4 py-3 font-semibold text-gray-600">Net/g</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {sorted.map((r) => {
-              const net = per(r.won - r.lostDirect - r.setup, r.games);
-              return (
-                <tr key={r.pid} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3"><div className="flex items-center gap-2"><Avatar p={pm.get(r.pid)!} sm /><span className="text-gray-700 font-medium">{pm.get(r.pid)!.name}</span></div></td>
-                  <td className="px-4 py-3 text-right tabular-nums text-emerald-700 font-semibold">{per(r.won, r.games).toFixed(1)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{per(r.lostDirect, r.games).toFixed(1)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{per(r.setup, r.games).toFixed(1)}</td>
-                  <td className={`px-4 py-3 text-right tabular-nums font-bold ${net >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{net > 0 ? '+' : ''}{net.toFixed(1)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="net" />
     </SectionCard>
   );
 }
 
-// ─── Targeting (aggressor vs picked-on) ────────────────────────────────────────
+// ─── Targeting ─────────────────────────────────────────────────────────────────
 
 export function TargetingSection({ data }: Props) {
   const { targeting, players } = data;
   const pm = pmap(players);
   const rows = withPlayer(targeting, pm).filter((r) => r.games > 0);
   if (rows.length === 0) return null;
-  const sorted = [...rows].sort((a, b) => per(b.attacks, b.games) - per(a.attacks, a.games));
+
+  const columns: ColumnDef<TargetingRow>[] = [
+    { key: 'attacks', header: 'Attacks/g', getValue: (r) => per(r.attacks, r.games), render: (r) => <span className="tabular-nums font-semibold text-gray-800">{per(r.attacks, r.games).toFixed(1)}</span> },
+    { key: 'fin', header: 'Finish/g', getValue: (r) => per(r.fin, r.games), render: (r) => num(per(r.fin, r.games)) },
+    { key: 'pop', header: 'Pop-ups/g', getValue: (r) => per(r.pop, r.games), render: (r) => num(per(r.pop, r.games)) },
+    { key: 'gotAttacked', header: 'Got attacked/g', getValue: (r) => per(r.gotAttacked, r.games), render: (r) => <span className="tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</span> },
+  ];
 
   return (
     <SectionCard title="Targeting — Who Attacks, Who Gets Picked On">
       <p className="text-sm text-gray-500 -mt-2 mb-4">
         Per game. <strong className="text-gray-600">Attacks/Finish</strong> = how much you go on offense. <strong className="text-gray-600">Pop-ups</strong> and <strong className="text-gray-600">Got attacked</strong> = how often you give the opponent a ball to put away.
       </p>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-medium">
-              <th className="text-left px-5 py-3">Player</th>
-              <th className="text-right px-4 py-3">Attacks/g</th>
-              <th className="text-right px-4 py-3">Finish/g</th>
-              <th className="text-right px-4 py-3">Pop-ups/g</th>
-              <th className="text-right px-4 py-3">Got attacked/g</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {sorted.map((r) => (
-              <tr key={r.pid} className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3"><div className="flex items-center gap-2"><Avatar p={pm.get(r.pid)!} sm /><span className="text-gray-700 font-medium">{pm.get(r.pid)!.name}</span></div></td>
-                <td className="px-4 py-3 text-right tabular-nums font-semibold text-gray-800">{per(r.attacks, r.games).toFixed(1)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-gray-600">{per(r.fin, r.games).toFixed(1)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-gray-600">{per(r.pop, r.games).toFixed(1)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="attacks" />
     </SectionCard>
   );
 }
@@ -177,40 +142,25 @@ export function KitchenServeReceiveSection({ data }: Props) {
   const pm = pmap(players);
   const rows = withPlayer(kitchenSR, pm).filter((r) => r.serveDen + r.recvDen > 0);
   if (rows.length === 0) return null;
-  const sorted = [...rows].sort((a, b) => (pct(b.serveNum, b.serveDen) ?? 0) - (pct(a.serveNum, a.serveDen) ?? 0));
 
-  const Cell = ({ n, d }: { n: number; d: number }) => {
+  const cell = (n: number, d: number) => {
     const v = pct(n, d);
     if (v === null) return <span className="text-gray-300">—</span>;
     const color = v >= 90 ? 'text-emerald-700' : v >= 70 ? 'text-gray-800' : 'text-amber-600';
-    return <><span className={`font-semibold tabular-nums ${color}`}>{v}%</span><span className="text-gray-400 text-xs ml-1">({n}/{d})</span></>;
+    return <span><span className={`font-semibold tabular-nums ${color}`}>{v}%</span><span className="text-gray-400 text-xs ml-1">({n}/{d})</span></span>;
   };
+
+  const columns: ColumnDef<KitchenSRRow>[] = [
+    { key: 'serve', header: 'Serving', getValue: (r) => pct(r.serveNum, r.serveDen) ?? -1, render: (r) => cell(r.serveNum, r.serveDen) },
+    { key: 'recv', header: 'Receiving', getValue: (r) => pct(r.recvNum, r.recvDen) ?? -1, render: (r) => cell(r.recvNum, r.recvDen) },
+  ];
 
   return (
     <SectionCard title="Kitchen Arrival — Serving vs Receiving">
       <p className="text-sm text-gray-500 -mt-2 mb-4">
         How often each player personally gets to the kitchen, split by role. Receiving is almost automatic; serving is the hard part (and the team&apos;s biggest leak).
       </p>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-medium">
-              <th className="text-left px-5 py-3">Player</th>
-              <th className="text-right px-4 py-3">Serving</th>
-              <th className="text-right px-4 py-3">Receiving</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {sorted.map((r) => (
-              <tr key={r.pid} className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3"><div className="flex items-center gap-2"><Avatar p={pm.get(r.pid)!} sm /><span className="text-gray-700 font-medium">{pm.get(r.pid)!.name}</span></div></td>
-                <td className="px-4 py-3 text-right"><Cell n={r.serveNum} d={r.serveDen} /></td>
-                <td className="px-4 py-3 text-right"><Cell n={r.recvNum} d={r.recvDen} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="serve" />
     </SectionCard>
   );
 }
