@@ -25,7 +25,6 @@ import { PairingSideSection } from '@/components/sections/PairingSideSection';
 import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeReceiveSection } from '@/components/sections/NewInsightsSections';
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
-import { TrendsSection } from '@/components/sections/TrendsSection';
 import { anonymizeData } from '@/lib/anonymize';
 
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
@@ -232,7 +231,6 @@ export default function DashboardPage() {
       {view === 'dashboard' ? (
         <main className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-10 md:space-y-12">
           <HeroSection data={visibleData} />
-          <TrendsSection data={visibleData} />
           <AskClaudeSection data={visibleData} />
           <HighlightsSection data={visibleData} />
           <SkillRatingsSection data={visibleData} />

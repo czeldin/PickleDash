@@ -1,10 +1,32 @@
 'use client';
 
-import { DashboardData, PlayerMeta, RallyImpactRow, TargetingRow, KitchenSRRow } from '@/types/dashboard';
+import { DashboardData, PlayerMeta, RallyImpactRow, TargetingRow, KitchenSRRow, NightTrendRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
+import { TrendButton, MetricDef } from '@/components/TrendChart';
 
 interface Props { data: DashboardData; }
+
+const g = (v: number, r: NightTrendRow) => (r.gamesPlayed > 0 ? v / r.gamesPlayed : null);
+const rt = (n: number, d: number) => (d > 0 ? (100 * n) / d : null);
+
+const RALLY_METRICS: MetricDef[] = [
+  { key: 'net', label: 'Net/g', value: (r) => g(r.riWon - r.riLost - r.riSetup, r), pct: false },
+  { key: 'winners', label: 'Winners/g', value: (r) => g(r.riWon, r), pct: false },
+  { key: 'lost', label: 'Lost/g', value: (r) => g(r.riLost, r), pct: false },
+  { key: 'setup', label: 'Set up opp/g', value: (r) => g(r.riSetup, r), pct: false },
+];
+const TARGETING_METRICS: MetricDef[] = [
+  { key: 'attacks', label: 'Attacks/g', value: (r) => g(r.attacks, r), pct: false },
+  { key: 'winners', label: 'Winners/g', value: (r) => g(r.finClean, r), pct: false },
+  { key: 'finish', label: 'Finish win %', value: (r) => rt(r.finClean, r.finAtt), pct: true },
+  { key: 'pop', label: 'Pop-ups/g', value: (r) => g(r.pop, r), pct: false },
+  { key: 'got', label: 'Got attacked/g', value: (r) => g(r.gotAttacked, r), pct: false },
+];
+const KITCHEN_SR_METRICS: MetricDef[] = [
+  { key: 'serve', label: 'Serving %', value: (r) => rt(r.kServeNum, r.kServeDen), pct: true },
+  { key: 'recv', label: 'Receiving %', value: (r) => rt(r.kRecvNum, r.kRecvDen), pct: true },
+];
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((100 * n) / d) : null);
 const per = (n: number, g: number) => (g > 0 ? n / g : 0);
@@ -101,7 +123,7 @@ export function RallyImpactSection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Rally Impact — Winners vs Points Given Away">
+    <SectionCard title="Rally Impact — Winners vs Points Given Away" action={<TrendButton title="Rally Impact" metrics={RALLY_METRICS} data={data} />}>
       <p className="text-sm text-gray-500 -mt-2 mb-4">
         Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your rally-ending errors; <strong className="text-gray-600">Set up</strong> = your pop-ups the opponent put away. Net = winners − both.
       </p>
@@ -130,7 +152,7 @@ export function TargetingSection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Targeting — Who Attacks, Who Gets Picked On">
+    <SectionCard title="Targeting — Who Attacks, Who Gets Picked On" action={<TrendButton title="Targeting" metrics={TARGETING_METRICS} data={data} />}>
       <p className="text-sm text-gray-500 -mt-2 mb-4">
         Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-emerald-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups / Got attacked</strong> = how often you give the opponent a ball to put away.
       </p>
@@ -160,7 +182,7 @@ export function KitchenServeReceiveSection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Kitchen Arrival — Serving vs Receiving">
+    <SectionCard title="Kitchen Arrival — Serving vs Receiving" action={<TrendButton title="Kitchen arrival" metrics={KITCHEN_SR_METRICS} data={data} />}>
       <p className="text-sm text-gray-500 -mt-2 mb-4">
         How often each player personally gets to the kitchen, split by role. Receiving is almost automatic; serving is the hard part (and the team&apos;s biggest leak).
       </p>

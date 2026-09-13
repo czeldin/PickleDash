@@ -2,13 +2,17 @@ import { ReactNode } from 'react';
 
 interface Props {
   title: string;
+  action?: ReactNode;
   children: ReactNode;
 }
 
-export function SectionCard({ title, children }: Props) {
+export function SectionCard({ title, action, children }: Props) {
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2">{title}</h2>
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-2">
+        <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   );

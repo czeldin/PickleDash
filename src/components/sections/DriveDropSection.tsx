@@ -1,10 +1,19 @@
 'use client';
 
-import { DashboardData, DriveDropRow } from '@/types/dashboard';
+import { DashboardData, DriveDropRow, NightTrendRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
+import { TrendButton, MetricDef } from '@/components/TrendChart';
 
 interface Props { data: DashboardData; }
+
+const rt = (n: number, d: number) => (d > 0 ? (100 * n) / d : null);
+const DD_METRICS: MetricDef[] = [
+  { key: 'drop', label: '3rd drop win %', value: (r: NightTrendRow) => rt(r.dropWon, r.dropN), pct: true },
+  { key: 'dnd', label: 'Drive-and-drop win %', value: (r: NightTrendRow) => rt(r.dndWon, r.dndN), pct: true },
+  { key: 'off', label: 'Drive → offense win %', value: (r: NightTrendRow) => rt(r.offWon, r.offN), pct: true },
+  { key: 'dropsel', label: '3rd drop %', value: (r: NightTrendRow) => rt(r.dropN, r.dropN + r.driveN), pct: true },
+];
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((100 * n) / d) : null);
 
@@ -45,7 +54,7 @@ export function DriveDropSection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Drive-and-Drop Analysis">
+    <SectionCard title="Drive-and-Drop Analysis" action={<TrendButton title="Drive-and-drop" metrics={DD_METRICS} data={data} />}>
       <p className="text-sm text-gray-500 -mt-2 mb-4">
         For each player&apos;s own 3rd shots. A <strong className="text-gray-600">drive-and-drop</strong> (drive the 3rd, drop the 5th) usually forces a hard reset — it wins less than just dropping the 3rd. <strong className="text-amber-600">Gap</strong> = points per 100 you lose by drive-and-dropping instead of dropping the 3rd (red = drop is the better play).
       </p>

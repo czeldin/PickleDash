@@ -239,17 +239,19 @@ export interface TargetingRow {
   gotAttacked: number;  // this player's shot immediately followed by an opponent finish
 }
 
-// Per-player, per-night rollup for trend charts
+// Per-player, per-night rollup for trend charts (raw counts; the UI derives rates)
 export interface NightTrendRow {
   pid: string;
   night: string;   // night label (e.g. "9/10/26")
   ts: number;      // unix seconds, for chronological sorting
   gamesPlayed: number; gamesWon: number;
-  kServeNum: number; kServeDen: number;   // kitchen arrival on serve
-  dropN: number; driveN: number;           // 3rd-shot selection
-  dropKitchen: number;                     // 3rd-shot drops that reached the kitchen
-  finAtt: number; finClean: number;        // finishing attempts / clean winners
-  ratingSum: number; ratingW: number;      // shot-weighted pb.vision overall
+  ratingSum: number; ratingW: number;                          // pb.vision overall
+  kServeNum: number; kServeDen: number; kRecvNum: number; kRecvDen: number; // kitchen serve/receive
+  dropN: number; driveN: number; dropKitchen: number; dropWon: number;      // 3rd-shot
+  dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number; // drive-and-drop
+  finAtt: number; finClean: number;                            // finishing
+  attacks: number; pop: number; gotAttacked: number;           // targeting
+  riWon: number; riLost: number; riSetup: number;              // rally impact
 }
 
 // 3rd-shot drive-and-drop analysis (per the shot's hitter)
