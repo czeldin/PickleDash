@@ -4,7 +4,7 @@ import {
   HeroStats, SkillRatingsRow, SkillRatingsByGameRow, ShotAccuracyRow, SpeedRow,
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
-  CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow, DriveDropRow,
+  CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow, DriveDropRow, NightTrendRow,
 } from '@/types/dashboard';
 
 interface RawShot {
@@ -24,6 +24,7 @@ interface RawPd {
     return_depth?: { deep?: number; medium?: number; shallow?: number };
     serve_speed?: number[];
     shot_quality?: { excellent?: number; poor?: number };
+    flags?: { won_game?: boolean };
   };
 }
 interface RawSession {
@@ -333,7 +334,7 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
     const g = acc.sessionCount || 1;
     return { pid: players[i].pid, dinkTotal: acc.dinkTotal, dinkPerGame: acc.dinkTotal / g, dinkExcellentPct: acc.dinkExW > 0 ? (acc.dinkExSum / acc.dinkExW) * 100 : 0 };
   });
-  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [], coaching: [], rallyImpact: [], targeting: [], kitchenSR: [], driveDrop: [] };
+  return { sessions: allSessions, highlights: [], players, hero, skillRatings, skillRatingsByGame: [], shotAccuracy, serveSpeed, driveSpeed, kitchenArrival, thirdShot, fifthShot, shotQuality, serveDepth, returnDepth, errors, attacks, dinks, kitchenByGame: [], servingRallies: [], rallySides: [], coaching: [], rallyImpact: [], targeting: [], kitchenSR: [], driveDrop: [], nightTrends: [] };
 }
 
 // Parse multiple nights, filtering to selectedSessionKeys (undefined = all)
@@ -356,6 +357,9 @@ export function parseMultipleNights(
   const coachMap = new Map<string, Map<string, { vs: number; rs: number; n: number }>>();
   const ddMap = new Map<string, { dropN: number; dropWon: number; dropReached: number; driveN: number; driveWon: number; dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number }>();
   const dd = (f: string) => { let v = ddMap.get(f); if (!v) { v = { dropN: 0, dropWon: 0, dropReached: 0, driveN: 0, driveWon: 0, dndN: 0, dndWon: 0, dndPop: 0, offN: 0, offWon: 0 }; ddMap.set(f, v); } return v; };
+  type NT = { pid: string; night: string; ts: number; gp: number; gw: number; ksN: number; ksD: number; dropN: number; driveN: number; dropK: number; finA: number; finC: number; rS: number; rW: number };
+  const ntMap = new Map<string, NT>();
+  const nt = (pid: string, night: string, ts: number) => { const k = pid + '|' + night; let v = ntMap.get(k); if (!v) { v = { pid, night, ts, gp: 0, gw: 0, ksN: 0, ksD: 0, dropN: 0, driveN: 0, dropK: 0, finA: 0, finC: 0, rS: 0, rW: 0 }; ntMap.set(k, v); } return v; };
   const ri = (f: string) => { let v = riMap.get(f); if (!v) { v = { games: 0, won: 0, lostDirect: 0, setup: 0 }; riMap.set(f, v); } return v; };
   const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
@@ -502,6 +506,30 @@ export function parseMultipleNights(
             }
           }
         }
+
+        // ── Per-night trend rollup ──
+        {
+          const nl = night.label; const ts = s.ses?.ge ?? 0; const pdn = s.pd ?? [];
+          for (const p of pdn) {
+            const f = p?.name?.trim()?.toLowerCase(); if (!f) continue;
+            const v = nt(f, nl, ts);
+            v.gp++; if (p.trends?.flags?.won_game) v.gw++;
+            const sc = p.shot_count ?? 0; const ov = p.trends?.ratings?.overall;
+            if (ov != null && sc > 0) { v.rS += ov * sc; v.rW += sc; }
+            const rs = p.role_data?.serving?.oneself; if (rs) { v.ksD += rs.total ?? 0; v.ksN += rs.kitchen_arrival ?? 0; }
+          }
+          if (Array.isArray(s.ral)) {
+            for (const rally of s.ral) {
+              const shots = rally.sh ?? []; if (!shots.length) continue;
+              for (const sh of shots) { const f = pdn[sh.pid]?.name?.trim()?.toLowerCase(); if (!f) continue; const v = nt(f, nl, ts); if (sh.fin) v.finA++; if (sh.win === 'clean') v.finC++; }
+              if (rally.wt !== 0 && rally.wt !== 1) continue;
+              const st2 = pdn[shots[0].pid]?.team; if (st2 === undefined) continue;
+              const team = shots.filter((x) => pdn[x.pid]?.team === st2);
+              const t3 = team[1]; const f3 = t3 && pdn[t3.pid]?.name?.trim()?.toLowerCase();
+              if (t3 && f3) { const v = nt(f3, nl, ts); if (t3.sht === 2) { v.dropN++; if (reachedKitchen(shots, pdn, st2, shots.indexOf(t3))) v.dropK++; } else if (t3.sht === 0) { v.driveN++; } }
+            }
+          }
+        }
         // Collect per-game skill ratings for the By Game breakdown tab
         if (Array.isArray(s.pd)) {
           for (const player of s.pd) {
@@ -587,8 +615,12 @@ export function parseMultipleNights(
     const v = ddMap.get(p.pid) ?? { dropN: 0, dropWon: 0, dropReached: 0, driveN: 0, driveWon: 0, dndN: 0, dndWon: 0, dndPop: 0, offN: 0, offWon: 0 };
     return { pid: p.pid, ...v };
   });
+  const knownPids = new Set(data.players.map((p) => p.pid));
+  const nightTrends: NightTrendRow[] = [...ntMap.values()]
+    .filter((v) => knownPids.has(v.pid))
+    .map((v) => ({ pid: v.pid, night: v.night, ts: v.ts, gamesPlayed: v.gp, gamesWon: v.gw, kServeNum: v.ksN, kServeDen: v.ksD, dropN: v.dropN, driveN: v.driveN, dropKitchen: v.dropK, finAtt: v.finA, finClean: v.finC, ratingSum: v.rS, ratingW: v.rW }));
 
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop };
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends };
 }
 
 // Convenience wrapper for a single file
