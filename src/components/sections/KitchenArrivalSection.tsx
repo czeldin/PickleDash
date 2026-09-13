@@ -1,8 +1,16 @@
 'use client';
 
-import { DashboardData, KitchenArrivalRow } from '@/types/dashboard';
+import { DashboardData, KitchenArrivalRow, NightTrendRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton, MetricDef } from '@/components/TrendChart';
+
+const rt = (n: number, d: number) => (d > 0 ? (100 * n) / d : null);
+const KA_METRICS: MetricDef<NightTrendRow>[] = [
+  { key: 'drop', label: '3rd drop → kitchen %', value: (r) => rt(r.dropKitchen, r.dropN), pct: true },
+  { key: 'drive', label: '3rd drive → kitchen %', value: (r) => rt(r.driveKitchen, r.driveN), pct: true },
+  { key: 'either', label: '3rd either → kitchen %', value: (r) => rt(r.dropKitchen + r.driveKitchen, r.dropN + r.driveN), pct: true },
+];
 
 interface Props {
   data: DashboardData;
@@ -98,7 +106,7 @@ export function KitchenArrivalSection({ data }: Props) {
   ];
 
   return (
-    <SectionCard title="Kitchen Arrival by Shot Type">
+    <SectionCard title="Kitchen Arrival by Shot Type" action={<TrendButton title="Kitchen arrival by shot" metrics={KA_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-xs text-gray-400 -mt-2 mb-4">
         % of rallies where the serving team reached the kitchen after hitting that shot type. Green = best · Red = lowest.
       </p>

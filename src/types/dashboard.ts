@@ -247,7 +247,7 @@ export interface NightTrendRow {
   gamesPlayed: number; gamesWon: number;
   ratingSum: number; ratingW: number;                          // pb.vision overall
   kServeNum: number; kServeDen: number; kRecvNum: number; kRecvDen: number; // kitchen serve/receive
-  dropN: number; driveN: number; dropKitchen: number; dropWon: number;      // 3rd-shot
+  dropN: number; driveN: number; dropKitchen: number; driveKitchen: number; dropWon: number;      // 3rd-shot
   dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number; // drive-and-drop
   finAtt: number; finClean: number;                            // finishing
   attacks: number; pop: number; gotAttacked: number;           // targeting

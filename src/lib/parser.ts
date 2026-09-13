@@ -357,9 +357,9 @@ export function parseMultipleNights(
   const coachMap = new Map<string, Map<string, { vs: number; rs: number; n: number }>>();
   const ddMap = new Map<string, { dropN: number; dropWon: number; dropReached: number; driveN: number; driveWon: number; dndN: number; dndWon: number; dndPop: number; offN: number; offWon: number }>();
   const dd = (f: string) => { let v = ddMap.get(f); if (!v) { v = { dropN: 0, dropWon: 0, dropReached: 0, driveN: 0, driveWon: 0, dndN: 0, dndWon: 0, dndPop: 0, offN: 0, offWon: 0 }; ddMap.set(f, v); } return v; };
-  type NT = { pid: string; night: string; ts: number; gp: number; gw: number; rS: number; rW: number; ksN: number; ksD: number; krN: number; krD: number; dropN: number; driveN: number; dropK: number; dropW: number; dndN: number; dndW: number; dndP: number; offN: number; offW: number; finA: number; finC: number; atk: number; pop: number; got: number; riW: number; riL: number; riS: number };
+  type NT = { pid: string; night: string; ts: number; gp: number; gw: number; rS: number; rW: number; ksN: number; ksD: number; krN: number; krD: number; dropN: number; driveN: number; dropK: number; driveK: number; dropW: number; dndN: number; dndW: number; dndP: number; offN: number; offW: number; finA: number; finC: number; atk: number; pop: number; got: number; riW: number; riL: number; riS: number };
   const ntMap = new Map<string, NT>();
-  const nt = (pid: string, night: string, ts: number) => { const k = pid + '|' + night; let v = ntMap.get(k); if (!v) { v = { pid, night, ts, gp: 0, gw: 0, rS: 0, rW: 0, ksN: 0, ksD: 0, krN: 0, krD: 0, dropN: 0, driveN: 0, dropK: 0, dropW: 0, dndN: 0, dndW: 0, dndP: 0, offN: 0, offW: 0, finA: 0, finC: 0, atk: 0, pop: 0, got: 0, riW: 0, riL: 0, riS: 0 }; ntMap.set(k, v); } return v; };
+  const nt = (pid: string, night: string, ts: number) => { const k = pid + '|' + night; let v = ntMap.get(k); if (!v) { v = { pid, night, ts, gp: 0, gw: 0, rS: 0, rW: 0, ksN: 0, ksD: 0, krN: 0, krD: 0, dropN: 0, driveN: 0, dropK: 0, driveK: 0, dropW: 0, dndN: 0, dndW: 0, dndP: 0, offN: 0, offW: 0, finA: 0, finC: 0, atk: 0, pop: 0, got: 0, riW: 0, riL: 0, riS: 0 }; ntMap.set(k, v); } return v; };
   const ri = (f: string) => { let v = riMap.get(f); if (!v) { v = { games: 0, won: 0, lostDirect: 0, setup: 0 }; riMap.set(f, v); } return v; };
   const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
@@ -544,7 +544,8 @@ export function parseMultipleNights(
                 const v = nt(f3, nl, ts); const won = rally.wt === st2;
                 if (t3.sht === 2) { v.dropN++; if (won) v.dropW++; if (reachedKitchen(shots, pdn, st2, shots.indexOf(t3))) v.dropK++; }
                 else if (t3.sht === 0) {
-                  v.driveN++; const t5 = team[2];
+                  v.driveN++; if (reachedKitchen(shots, pdn, st2, shots.indexOf(t3))) v.driveK++;
+                  const t5 = team[2];
                   if (t5 && t5.sht === 2) { v.dndN++; if (won) v.dndW++; if (t5.err?.pop) v.dndP++; }
                   else if (t5 && (t5.sht === 0 || t5.sht === 4)) { v.offN++; if (won) v.offW++; }
                 }
@@ -643,7 +644,7 @@ export function parseMultipleNights(
     .map((v) => ({
       pid: v.pid, night: v.night, ts: v.ts, gamesPlayed: v.gp, gamesWon: v.gw, ratingSum: v.rS, ratingW: v.rW,
       kServeNum: v.ksN, kServeDen: v.ksD, kRecvNum: v.krN, kRecvDen: v.krD,
-      dropN: v.dropN, driveN: v.driveN, dropKitchen: v.dropK, dropWon: v.dropW,
+      dropN: v.dropN, driveN: v.driveN, dropKitchen: v.dropK, driveKitchen: v.driveK, dropWon: v.dropW,
       dndN: v.dndN, dndWon: v.dndW, dndPop: v.dndP, offN: v.offN, offWon: v.offW,
       finAtt: v.finA, finClean: v.finC, attacks: v.atk, pop: v.pop, gotAttacked: v.got,
       riWon: v.riW, riLost: v.riL, riSetup: v.riS,
