@@ -25,7 +25,22 @@ import { PairingSideSection } from '@/components/sections/PairingSideSection';
 import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeReceiveSection } from '@/components/sections/NewInsightsSections';
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
+import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
 import { anonymizeData } from '@/lib/anonymize';
+
+// Themed tabs — question-oriented, not category-oriented. See build plan.
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'finishing', label: 'Finishing & Attacking' },
+  { id: 'kitchen', label: 'Kitchen & Positioning' },
+  { id: 'courtmaps', label: 'Court Maps' },
+  { id: 'partners', label: 'Partners & Matchups' },
+  { id: 'trends', label: 'Trends' },
+  { id: 'filmroom', label: 'Film Room' },
+  { id: 'reference', label: 'Reference' },
+  { id: 'players', label: 'By Game' },
+] as const;
+type TabId = typeof TABS[number]['id'];
 
 /**
  * Reconcile a player selection against the players present in newly-parsed data,
@@ -86,7 +101,24 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isAll, setIsAll] = useState(false);
   const [isAnon, setIsAnon] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'players'>('dashboard');
+  const [tab, setTab] = useState<TabId>('overview');
+  // Focus player: whose personal story/clips to surface. null = neutral view.
+  const [focusPid, setFocusPid] = useState<string | null>(null);
+
+  // Restore the last focus-player choice for this viewer (per-device convenience).
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pickledash.focusPid');
+      if (saved) setFocusPid(saved);
+    } catch { /* ignore */ }
+  }, []);
+  const changeFocus = useCallback((pid: string | null) => {
+    setFocusPid(pid);
+    try {
+      if (pid) localStorage.setItem('pickledash.focusPid', pid);
+      else localStorage.removeItem('pickledash.focusPid');
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -211,33 +243,11 @@ export default function DashboardPage() {
                 <p className="text-xs md:text-sm font-semibold text-slate-500 leading-tight truncate max-w-[140px] md:max-w-none">{pageTitle}</p>
               </div>
             </div>
-            {/* View tabs */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 ml-1 flex-shrink-0">
-              <button
-                onClick={() => setView('dashboard')}
-                className={`px-3 py-1 text-xs md:text-sm font-medium rounded-md transition-colors ${
-                  view === 'dashboard'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => setView('players')}
-                className={`px-3 py-1 text-xs md:text-sm font-medium rounded-md transition-colors ${
-                  view === 'players'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Players
-              </button>
-            </div>
           </div>
 
           {/* Right: filters + back */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            <FocusPlayerSelect players={data.players} focusPid={focusPid} onChange={changeFocus} />
             {isAll && allNights.length > 0 && (
               <NightFilter
                 nights={allNights}
@@ -252,32 +262,85 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* Tab bar — horizontally scrollable on narrow screens */}
+        <div className="max-w-7xl mx-auto mt-3 -mb-1 overflow-x-auto">
+          <div className="flex items-center gap-1 min-w-max">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-3 py-1.5 text-xs md:text-sm font-medium rounded-t-lg whitespace-nowrap transition-colors ${
+                  tab === t.id
+                    ? 'bg-gray-200 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </header>
 
-      {view === 'dashboard' ? (
-        <main className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-10 md:space-y-12">
-          <HeroSection data={visibleData} />
-          <AskClaudeSection data={visibleData} />
-          <HighlightsSection data={visibleData} />
-          <SkillRatingsSection data={visibleData} />
-          <ShotAccuracySection data={visibleData} />
-          <SpeedSection data={visibleData} />
-          <ShotBreakdownSection data={visibleData} />
-          <KitchenArrivalSection data={visibleData} />
-          <DriveDropSection data={visibleData} />
-          <PairingSideSection data={visibleData} />
-          <KitchenServeReceiveSection data={visibleData} />
-          <RallyImpactSection data={visibleData} />
-          <TargetingSection data={visibleData} />
-          <CoachingSection data={visibleData} />
-          <ShotQualitySection data={visibleData} />
-          <DepthSection data={visibleData} />
-          <ErrorSection data={visibleData} />
-          <AttackDinkSection data={visibleData} />
-          <PlayerSummarySection data={visibleData} />
-        </main>
-      ) : (
+      {tab === 'players' ? (
         <PlayerSkillsByGame data={visibleData} />
+      ) : (
+        <main className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-10 md:space-y-12">
+          {tab === 'overview' && (
+            <>
+              <HeroSection data={visibleData} />
+              <AskClaudeSection data={visibleData} />
+              <HighlightsSection data={visibleData} />
+              <SkillRatingsSection data={visibleData} />
+              <PlayerSummarySection data={visibleData} />
+            </>
+          )}
+
+          {tab === 'finishing' && (
+            <>
+              <RallyImpactSection data={visibleData} />
+              <TargetingSection data={visibleData} />
+              <AttackDinkSection data={visibleData} />
+              <ShotQualitySection data={visibleData} />
+              <CoachingSection data={visibleData} />
+            </>
+          )}
+
+          {tab === 'kitchen' && (
+            <>
+              <KitchenArrivalSection data={visibleData} />
+              <KitchenServeReceiveSection data={visibleData} />
+              <DriveDropSection data={visibleData} />
+              <ShotBreakdownSection data={visibleData} />
+            </>
+          )}
+
+          {tab === 'courtmaps' && (
+            <p className="text-center text-gray-400 py-16 text-sm">Court Maps — coming next.</p>
+          )}
+
+          {tab === 'partners' && (
+            <PairingSideSection data={visibleData} />
+          )}
+
+          {tab === 'trends' && (
+            <p className="text-center text-gray-400 py-16 text-sm">Consolidated Trends — coming next. (Per-table trend charts are available on each table via the Trends button.)</p>
+          )}
+
+          {tab === 'filmroom' && (
+            <p className="text-center text-gray-400 py-16 text-sm">Film Room — coming next.</p>
+          )}
+
+          {tab === 'reference' && (
+            <>
+              <ShotAccuracySection data={visibleData} />
+              <SpeedSection data={visibleData} />
+              <DepthSection data={visibleData} />
+              <ErrorSection data={visibleData} />
+            </>
+          )}
+        </main>
       )}
     </div>
   );
