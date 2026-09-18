@@ -41,7 +41,7 @@ const TABS = [
   { id: 'partners', label: 'Partners & Matchups' },
   { id: 'trends', label: 'Trends' },
   { id: 'filmroom', label: 'Film Room' },
-  { id: 'reference', label: 'Reference' },
+  { id: 'reference', label: 'Shot Details' },
   { id: 'players', label: 'By Game' },
 ] as const;
 type TabId = typeof TABS[number]['id'];
@@ -303,6 +303,7 @@ export default function DashboardPage() {
               <SkillRatingsSection data={visibleData} />
               <OutcomesSection data={visibleData} focusPid={focusPid} />
               <TopPerformerByGameSection data={visibleData} focusPid={focusPid} />
+              <ShotQualitySection data={visibleData} />
               <LossReasonsSection data={visibleData} focusPid={focusPid} />
               <HighlightsSection data={visibleData} />
               <PlayerSummarySection data={visibleData} />
@@ -314,7 +315,6 @@ export default function DashboardPage() {
               <RallyImpactSection data={visibleData} />
               <TargetingSection data={visibleData} />
               <AttackDinkSection data={visibleData} />
-              <ShotQualitySection data={visibleData} />
               <CoachingSection data={visibleData} />
             </>
           )}
