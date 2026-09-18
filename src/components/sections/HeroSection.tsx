@@ -31,11 +31,7 @@ function CustomYAxisTick({ x, y, payload, rows }: any) {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <circle cx={-18} cy={0} r={14} fill={row.bgColor} />
-      <text x={-18} y={0} dy="0.35em" textAnchor="middle" fontSize={9} fontWeight={700} fill={row.color}>
-        {row.pid.slice(0, 2).toUpperCase()}
-      </text>
-      <text x={-36} y={0} dy="0.35em" textAnchor="end" fontSize={11} fontWeight={700} fill="#111827">
+      <text x={-90} y={0} dy="0.35em" textAnchor="start" fontSize={14} fontWeight={600} fill={row.color}>
         {row.label.length > 11 ? row.label.slice(0, 10) + '…' : row.label}
       </text>
     </g>
@@ -99,8 +95,8 @@ export function HeroSection({ data }: Props) {
               <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
                 type="number"
-                domain={[3.5, 5.25]}
-                ticks={[3.5, 4.0, 4.5, 5.0, 5.25]}
+                domain={[3.75, 5.0]}
+                ticks={[3.75, 4.0, 4.25, 4.5, 4.75, 5.0]}
                 tick={{ fontSize: 11, fill: '#9ca3af' }}
                 axisLine={false}
                 tickLine={false}
@@ -108,7 +104,7 @@ export function HeroSection({ data }: Props) {
               <YAxis
                 type="category"
                 dataKey="label"
-                width={155}
+                width={90}
                 tick={(props) => <CustomYAxisTick {...props} rows={rows} />}
                 axisLine={false}
                 tickLine={false}
@@ -138,7 +134,7 @@ export function HeroSection({ data }: Props) {
               return (
                 <div key={h.pid}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold text-gray-800">{player?.name ?? h.pid}</span>
+                    <span className="text-sm font-semibold" style={{ color: player?.color.text }}>{player?.name ?? h.pid}</span>
                     <span className="text-sm font-bold tabular-nums" style={{ color: player?.color.text }}>
                       {h.wins}W–{h.losses}L
                     </span>
@@ -194,15 +190,7 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
           return (
             <div key={r.sessionKey + i} className="flex items-center gap-2">
               <span className="text-xs" aria-hidden>👑</span>
-              {p && (
-                <span
-                  className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold shrink-0"
-                  style={{ backgroundColor: p.color.bg, color: p.color.text }}
-                >
-                  {p.initials}
-                </span>
-              )}
-              <span className="text-sm font-medium text-gray-800 truncate flex-1">{p?.name ?? r.pid}</span>
+              <span className="text-sm font-semibold text-gray-800 truncate flex-1" style={{ color: p?.color.text }}>{p?.name ?? r.pid}</span>
               <span className="text-xs text-gray-400 tabular-nums shrink-0">{r.overall.toFixed(2)}</span>
             </div>
           );
