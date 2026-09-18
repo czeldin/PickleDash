@@ -67,7 +67,7 @@ export function CoachingSection({ data }: Props) {
 
   return (
     <SectionCard title="Areas for Improvement">
-      <p className="text-sm text-gray-500 -mt-2 mb-4">
+      <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         pb.vision&apos;s own coaching flags — each player&apos;s lowest-scoring metrics (higher relevance = bigger opportunity).
       </p>
       <div className="grid gap-3 md:grid-cols-2">
@@ -124,7 +124,7 @@ export function RallyImpactSection({ data }: Props) {
 
   return (
     <SectionCard title="Rally Impact — Winners vs Points Given Away" action={<TrendButton title="Rally Impact" metrics={RALLY_METRICS} rows={data.nightTrends} players={data.players} />}>
-      <p className="text-sm text-gray-500 -mt-2 mb-4">
+      <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your rally-ending errors; <strong className="text-gray-600">Set up</strong> = your pop-ups the opponent put away. Net = winners − both.
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="net" />
@@ -153,7 +153,7 @@ export function TargetingSection({ data }: Props) {
 
   return (
     <SectionCard title="Targeting — Who Attacks, Who Gets Picked On" action={<TrendButton title="Targeting" metrics={TARGETING_METRICS} rows={data.nightTrends} players={data.players} />}>
-      <p className="text-sm text-gray-500 -mt-2 mb-4">
+      <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-emerald-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups / Got attacked</strong> = how often you give the opponent a ball to put away.
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="attacks" />
@@ -183,7 +183,7 @@ export function KitchenServeReceiveSection({ data }: Props) {
 
   return (
     <SectionCard title="Kitchen Arrival — Serving vs Receiving" action={<TrendButton title="Kitchen arrival" metrics={KITCHEN_SR_METRICS} rows={data.nightTrends} players={data.players} />}>
-      <p className="text-sm text-gray-500 -mt-2 mb-4">
+      <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         How often each player personally gets to the kitchen, split by role. Receiving is almost automatic; serving is the hard part (and the team&apos;s biggest leak).
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="serve" />

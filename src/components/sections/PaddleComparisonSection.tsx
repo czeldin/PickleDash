@@ -194,7 +194,7 @@ export function PaddleComparisonSection({ data, night }: Props) {
 
   return (
     <SectionCard title="Paddle Comparison">
-      <p className="text-xs text-gray-400 -mt-2 mb-4">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Head-to-head stats for each player across their two paddles. ▲ = better result.
         <span className="ml-2 font-semibold" style={{ color: '#7c3aed' }}>{paddles[0]}</span>
         {' vs '}

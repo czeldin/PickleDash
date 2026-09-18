@@ -46,7 +46,7 @@ export function TrendsSection({ data }: Props) {
 
   return (
     <SectionCard title="Trends Over Time">
-      <p className="text-xs text-gray-400 -mt-2 mb-4">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Each point is one night. A line starts at the first night its metric has data, so newer stats simply begin later
         rather than showing a misleading zero. Toggle players below each chart.
       </p>

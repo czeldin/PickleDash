@@ -115,7 +115,7 @@ export function CourtMapsSection({ data, focusPid }: Props) {
 
   return (
     <SectionCard title="Court Maps — Shot Locations">
-      <p className="text-xs text-gray-400 -mt-2 mb-3">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Where shots are hit and where they land. Lines run contact → landing; the dot is the landing spot,
         <span className="text-green-600 font-medium"> green = won the rally</span>,
         <span className="text-red-600 font-medium"> red = lost</span>. Kitchen band shaded.

@@ -122,7 +122,7 @@ export function AttackDinkSection({ data }: Props) {
 
   return (
     <SectionCard title="Attacking & Dinking" action={<TrendButton title="Attacking & dinking" metrics={ATTACK_DINK_METRICS} rows={data.nightTrends} players={data.players} />}>
-      <p className="text-xs text-gray-400 -mt-2 mb-4">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Attacks are speed-ups and overheads (sht=4). Win Rate = team won the rally on that attack. Quality = % rated excellent. Green = best · Red = lowest.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -76,7 +76,7 @@ export function OutcomesSection({ data }: Props) {
 
   return (
     <SectionCard title="Outcomes — Games · Points · Rallies">
-      <p className="text-xs text-gray-400 -mt-2 mb-3">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Three lenses on winning. A player can win <em>games</em> but lose the <em>rally</em> battle (carried by a partner),
         or vice-versa. <strong>Net Pts / G</strong> = points won − lost, per game (a points margin).
         <span className="ml-1">The <span className="bg-green-100 text-green-800 rounded-full px-1.5">green</span> value leads each column (qualified players only).</span>
@@ -95,7 +95,7 @@ export function PartnerAdjSection({ data }: Props) {
 
   return (
     <SectionCard title="Partner-Adjusted Rally Win %">
-      <p className="text-xs text-gray-400 -mt-2 mb-3">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         <strong>Approximate.</strong> <em>Expected</em> = the rally win% your partners posted overall; <em>Actual</em> = yours.
         Positive <em>lift</em> = you won more than your partners&apos; own baseline (you tended to raise them). This is a rough
         control for partner quality, not opponents — not the full adjusted model.
@@ -169,7 +169,7 @@ export function LossReasonsSection({ data, focusPid }: Props) {
         </div>
       }
     >
-      <p className="text-xs text-gray-400 -mt-2 mb-4">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Every lost rally charged to the cause of its final shot — a <strong>team</strong> stat, so both partners share each loss.
         &ldquo;We…&rdquo; are your side&apos;s own errors (the fixable ones); &ldquo;They hit a winner&rdquo; is earned against you.
         {perGame ? ' Shown per game played (fair across different game counts).' : ' Raw totals this selection.'} Hover a cause for its definition.
@@ -225,7 +225,7 @@ export function TopPerformerByGameSection({ data }: Props) {
 
   return (
     <SectionCard title="Top Performer by Game">
-      <p className="text-xs text-gray-400 -mt-2 mb-3">Highest pb.vision overall rating in each game this selection.</p>
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">Highest pb.vision overall rating in each game this selection.</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
         {mvps.map((r, i) => {
           const p = playerById(data.players, r.pid);

@@ -88,7 +88,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
 
   return (
     <SectionCard title="Film Room" action={<FocusPlayerSelect players={data.players} focusPid={focusPid} onChange={onFocusChange} />}>
-      <p className="text-xs text-gray-400 -mt-2 mb-3">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Clip queues for <strong>{focusName}</strong>. Each link opens the rally on pb.vision. Review queues are sorted
         weakest-first; these are shots to <em>watch</em>, not a scorecard.
       </p>

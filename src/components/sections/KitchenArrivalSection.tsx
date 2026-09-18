@@ -107,7 +107,7 @@ export function KitchenArrivalSection({ data }: Props) {
 
   return (
     <SectionCard title="Kitchen Arrival by Shot Type" action={<TrendButton title="Kitchen arrival by shot" metrics={KA_METRICS} rows={data.nightTrends} players={data.players} />}>
-      <p className="text-xs text-gray-400 -mt-2 mb-4">
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         % of rallies where the serving team reached the kitchen after hitting that shot type. Green = best · Red = lowest.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

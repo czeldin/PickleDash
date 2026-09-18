@@ -55,7 +55,7 @@ export function DriveDropSection({ data }: Props) {
 
   return (
     <SectionCard title="Drive-and-Drop Analysis" action={<TrendButton title="Drive-and-drop" metrics={DD_METRICS} rows={data.nightTrends} players={data.players} />}>
-      <p className="text-sm text-gray-500 -mt-2 mb-4">
+      <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         For each player&apos;s own 3rd shots. A <strong className="text-gray-600">drive-and-drop</strong> (drive the 3rd, drop the 5th) usually forces a hard reset — it wins less than just dropping the 3rd. <strong className="text-amber-600">Gap</strong> = points per 100 you lose by drive-and-dropping instead of dropping the 3rd (red = drop is the better play).
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="gap" />
