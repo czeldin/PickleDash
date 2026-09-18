@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { DashboardData, CourtShotRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
+import { ShotThumbnail } from '@/components/ShotThumbnail';
 
 interface Props {
   data: DashboardData;
@@ -125,12 +126,15 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
               rel="noreferrer"
               className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 transition-colors group"
             >
-              <span className="text-sm text-gray-700">
-                Rally {s.rallyNum} · shot {s.shotNum}
-                <span className="text-gray-400 ml-2">{s.type}</span>
-                {s.endZone && s.endZone !== 'kitchen' && s.endZone !== 'deep' && s.endZone !== 'mid' && s.endZone !== 'short' && (
-                  <span className="text-red-500 ml-2">{s.endZone}</span>
-                )}
+              <span className="flex items-center gap-2.5 text-sm text-gray-700">
+                <ShotThumbnail shot={s} />
+                <span>
+                  Rally {s.rallyNum} · shot {s.shotNum}
+                  <span className="text-gray-400 ml-2">{s.type}</span>
+                  {s.endZone && s.endZone !== 'kitchen' && s.endZone !== 'deep' && s.endZone !== 'mid' && s.endZone !== 'short' && (
+                    <span className="text-red-500 ml-2">{s.endZone}</span>
+                  )}
+                </span>
               </span>
               <span className="inline-flex items-center gap-2">
                 {s.quality != null && (
