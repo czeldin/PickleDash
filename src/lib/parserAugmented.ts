@@ -267,7 +267,9 @@ function processSession(ins: AugInsights, accumMap: Map<string, PlayerAccum>) {
       if (idx >= 2 && isDrive(shot)) { const spd = shotSpeedMph(shot); if (spd !== null) acc.driveSpeeds.push(spd); }
       // Real serve speed: the serve is shots[0].
       if (idx === 0) { const spd = shotSpeedMph(shot); if (spd !== null) acc.serveSpeeds.push(spd); }
-      // Errors: faults.net → net, faults.out → out, faults.short → kitchen/NVZ.
+      // Errors: faults.net → net, faults.out → out, faults.short → "hit it short"
+      // (ball landed on the hitter's own side before clearing the net — NOT a
+      // kitchen/NVZ foot fault, which pb.vision does not flag).
       const e = shot.errors;
       if (e) {
         const f = e.faults ?? {};

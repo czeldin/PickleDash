@@ -121,7 +121,7 @@ const partnerCols: ColumnDef<PartnerAdjRow>[] = [
 const REASONS: { key: keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>; label: string; tone: string; hint: string }[] = [
   { key: 'ownNet', label: 'We hit into net', tone: 'bg-red-500', hint: 'The rally-ending shot was ours and went into the net.' },
   { key: 'ownOut', label: 'We hit out', tone: 'bg-orange-500', hint: 'The rally-ending shot was ours and landed out.' },
-  { key: 'ownKitchen', label: 'We hit short/kitchen', tone: 'bg-amber-500', hint: 'The rally-ending shot was ours and landed short of the net or a kitchen fault.' },
+  { key: 'ownKitchen', label: 'We hit it short', tone: 'bg-amber-500', hint: 'The rally-ending shot was ours and landed on our own side before clearing the net (a drop/dink that fell short) — not a net-cord, and not a kitchen-line foot fault, which pb.vision does not track.' },
   { key: 'popupExploited', label: 'We popped it up', tone: 'bg-fuchsia-500', hint: 'A dink/drop of ours popped up and the opponents attacked it out of the air.' },
   { key: 'oppWinner', label: 'They hit a winner', tone: 'bg-slate-400', hint: 'The opponents ended the rally with a clean winner or putaway — not our error.' },
   { key: 'other', label: 'Unattributed', tone: 'bg-gray-300', hint: 'The rally ended but the final shot could not be classified from the data (no fault or winner tag).' },
