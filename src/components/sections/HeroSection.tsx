@@ -95,8 +95,8 @@ export function HeroSection({ data }: Props) {
               <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
                 type="number"
-                domain={[3.75, 5.0]}
-                ticks={[3.75, 4.0, 4.25, 4.5, 4.75, 5.0]}
+                domain={[3.75, 4.75]}
+                ticks={[3.75, 4.0, 4.25, 4.5, 4.75]}
                 tick={{ fontSize: 11, fill: '#9ca3af' }}
                 axisLine={false}
                 tickLine={false}
