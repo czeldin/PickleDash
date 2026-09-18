@@ -498,8 +498,11 @@ export function parseAugmentedNights(
 
       // Per-rally serving data for left/right side pairing analysis. Court side
       // comes from rally.players[i].started_on_left_side (real per-player side).
+      const cmVid = ins.session?.vid ?? '';
+      const cmSi = ins.session?.session_index ?? i;
       if (Array.isArray(ral)) {
-        for (const rally of ral) {
+        for (let rIdx = 0; rIdx < ral.length; rIdx++) {
+          const rally = ral[rIdx];
           const shots = rally.shots ?? [];
           if (shots.length === 0) continue;
           const serve = shots[0];
@@ -542,6 +545,7 @@ export function parseAugmentedNights(
               courtShots.push({
                 pid: nm,
                 sessionKey: key,
+                vid: cmVid, si: cmSi, rallyNum: rIdx + 1,
                 shotNum: si2 + 1,
                 type: sh.shot_type ?? (si2 === 0 ? 'serve' : si2 === 1 ? 'return' : 'other'),
                 fromX: from.x, fromY: from.y,

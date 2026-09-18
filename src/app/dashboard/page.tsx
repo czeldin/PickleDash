@@ -27,6 +27,7 @@ import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
 import { OutcomesSection, LossReasonsSection, LeaderboardSection } from '@/components/sections/OutcomesSection';
+import { FilmRoomSection } from '@/components/sections/FilmRoomSection';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
 import { anonymizeData } from '@/lib/anonymize';
 
@@ -339,7 +340,7 @@ export default function DashboardPage() {
           )}
 
           {tab === 'filmroom' && (
-            <p className="text-center text-gray-400 py-16 text-sm">Film Room — coming next.</p>
+            <FilmRoomSection data={visibleData} focusPid={focusPid} onFocusChange={changeFocus} />
           )}
 
           {tab === 'reference' && (

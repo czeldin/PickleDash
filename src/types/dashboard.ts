@@ -308,6 +308,9 @@ export interface LossReasonRow {
 export interface CourtShotRow {
   pid: string;
   sessionKey: string;
+  vid: string;                     // pb.vision video id (for deep-links)
+  si: number;                      // session index within the video
+  rallyNum: number;                // 1-based rally index (for deep-links)
   shotNum: number;                 // 1-based shot index in the rally (serve = 1)
   type: string;                    // "drive" | "drop" | "dink" | "lob" | "atp" | ...
   fromX: number; fromY: number;    // contact point (abs court feet)
