@@ -1,7 +1,8 @@
 'use client';
 
-import { DashboardData, OutcomeStatsRow, LossReasonRow, PlayerMeta } from '@/types/dashboard';
+import { DashboardData, OutcomeStatsRow, LossReasonRow, PartnerAdjRow, PlayerMeta } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
+import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { qualifiedPids } from '@/lib/qualified';
 
@@ -28,8 +29,6 @@ export function OutcomesSection({ data }: Props) {
       </SectionCard>
     );
   }
-  const sorted = [...rows].sort((a, b) => (pct(b.gamesWon, b.gamesLost) ?? -1) - (pct(a.gamesWon, a.gamesLost) ?? -1));
-
   const Cell = ({ w, l }: { w: number; l: number }) => {
     const p = pct(w, l);
     return (
@@ -40,44 +39,27 @@ export function OutcomesSection({ data }: Props) {
     );
   };
 
+  const columns: ColumnDef<OutcomeStatsRow>[] = [
+    { key: 'games', header: 'Games', getValue: (o) => pct(o.gamesWon, o.gamesLost) ?? -1, render: (o) => <Cell w={o.gamesWon} l={o.gamesLost} /> },
+    { key: 'points', header: 'Points', getValue: (o) => pct(o.pointsWon, o.pointsLost) ?? -1, render: (o) => <Cell w={o.pointsWon} l={o.pointsLost} /> },
+    { key: 'rallies', header: 'Rallies', getValue: (o) => pct(o.ralliesWon, o.ralliesLost) ?? -1, render: (o) => <Cell w={o.ralliesWon} l={o.ralliesLost} /> },
+    {
+      key: 'net', header: 'Net/g', getValue: (o) => o.netPointsPerGame,
+      render: (o) => (
+        <span className={`tabular-nums font-medium ${o.netPointsPerGame >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+          {o.netPointsPerGame >= 0 ? '+' : ''}{o.netPointsPerGame.toFixed(1)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <SectionCard title="Outcomes — Games · Points · Rallies">
       <p className="text-xs text-gray-400 -mt-2 mb-3">
         Three lenses on winning. A player can win <em>games</em> but lose the <em>rally</em> battle (carried by a partner),
         or vice-versa. <strong>Net/g</strong> = points won − lost, per game.
       </p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-gray-400 border-b border-gray-200">
-              <th className="py-2 pr-2">Player</th>
-              <th className="py-2 px-2">Games</th>
-              <th className="py-2 px-2">Points</th>
-              <th className="py-2 px-2">Rallies</th>
-              <th className="py-2 px-2">Net/g</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((o) => {
-              const p = playerById(data.players, o.pid);
-              if (!p) return null;
-              return (
-                <tr key={o.pid} className="border-b border-gray-100">
-                  <td className="py-2 pr-2">
-                    <span className="inline-flex items-center gap-1.5"><PlayerAvatar player={p} size="sm" /> {p.name}</span>
-                  </td>
-                  <td className="py-2 px-2"><Cell w={o.gamesWon} l={o.gamesLost} /></td>
-                  <td className="py-2 px-2"><Cell w={o.pointsWon} l={o.pointsLost} /></td>
-                  <td className="py-2 px-2"><Cell w={o.ralliesWon} l={o.ralliesLost} /></td>
-                  <td className={`py-2 px-2 tabular-nums font-medium ${o.netPointsPerGame >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                    {o.netPointsPerGame >= 0 ? '+' : ''}{o.netPointsPerGame.toFixed(1)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <SortableTable rows={rows} columns={columns} players={data.players} defaultSortKey="games" />
     </SectionCard>
   );
 }
@@ -96,39 +78,23 @@ export function PartnerAdjSection({ data }: Props) {
         Positive <em>lift</em> = you won more than your partners&apos; own baseline (you tended to raise them). This is a rough
         control for partner quality, not opponents — not the full adjusted model.
       </p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-gray-400 border-b border-gray-200">
-              <th className="py-2 pr-2">Player</th>
-              <th className="py-2 px-2">Actual</th>
-              <th className="py-2 px-2">Expected</th>
-              <th className="py-2 px-2">Lift</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((r) => {
-              const p = playerById(data.players, r.pid);
-              if (!p) return null;
-              return (
-                <tr key={r.pid} className="border-b border-gray-100">
-                  <td className="py-2 pr-2">
-                    <span className="inline-flex items-center gap-1.5"><PlayerAvatar player={p} size="sm" /> {p.name}</span>
-                  </td>
-                  <td className="py-2 px-2 tabular-nums text-gray-700">{r.actualWinPct.toFixed(0)}%</td>
-                  <td className="py-2 px-2 tabular-nums text-gray-500">{r.expectedWinPct.toFixed(0)}%</td>
-                  <td className={`py-2 px-2 tabular-nums font-medium ${r.lift >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                    {r.lift >= 0 ? '+' : ''}{r.lift.toFixed(1)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <SortableTable rows={sorted} columns={partnerCols} players={data.players} defaultSortKey="lift" />
     </SectionCard>
   );
 }
+
+const partnerCols: ColumnDef<PartnerAdjRow>[] = [
+  { key: 'actual', header: 'Actual', getValue: (r) => r.actualWinPct, render: (r) => <span className="tabular-nums text-gray-700">{r.actualWinPct.toFixed(0)}%</span> },
+  { key: 'expected', header: 'Expected', getValue: (r) => r.expectedWinPct, render: (r) => <span className="tabular-nums text-gray-500">{r.expectedWinPct.toFixed(0)}%</span> },
+  {
+    key: 'lift', header: 'Lift', getValue: (r) => r.lift,
+    render: (r) => (
+      <span className={`tabular-nums font-medium ${r.lift >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+        {r.lift >= 0 ? '+' : ''}{r.lift.toFixed(1)}
+      </span>
+    ),
+  },
+];
 
 const REASONS: { key: keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>; label: string; tone: string }[] = [
   { key: 'ownNet', label: 'Into net', tone: 'bg-red-500' },
