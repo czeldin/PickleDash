@@ -163,7 +163,52 @@ export function HeroSection({ data }: Props) {
           </div>
         </div>
 
+        {/* MVP by game tile */}
+        <MvpByGameTile data={data} playerMap={playerMap} />
+
       </div>
     </section>
+  );
+}
+
+function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Map<string, PlayerMeta> }) {
+  const rows = data.skillRatingsByGame;
+  if (!rows || rows.length === 0) return null;
+  const bySession = new Map<string, typeof rows>();
+  for (const r of rows) {
+    if (!bySession.has(r.sessionKey)) bySession.set(r.sessionKey, []);
+    bySession.get(r.sessionKey)!.push(r);
+  }
+  const mvps = [...bySession.values()]
+    .map((rs) => rs.reduce((best, r) => (r.overall > best.overall ? r : best), rs[0]))
+    .filter((r) => r.overall > 0)
+    .sort((a, b) => a.timestamp - b.timestamp || a.sessionKey.localeCompare(b.sessionKey));
+  if (mvps.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-64 md:flex-shrink-0">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">MVP by Game 👑</p>
+      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+        {mvps.map((r, i) => {
+          const p = playerMap.get(r.pid);
+          return (
+            <div key={r.sessionKey + i} className="flex items-center gap-2">
+              <span className="text-xs" aria-hidden>👑</span>
+              {p && (
+                <span
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold shrink-0"
+                  style={{ backgroundColor: p.color.bg, color: p.color.text }}
+                >
+                  {p.initials}
+                </span>
+              )}
+              <span className="text-sm font-medium text-gray-800 truncate flex-1">{p?.name ?? r.pid}</span>
+              <span className="text-xs text-gray-400 tabular-nums shrink-0">{r.overall.toFixed(2)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[11px] text-gray-400 mt-3">Highest pb.vision rating each game.</p>
+    </div>
   );
 }
