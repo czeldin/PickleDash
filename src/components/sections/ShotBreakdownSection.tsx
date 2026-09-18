@@ -1,12 +1,20 @@
 'use client';
 
-import { DashboardData, ShotBreakdownRow } from '@/types/dashboard';
+import { DashboardData, ShotBreakdownRow, NightTrendRow } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { TrendButton, MetricDef } from '@/components/TrendChart';
 
 interface Props {
   data: DashboardData;
 }
+
+// 3rd-shot drop vs drive share over time (nightTrends only tracks the 3rd shot).
+const rt = (n: number, d: number) => (d > 0 ? (100 * n) / d : null);
+const SHOT_MIX_METRICS: MetricDef<NightTrendRow>[] = [
+  { key: 'drop', label: '3rd drop %', value: (r) => rt(r.dropN, r.dropN + r.driveN), pct: true },
+  { key: 'drive', label: '3rd drive %', value: (r) => rt(r.driveN, r.dropN + r.driveN), pct: true },
+];
 
 function DropDriveBar({ row }: { row: ShotBreakdownRow }) {
   const total = row.dropCount + row.driveCount;
@@ -66,7 +74,10 @@ export function ShotBreakdownSection({ data }: Props) {
   const { thirdShot, fifthShot, players } = data;
 
   return (
-    <SectionCard title="3rd Shot &amp; 5th Shot Breakdown">
+    <SectionCard
+      title="3rd Shot &amp; 5th Shot Breakdown"
+      action={<TrendButton title="3rd-shot drop vs drive %" metrics={SHOT_MIX_METRICS} rows={data.nightTrends} players={data.players} />}
+    >
       <div className="flex gap-3 text-xs mb-2">
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-400 inline-block" />Drop</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />Drive</span>
