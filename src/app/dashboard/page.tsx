@@ -300,11 +300,11 @@ export default function DashboardPage() {
           {tab === 'overview' && (
             <>
               <HeroSection data={visibleData} />
+              <SkillRatingsSection data={visibleData} />
               <OutcomesSection data={visibleData} focusPid={focusPid} />
               <TopPerformerByGameSection data={visibleData} focusPid={focusPid} />
               <LossReasonsSection data={visibleData} focusPid={focusPid} />
               <HighlightsSection data={visibleData} />
-              <SkillRatingsSection data={visibleData} />
               <PlayerSummarySection data={visibleData} />
             </>
           )}
