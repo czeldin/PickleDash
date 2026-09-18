@@ -303,7 +303,6 @@ export default function DashboardPage() {
               <OutcomesSection data={visibleData} focusPid={focusPid} />
               <TopPerformerByGameSection data={visibleData} focusPid={focusPid} />
               <LossReasonsSection data={visibleData} focusPid={focusPid} />
-              <AskClaudeSection data={visibleData} />
               <HighlightsSection data={visibleData} />
               <SkillRatingsSection data={visibleData} />
               <PlayerSummarySection data={visibleData} />
@@ -358,6 +357,9 @@ export default function DashboardPage() {
           )}
         </main>
       )}
+
+      {/* Floating Ask-Claude chat widget — available on every tab */}
+      <AskClaudeSection data={visibleData} />
     </div>
   );
 }

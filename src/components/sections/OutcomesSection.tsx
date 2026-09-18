@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { DashboardData, OutcomeStatsRow, LossReasonRow, PartnerAdjRow, PlayerMeta } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
@@ -126,8 +127,9 @@ const REASONS: { key: keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>; label: s
   { key: 'other', label: 'Unattributed', tone: 'bg-gray-300' },
 ];
 
-/** Why We Lost — attribution of lost rallies to causes, per player. */
+/** Why We Lost — grouped by cause, one bar per player, for easy comparison. */
 export function LossReasonsSection({ data, focusPid }: Props) {
+  const [perGame, setPerGame] = useState(true);
   const rows = data.lossReasons;
   if (!rows || rows.length === 0) {
     return (
@@ -138,54 +140,67 @@ export function LossReasonsSection({ data, focusPid }: Props) {
       </SectionCard>
     );
   }
-  // Focus player first, then the rest by rallies lost.
-  const sorted = [...rows].sort((a, b) => {
-    if (a.pid === focusPid) return -1;
-    if (b.pid === focusPid) return 1;
-    return b.ralliesLost - a.ralliesLost;
-  });
+  // games played per pid, for per-game normalization
+  const gamesOf = new Map<string, number>((data.outcomeStats ?? []).map((o) => [o.pid, o.gamesPlayed]));
+  const players = data.players.filter((p) => rows.some((r) => r.pid === p.pid && r.ralliesLost > 0));
+
+  // value for a (player, cause), raw or per-game
+  const val = (r: LossReasonRow, key: typeof REASONS[number]['key']) => {
+    const raw = r[key];
+    if (!perGame) return raw;
+    const g = gamesOf.get(r.pid) ?? 0;
+    return g > 0 ? raw / g : 0;
+  };
+  const rowOf = (pid: string) => rows.find((r) => r.pid === pid)!;
+  // max across everything for a shared x-scale
+  const maxVal = Math.max(
+    ...players.flatMap((p) => REASONS.map(({ key }) => val(rowOf(p.pid), key))),
+    0.001,
+  );
+  const fmt = (v: number) => (perGame ? v.toFixed(1) : String(Math.round(v)));
 
   return (
-    <SectionCard title="Why We Lost — Lost Rallies by Cause">
-      <p className="text-xs text-gray-400 -mt-2 mb-3">
-        Each rally your team lost, charged to the cause of the final shot. Own errors are the fixable ones;
-        opponent winners are earned against you. Bars are proportional within each player.
+    <SectionCard
+      title="Why We Lost — Lost Rallies by Cause"
+      action={
+        <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-xs">
+          <button onClick={() => setPerGame(true)} className={`px-2.5 py-1 rounded-md font-medium ${perGame ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Per game</button>
+          <button onClick={() => setPerGame(false)} className={`px-2.5 py-1 rounded-md font-medium ${!perGame ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Total</button>
+        </div>
+      }
+    >
+      <p className="text-xs text-gray-400 -mt-2 mb-4">
+        Lost rallies charged to the cause of the final shot, grouped by cause so you can compare players directly.
+        Own errors (net / out / kitchen) are the fixable ones; opponent winners are earned against you.
+        {perGame ? ' Shown per game played (fair across different game counts).' : ' Raw totals this selection.'}
       </p>
-      <div className="space-y-3">
-        {sorted.map((r) => {
-          const p = playerById(data.players, r.pid);
-          if (!p || r.ralliesLost === 0) return null;
-          const isFocus = r.pid === focusPid;
-          return (
-            <div key={r.pid} className={`rounded-lg p-3 ${isFocus ? 'bg-blue-50 ring-1 ring-blue-200' : 'bg-gray-50'}`}>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-800">
-                  <PlayerAvatar player={p} size="sm" /> {p.name}
-                </span>
-                <span className="text-xs text-gray-400">{r.ralliesLost} rallies lost</span>
-              </div>
-              <div className="flex h-4 rounded overflow-hidden">
-                {REASONS.map(({ key, label, tone }) => {
-                  const v = r[key];
-                  if (!v) return null;
-                  const w = (100 * v) / r.ralliesLost;
-                  return <div key={key} className={tone} style={{ width: `${w}%` }} title={`${label}: ${v} (${Math.round(w)}%)`} />;
-                })}
-              </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-                {REASONS.map(({ key, label, tone }) => {
-                  const v = r[key];
-                  if (!v) return null;
+      <div className="space-y-4">
+        {REASONS.map(({ key, label, tone }) => (
+          <div key={key}>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className={`w-2.5 h-2.5 rounded-sm ${tone}`} />
+              <span className="text-sm font-semibold text-gray-700">{label}</span>
+            </div>
+            <div className="space-y-1">
+              {[...players]
+                .sort((a, b) => val(rowOf(b.pid), key) - val(rowOf(a.pid), key))
+                .map((p) => {
+                  const v = val(rowOf(p.pid), key);
+                  const w = (100 * v) / maxVal;
+                  const isFocus = p.pid === focusPid;
                   return (
-                    <span key={key} className="inline-flex items-center gap-1 text-xs text-gray-500">
-                      <span className={`w-2 h-2 rounded-sm ${tone}`} /> {label} {v}
-                    </span>
+                    <div key={p.pid} className="flex items-center gap-2">
+                      <span className={`w-16 text-xs shrink-0 text-right ${isFocus ? 'font-semibold text-blue-700' : 'text-gray-500'}`}>{p.name}</span>
+                      <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
+                        <div className={`h-full ${tone} ${isFocus ? '' : 'opacity-80'}`} style={{ width: `${Math.max(w, v > 0 ? 2 : 0)}%` }} />
+                      </div>
+                      <span className={`w-9 text-xs tabular-nums shrink-0 ${isFocus ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>{fmt(v)}</span>
+                    </div>
                   );
                 })}
-              </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </SectionCard>
   );
