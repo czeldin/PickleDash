@@ -5,6 +5,7 @@ import {
   getAllNightMetas, saveNightMeta, saveRawData, getRawData,
   getOrphanedRawIds, getManifest, NightMeta,
 } from '@/lib/blobStore';
+import { ensureAugmentedForNight } from '@/lib/augmentedInsights';
 import { PaddleTag } from '@/types/nights';
 
 // Paddle tags for the preloaded Apr 30 night
@@ -124,7 +125,16 @@ export async function POST(req: NextRequest) {
       saveRawData(meta.id, raw),
       saveNightMeta(meta.id, meta),
     ]);
-    return NextResponse.json({ ok: true });
+    // Best-effort: fetch & cache pb.vision augmented insights for this night's
+    // sessions so the richer parser has real coordinates/putaways. Never blocks
+    // or fails the upload — backfill can fill any gaps later.
+    let augmented: Awaited<ReturnType<typeof ensureAugmentedForNight>> | null = null;
+    try {
+      augmented = await ensureAugmentedForNight(meta.id, raw);
+    } catch (e) {
+      console.error('augmented fetch on upload failed (non-fatal):', e);
+    }
+    return NextResponse.json({ ok: true, augmented });
   } catch (e) {
     console.error('POST /api/nights error:', e);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
