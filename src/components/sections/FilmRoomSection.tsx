@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { DashboardData, CourtShotRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
-import { ShotThumbnail } from '@/components/ShotThumbnail';
+
+const posterUrl = (vid: string) => `https://storage.googleapis.com/pbv-pro/${vid}/poster.jpg`;
 
 interface Props {
   data: DashboardData;
@@ -55,6 +56,13 @@ const CATEGORIES: Category[] = [
 export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
   const courtShots = data.courtShots;
   const [catId, setCatId] = useState<string>('clean-winners');
+
+  // Game number per session (G1 = first game listed), for labeling each clip.
+  const gameNum = useMemo(() => {
+    const m = new Map<string, number>();
+    data.sessions.forEach((s, i) => m.set(s.key, i + 1));
+    return m;
+  }, [data.sessions]);
 
   const cat = CATEGORIES.find((c) => c.id === catId)!;
   const clips = useMemo(() => {
@@ -124,11 +132,18 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
               href={deepLink(s)}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 transition-colors group"
+              className="flex items-center justify-between gap-3 px-2 py-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 transition-colors group"
             >
-              <span className="flex items-center gap-2.5 text-sm text-gray-700">
-                <ShotThumbnail shot={s} />
-                <span>
+              <span className="flex items-center gap-3 text-sm text-gray-700 min-w-0">
+                <img
+                  src={posterUrl(s.vid)}
+                  alt=""
+                  loading="lazy"
+                  className="w-16 h-10 rounded object-cover bg-gray-200 shrink-0"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                />
+                <span className="min-w-0">
+                  <span className="text-gray-400 font-medium mr-1.5">G{gameNum.get(s.sessionKey) ?? '?'}</span>
                   Rally {s.rallyNum} · shot {s.shotNum}
                   <span className="text-gray-400 ml-2">{s.type}</span>
                   {s.endZone && s.endZone !== 'kitchen' && s.endZone !== 'deep' && s.endZone !== 'mid' && s.endZone !== 'short' && (
