@@ -28,6 +28,7 @@ import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
 import { OutcomesSection, LossReasonsSection, LeaderboardSection, TopPerformerByGameSection, PartnerAdjSection } from '@/components/sections/OutcomesSection';
 import { FilmRoomSection } from '@/components/sections/FilmRoomSection';
+import { TrendsSection } from '@/components/sections/TrendsSection';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
 import { anonymizeData } from '@/lib/anonymize';
 
@@ -341,7 +342,7 @@ export default function DashboardPage() {
           )}
 
           {tab === 'trends' && (
-            <p className="text-center text-gray-400 py-16 text-sm">Consolidated Trends — coming next. (Per-table trend charts are available on each table via the Trends button.)</p>
+            <TrendsSection data={visibleData} />
           )}
 
           {tab === 'filmroom' && (
