@@ -29,35 +29,55 @@ export function OutcomesSection({ data }: Props) {
       </SectionCard>
     );
   }
-  const Cell = ({ w, l }: { w: number; l: number }) => {
+  // Column leaders (among qualified players only, so a small sample can't be the
+  // highlighted best). Map of column key → the leading value.
+  const { pids: qPids } = qualifiedPids(rows);
+  const q = rows.filter((r) => qPids.has(r.pid));
+  const maxOf = (f: (o: OutcomeStatsRow) => number | null) => {
+    const vals = q.map(f).filter((v): v is number => v != null);
+    return vals.length ? Math.max(...vals) : null;
+  };
+  const leaders = {
+    games: maxOf((o) => pct(o.gamesWon, o.gamesLost)),
+    net: maxOf((o) => o.netPointsPerGame),
+    points: maxOf((o) => pct(o.pointsWon, o.pointsLost)),
+    rallies: maxOf((o) => pct(o.ralliesWon, o.ralliesLost)),
+  };
+
+  const Cell = ({ w, l, lead }: { w: number; l: number; lead: boolean }) => {
     const p = pct(w, l);
     return (
-      <span className="tabular-nums">
-        <span className="text-gray-800 font-medium">{w}–{l}</span>
-        <span className="text-gray-400 text-xs ml-1">{p == null ? '' : `${p}%`}</span>
+      <span className={`tabular-nums inline-flex items-center gap-1 ${lead ? 'bg-green-100 text-green-800 rounded-full px-2 py-0.5' : ''}`}>
+        <span className="font-medium">{w}–{l}</span>
+        <span className={`text-xs ${lead ? 'text-green-700' : 'text-gray-400'}`}>{p == null ? '' : `${p}%`}</span>
       </span>
     );
   };
+  const isLead = (v: number | null, lead: number | null) => v != null && lead != null && v === lead;
 
   const columns: ColumnDef<OutcomeStatsRow>[] = [
-    { key: 'games', header: 'Games', getValue: (o) => pct(o.gamesWon, o.gamesLost) ?? -1, render: (o) => <Cell w={o.gamesWon} l={o.gamesLost} /> },
-    { key: 'points', header: 'Points', getValue: (o) => pct(o.pointsWon, o.pointsLost) ?? -1, render: (o) => <Cell w={o.pointsWon} l={o.pointsLost} /> },
-    { key: 'rallies', header: 'Rallies', getValue: (o) => pct(o.ralliesWon, o.ralliesLost) ?? -1, render: (o) => <Cell w={o.ralliesWon} l={o.ralliesLost} /> },
+    { key: 'games', header: 'Games', getValue: (o) => pct(o.gamesWon, o.gamesLost) ?? -1, render: (o) => <Cell w={o.gamesWon} l={o.gamesLost} lead={qPids.has(o.pid) && isLead(pct(o.gamesWon, o.gamesLost), leaders.games)} /> },
     {
-      key: 'net', header: 'Net/g', getValue: (o) => o.netPointsPerGame,
-      render: (o) => (
-        <span className={`tabular-nums font-medium ${o.netPointsPerGame >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-          {o.netPointsPerGame >= 0 ? '+' : ''}{o.netPointsPerGame.toFixed(1)}
-        </span>
-      ),
+      key: 'net', header: 'Net Pts / G', getValue: (o) => o.netPointsPerGame,
+      render: (o) => {
+        const lead = qPids.has(o.pid) && isLead(o.netPointsPerGame, leaders.net);
+        return (
+          <span className={`tabular-nums font-medium ${lead ? 'bg-green-100 text-green-800 rounded-full px-2 py-0.5' : o.netPointsPerGame >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+            {o.netPointsPerGame >= 0 ? '+' : ''}{o.netPointsPerGame.toFixed(1)}
+          </span>
+        );
+      },
     },
+    { key: 'points', header: 'Points', getValue: (o) => pct(o.pointsWon, o.pointsLost) ?? -1, render: (o) => <Cell w={o.pointsWon} l={o.pointsLost} lead={qPids.has(o.pid) && isLead(pct(o.pointsWon, o.pointsLost), leaders.points)} /> },
+    { key: 'rallies', header: 'Rallies', getValue: (o) => pct(o.ralliesWon, o.ralliesLost) ?? -1, render: (o) => <Cell w={o.ralliesWon} l={o.ralliesLost} lead={qPids.has(o.pid) && isLead(pct(o.ralliesWon, o.ralliesLost), leaders.rallies)} /> },
   ];
 
   return (
     <SectionCard title="Outcomes — Games · Points · Rallies">
       <p className="text-xs text-gray-400 -mt-2 mb-3">
         Three lenses on winning. A player can win <em>games</em> but lose the <em>rally</em> battle (carried by a partner),
-        or vice-versa. <strong>Net/g</strong> = points won − lost, per game.
+        or vice-versa. <strong>Net Pts / G</strong> = points won − lost, per game (a points margin).
+        <span className="ml-1">The <span className="bg-green-100 text-green-800 rounded-full px-1.5">green</span> value leads each column (qualified players only).</span>
       </p>
       <SortableTable rows={rows} columns={columns} players={data.players} defaultSortKey="games" />
     </SectionCard>
@@ -210,57 +230,3 @@ export function TopPerformerByGameSection({ data }: Props) {
   );
 }
 
-/** Small leaderboard strip: category leaders among QUALIFIED players. */
-export function LeaderboardSection({ data }: Props) {
-  const rows = data.outcomeStats;
-  if (!rows || rows.length === 0) return null;
-  const { threshold, pids } = qualifiedPids(rows);
-  const q = rows.filter((r) => pids.has(r.pid));
-  if (q.length === 0) return null;
-
-  const leader = (
-    metric: (o: OutcomeStatsRow) => number | null,
-  ): { p: PlayerMeta; v: number } | null => {
-    let best: { p: PlayerMeta; v: number } | null = null;
-    for (const o of q) {
-      const v = metric(o);
-      if (v == null) continue;
-      const p = playerById(data.players, o.pid);
-      if (!p) continue;
-      if (!best || v > best.v) best = { p, v };
-    }
-    return best;
-  };
-
-  const cats: { label: string; get: () => { p: PlayerMeta; v: number } | null; fmt: (v: number) => string }[] = [
-    { label: 'Game win %', get: () => leader((o) => pct(o.gamesWon, o.gamesLost)), fmt: (v) => `${v}%` },
-    { label: 'Point win %', get: () => leader((o) => pct(o.pointsWon, o.pointsLost)), fmt: (v) => `${v}%` },
-    { label: 'Rally win %', get: () => leader((o) => pct(o.ralliesWon, o.ralliesLost)), fmt: (v) => `${v}%` },
-    { label: 'Net pts/game', get: () => leader((o) => o.netPointsPerGame), fmt: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}` },
-  ];
-
-  return (
-    <SectionCard title="Leaderboard">
-      <p className="text-xs text-gray-400 -mt-2 mb-3">
-        Category leaders among qualified players (≥ {threshold} game{threshold === 1 ? '' : 's'} this selection), so small samples don&apos;t top a list.
-      </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {cats.map(({ label, get, fmt }) => {
-          const res = get();
-          return (
-            <div key={label} className="rounded-lg bg-gray-50 p-3">
-              <p className="text-xs text-gray-400 mb-1">{label}</p>
-              {res ? (
-                <div className="flex items-center gap-1.5">
-                  <PlayerAvatar player={res.p} size="sm" />
-                  <span className="text-sm font-semibold text-gray-800">{res.p.name}</span>
-                  <span className="text-sm text-gray-500 ml-auto tabular-nums">{fmt(res.v)}</span>
-                </div>
-              ) : <p className="text-sm text-gray-300">—</p>}
-            </div>
-          );
-        })}
-      </div>
-    </SectionCard>
-  );
-}

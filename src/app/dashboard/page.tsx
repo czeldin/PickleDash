@@ -26,7 +26,7 @@ import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeRece
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
-import { OutcomesSection, LossReasonsSection, LeaderboardSection, TopPerformerByGameSection, PartnerAdjSection } from '@/components/sections/OutcomesSection';
+import { OutcomesSection, LossReasonsSection, TopPerformerByGameSection, PartnerAdjSection } from '@/components/sections/OutcomesSection';
 import { FilmRoomSection } from '@/components/sections/FilmRoomSection';
 import { TrendsSection } from '@/components/sections/TrendsSection';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
@@ -300,7 +300,6 @@ export default function DashboardPage() {
           {tab === 'overview' && (
             <>
               <HeroSection data={visibleData} />
-              <LeaderboardSection data={visibleData} focusPid={focusPid} />
               <OutcomesSection data={visibleData} focusPid={focusPid} />
               <TopPerformerByGameSection data={visibleData} focusPid={focusPid} />
               <LossReasonsSection data={visibleData} focusPid={focusPid} />
