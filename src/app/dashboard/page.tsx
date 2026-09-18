@@ -26,7 +26,7 @@ import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeRece
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
-import { OutcomesSection, LossReasonsSection, LeaderboardSection } from '@/components/sections/OutcomesSection';
+import { OutcomesSection, LossReasonsSection, LeaderboardSection, TopPerformerByGameSection, PartnerAdjSection } from '@/components/sections/OutcomesSection';
 import { FilmRoomSection } from '@/components/sections/FilmRoomSection';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
 import { anonymizeData } from '@/lib/anonymize';
@@ -94,6 +94,7 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     courtShots: data.courtShots,
     outcomeStats: data.outcomeStats?.filter((r) => pids.has(r.pid)),
     lossReasons: data.lossReasons?.filter((r) => pids.has(r.pid)),
+    partnerAdj: data.partnerAdj?.filter((r) => pids.has(r.pid)),
   };
 }
 
@@ -300,6 +301,7 @@ export default function DashboardPage() {
               <HeroSection data={visibleData} />
               <LeaderboardSection data={visibleData} focusPid={focusPid} />
               <OutcomesSection data={visibleData} focusPid={focusPid} />
+              <TopPerformerByGameSection data={visibleData} focusPid={focusPid} />
               <LossReasonsSection data={visibleData} focusPid={focusPid} />
               <AskClaudeSection data={visibleData} />
               <HighlightsSection data={visibleData} />
@@ -332,7 +334,10 @@ export default function DashboardPage() {
           )}
 
           {tab === 'partners' && (
-            <PairingSideSection data={visibleData} />
+            <>
+              <PartnerAdjSection data={visibleData} focusPid={focusPid} />
+              <PairingSideSection data={visibleData} />
+            </>
           )}
 
           {tab === 'trends' && (

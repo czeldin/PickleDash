@@ -288,6 +288,18 @@ export interface OutcomeStatsRow {
   netPointsPerGame: number; // (pointsWon - pointsLost) / gamesPlayed
 }
 
+// Lightweight partner-adjusted rally performance (approximate — NOT the full
+// Bradley-Terry model). "expected" = the rally win% Craig's partners posted
+// across ALL their rallies; "actual" = Craig's rally win%. actual − expected > 0
+// means the player tended to lift their partners above those partners' own baseline.
+export interface PartnerAdjRow {
+  pid: string;
+  rallies: number;         // rallies with a known partner
+  actualWinPct: number;    // this player's rally win% (0-100)
+  expectedWinPct: number;  // rally-weighted avg of partners' own overall rally win%
+  lift: number;            // actual − expected (percentage points)
+}
+
 // Why a player's team lost rallies — attribution by cause. Each lost rally is
 // charged to exactly one cause based on its final shot. Outcome-anchored.
 export interface LossReasonRow {
@@ -353,4 +365,5 @@ export interface DashboardData {
   courtShots?: CourtShotRow[]; // only present for augmented nights (needs coordinates)
   outcomeStats?: OutcomeStatsRow[];
   lossReasons?: LossReasonRow[];
+  partnerAdj?: PartnerAdjRow[];
 }

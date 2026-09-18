@@ -82,6 +82,54 @@ export function OutcomesSection({ data }: Props) {
   );
 }
 
+/** Lightweight partner-adjusted rally win% — actual vs partners' baseline. */
+export function PartnerAdjSection({ data }: Props) {
+  const rows = data.partnerAdj;
+  if (!rows || rows.length === 0) return null;
+  const sorted = [...rows].filter((r) => r.rallies > 0).sort((a, b) => b.lift - a.lift);
+  if (sorted.length === 0) return null;
+
+  return (
+    <SectionCard title="Partner-Adjusted Rally Win %">
+      <p className="text-xs text-gray-400 -mt-2 mb-3">
+        <strong>Approximate.</strong> <em>Expected</em> = the rally win% your partners posted overall; <em>Actual</em> = yours.
+        Positive <em>lift</em> = you won more than your partners&apos; own baseline (you tended to raise them). This is a rough
+        control for partner quality, not opponents — not the full adjusted model.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-400 border-b border-gray-200">
+              <th className="py-2 pr-2">Player</th>
+              <th className="py-2 px-2">Actual</th>
+              <th className="py-2 px-2">Expected</th>
+              <th className="py-2 px-2">Lift</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r) => {
+              const p = playerById(data.players, r.pid);
+              if (!p) return null;
+              return (
+                <tr key={r.pid} className="border-b border-gray-100">
+                  <td className="py-2 pr-2">
+                    <span className="inline-flex items-center gap-1.5"><PlayerAvatar player={p} size="sm" /> {p.name}</span>
+                  </td>
+                  <td className="py-2 px-2 tabular-nums text-gray-700">{r.actualWinPct.toFixed(0)}%</td>
+                  <td className="py-2 px-2 tabular-nums text-gray-500">{r.expectedWinPct.toFixed(0)}%</td>
+                  <td className={`py-2 px-2 tabular-nums font-medium ${r.lift >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                    {r.lift >= 0 ? '+' : ''}{r.lift.toFixed(1)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
 const REASONS: { key: keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>; label: string; tone: string }[] = [
   { key: 'ownNet', label: 'Into net', tone: 'bg-red-500' },
   { key: 'ownOut', label: 'Hit out', tone: 'bg-orange-500' },
@@ -148,6 +196,45 @@ export function LossReasonsSection({ data, focusPid }: Props) {
                     </span>
                   );
                 })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
+/** Top Performer by Game — the highest pb.vision overall rating in each game. */
+export function TopPerformerByGameSection({ data }: Props) {
+  const rows = data.skillRatingsByGame;
+  if (!rows || rows.length === 0) return null;
+  // Group by session, pick the max-overall player per session.
+  const bySession = new Map<string, typeof rows>();
+  for (const r of rows) {
+    if (!bySession.has(r.sessionKey)) bySession.set(r.sessionKey, []);
+    bySession.get(r.sessionKey)!.push(r);
+  }
+  const mvps = [...bySession.values()]
+    .map((rs) => rs.reduce((best, r) => (r.overall > best.overall ? r : best), rs[0]))
+    .filter((r) => r.overall > 0)
+    .sort((a, b) => a.timestamp - b.timestamp || a.sessionKey.localeCompare(b.sessionKey));
+  if (mvps.length === 0) return null;
+
+  return (
+    <SectionCard title="Top Performer by Game">
+      <p className="text-xs text-gray-400 -mt-2 mb-3">Highest pb.vision overall rating in each game this selection.</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        {mvps.map((r, i) => {
+          const p = playerById(data.players, r.pid);
+          if (!p) return null;
+          return (
+            <div key={r.sessionKey + i} className="rounded-lg bg-gray-50 p-2.5">
+              <p className="text-xs text-gray-400 truncate mb-1" title={r.sessionName}>{r.sessionName}</p>
+              <div className="flex items-center gap-1.5">
+                <PlayerAvatar player={p} size="sm" />
+                <span className="text-sm font-medium text-gray-800 truncate">{p.name}</span>
+                <span className="text-xs text-gray-500 ml-auto tabular-nums">{r.overall.toFixed(2)}</span>
               </div>
             </div>
           );

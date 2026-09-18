@@ -8,7 +8,7 @@ import {
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
   CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow, DriveDropRow, NightTrendRow,
-  CourtShotRow, OutcomeStatsRow, LossReasonRow,
+  CourtShotRow, OutcomeStatsRow, LossReasonRow, PartnerAdjRow,
 } from '@/types/dashboard';
 
 /**
@@ -402,6 +402,9 @@ export function parseAugmentedNights(
   const os = (f: string) => { let v = osMap.get(f); if (!v) { v = { gp: 0, gw: 0, gl: 0, pw: 0, pl: 0, rw: 0, rl: 0 }; osMap.set(f, v); } return v; };
   const lrMap = new Map<string, { rl: number; net: number; out: number; kit: number; uf: number; pop: number; opp: number; other: number }>();
   const lr = (f: string) => { let v = lrMap.get(f); if (!v) { v = { rl: 0, net: 0, out: 0, kit: 0, uf: 0, pop: 0, opp: 0, other: 0 }; lrMap.set(f, v); } return v; };
+  // Partner-pair rally tallies: key `${player}|${partner}` → rallies together.
+  const pairMap = new Map<string, number>();
+  const pair = (a: string, b: string) => { const k = a + '|' + b; pairMap.set(k, (pairMap.get(k) ?? 0) + 1); };
   const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
 
@@ -470,6 +473,11 @@ export function parseAugmentedNights(
         const lt = 1 - wt;
         for (const f of teamPlayers[wt]) os(f).rw++;
         for (const f of teamPlayers[lt]) os(f).rl++;
+        // Record partner pairings (both directions) for partner-adjustment.
+        for (const t of [0, 1] as const) {
+          const tp = teamPlayers[t];
+          if (tp.length === 2) { pair(tp[0], tp[1]); pair(tp[1], tp[0]); }
+        }
         // Attribute the loss.
         const shots = rally.shots ?? [];
         const last = shots[shots.length - 1];
@@ -811,8 +819,27 @@ export function parseAugmentedNights(
       ownUnforced: v.uf, popupExploited: v.pop, oppWinner: v.opp, other: v.other,
     };
   });
+  // Lightweight partner-adjusted rally win% (approximate). expected = rally-
+  // weighted average of each partner's own overall rally win%.
+  const rallyWinPctOf = new Map<string, number>();
+  for (const o of outcomeStats) {
+    const tot = o.ralliesWon + o.ralliesLost;
+    rallyWinPctOf.set(o.pid, tot > 0 ? (100 * o.ralliesWon) / tot : 0);
+  }
+  const partnerAdj: PartnerAdjRow[] = data.players.map((p) => {
+    let wSum = 0, n = 0;
+    for (const [k, cnt] of pairMap) {
+      const [a, b] = k.split('|');
+      if (a !== p.pid) continue;
+      wSum += (rallyWinPctOf.get(b) ?? 0) * cnt;
+      n += cnt;
+    }
+    const actual = rallyWinPctOf.get(p.pid) ?? 0;
+    const expected = n > 0 ? wSum / n : 0;
+    return { pid: p.pid, rallies: n, actualWinPct: actual, expectedWinPct: expected, lift: actual - expected };
+  });
 
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends, courtShots, outcomeStats, lossReasons };
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends, courtShots, outcomeStats, lossReasons, partnerAdj };
 }
 
 // Convenience wrapper for a single augmented game.
