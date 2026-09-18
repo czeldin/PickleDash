@@ -25,6 +25,7 @@ import { PairingSideSection } from '@/components/sections/PairingSideSection';
 import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeReceiveSection } from '@/components/sections/NewInsightsSections';
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
+import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
 import { anonymizeData } from '@/lib/anonymize';
 
@@ -86,6 +87,9 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     kitchenSR: data.kitchenSR.filter((r) => pids.has(r.pid)),
     driveDrop: data.driveDrop.filter((r) => pids.has(r.pid)),
     nightTrends: data.nightTrends.filter((r) => pids.has(r.pid)),
+    // Court Maps has its own player picker, and pids here are keyed differently
+    // than courtShots.pid in edge cases; pass through and let the section filter.
+    courtShots: data.courtShots,
   };
 }
 
@@ -317,7 +321,7 @@ export default function DashboardPage() {
           )}
 
           {tab === 'courtmaps' && (
-            <p className="text-center text-gray-400 py-16 text-sm">Court Maps — coming next.</p>
+            <CourtMapsSection data={visibleData} focusPid={focusPid} />
           )}
 
           {tab === 'partners' && (
