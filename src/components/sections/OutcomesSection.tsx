@@ -5,6 +5,7 @@ import { DashboardData, OutcomeStatsRow, LossReasonRow, PartnerAdjRow, PlayerMet
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
+import { InfoTip } from '@/components/InfoTip';
 import { qualifiedPids } from '@/lib/qualified';
 
 interface Props {
@@ -176,10 +177,10 @@ export function LossReasonsSection({ data, focusPid }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
         {REASONS.map(({ key, label, tone, hint }) => (
           <div key={key}>
-            <div className="flex items-center gap-1.5 mb-1" title={hint}>
+            <div className="flex items-center gap-1.5 mb-1">
               <span className={`w-2.5 h-2.5 rounded-sm ${tone}`} />
               <span className="text-sm font-semibold text-gray-700">{label}</span>
-              <span className="text-gray-300 text-xs cursor-help">ⓘ</span>
+              <InfoTip text={hint} />
             </div>
             <div className="space-y-1">
               {[...players]
