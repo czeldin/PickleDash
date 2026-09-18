@@ -26,6 +26,7 @@ import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeRece
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
+import { OutcomesSection, LossReasonsSection, LeaderboardSection } from '@/components/sections/OutcomesSection';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
 import { anonymizeData } from '@/lib/anonymize';
 
@@ -296,6 +297,9 @@ export default function DashboardPage() {
           {tab === 'overview' && (
             <>
               <HeroSection data={visibleData} />
+              <LeaderboardSection data={visibleData} focusPid={focusPid} />
+              <OutcomesSection data={visibleData} focusPid={focusPid} />
+              <LossReasonsSection data={visibleData} focusPid={focusPid} />
               <AskClaudeSection data={visibleData} />
               <HighlightsSection data={visibleData} />
               <SkillRatingsSection data={visibleData} />
