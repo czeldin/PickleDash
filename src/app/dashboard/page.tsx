@@ -27,6 +27,22 @@ import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { anonymizeData } from '@/lib/anonymize';
 
+/**
+ * Reconcile a player selection against the players present in newly-parsed data,
+ * so changing the night or game filter does NOT wipe the user's player picks.
+ * Keeps every still-present selected pid, adds any brand-new players (so a newly
+ * loaded night isn't silently hidden), and if nothing overlaps falls back to all.
+ */
+function reconcilePids(prev: Set<string>, allPids: string[], prevAllPids: string[]): Set<string> {
+  const present = new Set(allPids);
+  const kept = [...prev].filter((p) => present.has(p));
+  // Players that didn't exist before this change are shown by default.
+  const known = new Set(prevAllPids);
+  const brandNew = allPids.filter((p) => !known.has(p));
+  const next = new Set([...kept, ...brandNew]);
+  return next.size === 0 ? new Set(allPids) : next;
+}
+
 function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardData {
   if (pids.size === data.players.length) return data;
   return {
@@ -125,10 +141,13 @@ export default function DashboardPage() {
     const allData = parseNightsAuto(selected);
     const allSessions = parseNightsAuto(allNights).sessions; // keep full session list
     const withSessions = { ...allData, sessions: allSessions };
-    setData(withSessions);
+    setData((prev) => {
+      const prevPids = prev ? prev.players.map((p) => p.pid) : [];
+      setSelectedPids((sel) => reconcilePids(sel, allData.players.map((p) => p.pid), prevPids));
+      return withSessions;
+    });
     setAvailableSessions(allSessions);
     setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
-    setSelectedPids(new Set(allData.players.map((p) => p.pid)));
     setDashboardData(withSessions);
   }, [allNights]);
 
@@ -144,8 +163,11 @@ export default function DashboardPage() {
     // Keep the full session list so the game-filter dropdown still shows every game.
     const fullSessions = availableSessions.length ? availableSessions : base.sessions;
     const withSessions = { ...newData, sessions: fullSessions };
-    setSelectedPids(new Set(withSessions.players.map((p) => p.pid)));
-    setData(withSessions);
+    setData((prev) => {
+      const prevPids = prev ? prev.players.map((p) => p.pid) : [];
+      setSelectedPids((sel) => reconcilePids(sel, withSessions.players.map((p) => p.pid), prevPids));
+      return withSessions;
+    });
     setDashboardData(withSessions);
   }, [isAll, allNights, selectedNightIds, night, availableSessions]);
 
