@@ -189,6 +189,7 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
           const p = playerMap.get(r.pid);
           return (
             <div key={r.sessionKey + i} className="relative group flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-gray-50 cursor-default">
+              <span className="text-xs text-gray-400 tabular-nums w-6 shrink-0">G{i + 1}</span>
               <span className="text-xs" aria-hidden>👑</span>
               <span className="text-sm font-semibold truncate flex-1" style={{ color: p?.color.text }}>{p?.name ?? r.pid}</span>
               <span className="text-xs text-gray-400 tabular-nums shrink-0">{r.overall.toFixed(2)}</span>
