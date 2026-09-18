@@ -493,8 +493,7 @@ export function parseAugmentedNights(
           if (fl.net) cat('net');
           else if (fl.out) cat('out');
           else if (fl.short) cat('kit');
-          else if (last.errors.unforced) cat('uf');
-          else cat('other');
+          else cat('other'); // any other own-fault → unattributed (no distinct "unforced" bucket: it was always empty since net/out/short catch every fault first)
         } else if (exploitedByLoser) {
           cat('pop');
         } else if (last && lastTeam === wt && (last.is_putaway || last.winner_type === 'clean')) {

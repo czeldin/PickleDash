@@ -117,14 +117,13 @@ const partnerCols: ColumnDef<PartnerAdjRow>[] = [
   },
 ];
 
-const REASONS: { key: keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>; label: string; tone: string }[] = [
-  { key: 'ownNet', label: 'Into net', tone: 'bg-red-500' },
-  { key: 'ownOut', label: 'Hit out', tone: 'bg-orange-500' },
-  { key: 'ownKitchen', label: 'Kitchen/short', tone: 'bg-amber-500' },
-  { key: 'ownUnforced', label: 'Unforced', tone: 'bg-rose-400' },
-  { key: 'popupExploited', label: 'Popped up → put away', tone: 'bg-fuchsia-500' },
-  { key: 'oppWinner', label: 'Opponent winner', tone: 'bg-slate-400' },
-  { key: 'other', label: 'Unattributed', tone: 'bg-gray-300' },
+const REASONS: { key: keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>; label: string; tone: string; hint: string }[] = [
+  { key: 'ownNet', label: 'We hit into net', tone: 'bg-red-500', hint: 'The rally-ending shot was ours and went into the net.' },
+  { key: 'ownOut', label: 'We hit out', tone: 'bg-orange-500', hint: 'The rally-ending shot was ours and landed out.' },
+  { key: 'ownKitchen', label: 'We hit short/kitchen', tone: 'bg-amber-500', hint: 'The rally-ending shot was ours and landed short of the net or a kitchen fault.' },
+  { key: 'popupExploited', label: 'We popped it up', tone: 'bg-fuchsia-500', hint: 'A dink/drop of ours popped up and the opponents attacked it out of the air.' },
+  { key: 'oppWinner', label: 'They hit a winner', tone: 'bg-slate-400', hint: 'The opponents ended the rally with a clean winner or putaway — not our error.' },
+  { key: 'other', label: 'Unattributed', tone: 'bg-gray-300', hint: 'The rally ended but the final shot could not be classified from the data (no fault or winner tag).' },
 ];
 
 /** Why We Lost — grouped by cause, one bar per player, for easy comparison. */
@@ -170,16 +169,17 @@ export function LossReasonsSection({ data, focusPid }: Props) {
       }
     >
       <p className="text-xs text-gray-400 -mt-2 mb-4">
-        Lost rallies charged to the cause of the final shot, grouped by cause so you can compare players directly.
-        Own errors (net / out / kitchen) are the fixable ones; opponent winners are earned against you.
-        {perGame ? ' Shown per game played (fair across different game counts).' : ' Raw totals this selection.'}
+        Every lost rally charged to the cause of its final shot — a <strong>team</strong> stat, so both partners share each loss.
+        &ldquo;We…&rdquo; are your side&apos;s own errors (the fixable ones); &ldquo;They hit a winner&rdquo; is earned against you.
+        {perGame ? ' Shown per game played (fair across different game counts).' : ' Raw totals this selection.'} Hover a cause for its definition.
       </p>
-      <div className="space-y-4">
-        {REASONS.map(({ key, label, tone }) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        {REASONS.map(({ key, label, tone, hint }) => (
           <div key={key}>
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center gap-1.5 mb-1" title={hint}>
               <span className={`w-2.5 h-2.5 rounded-sm ${tone}`} />
               <span className="text-sm font-semibold text-gray-700">{label}</span>
+              <span className="text-gray-300 text-xs cursor-help">ⓘ</span>
             </div>
             <div className="space-y-1">
               {[...players]
