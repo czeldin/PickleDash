@@ -86,32 +86,21 @@ function Chart<T extends TrendRow>({ nightTrends, players, metrics, selectedPids
 }
 
 /**
- * Always-visible inline trend chart with its own player toggles. Metrics that
- * don't exist for a night produce null values and are simply not plotted, so a
- * newer-only metric's line starts at the first night it has data — no fake zeros.
+ * Always-visible inline trend chart. Player selection is CONTROLLED via
+ * `selectedPids` so a single control above can drive several charts at once.
+ * Metrics that don't exist for a night produce null values and are simply not
+ * plotted, so a newer-only metric's line starts at the first night it has data.
  */
-export function TrendChartInline<T extends TrendRow>({ title, metrics, rows, players: allPlayers }: { title: string; metrics: MetricDef<T>[]; rows: T[]; players: PlayerMeta[] }) {
+export function TrendChartInline<T extends TrendRow>({ title, metrics, rows, players: allPlayers, selectedPids }: {
+  title: string; metrics: MetricDef<T>[]; rows: T[]; players: PlayerMeta[]; selectedPids: Set<string>;
+}) {
   const havePids = useMemo(() => new Set(rows.map((r) => r.pid)), [rows]);
   const players = allPlayers.filter((p) => havePids.has(p.pid));
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(allPlayers.map((p) => p.pid)));
   if (players.length === 0) return null;
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
-      <Chart nightTrends={rows} players={players} metrics={metrics} selectedPids={selected} />
-      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
-        {players.map((p) => {
-          const on = selected.has(p.pid);
-          return (
-            <button key={p.pid} type="button"
-              onClick={() => setSelected((s) => { const n = new Set(s); if (n.has(p.pid)) n.delete(p.pid); else n.add(p.pid); return n; })}
-              className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors ${on ? 'border-gray-300 bg-white text-gray-700' : 'border-gray-200 bg-gray-50 text-gray-300'}`}>
-              <span className="w-3 h-1 rounded-full" style={{ backgroundColor: on ? p.color.text : '#d4d2c9' }} />
-              {p.name}
-            </button>
-          );
-        })}
-      </div>
+      <Chart nightTrends={rows} players={players} metrics={metrics} selectedPids={selectedPids} />
     </div>
   );
 }

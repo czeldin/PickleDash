@@ -29,7 +29,6 @@ import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
 import { OutcomesSection, LossReasonsSection, PartnerAdjSection } from '@/components/sections/OutcomesSection';
 import { FilmRoomSection } from '@/components/sections/FilmRoomSection';
 import { TrendsSection } from '@/components/sections/TrendsSection';
-import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
 import { anonymizeData } from '@/lib/anonymize';
 
 // Themed tabs — question-oriented, not category-oriented. See build plan.
@@ -257,7 +256,6 @@ export default function DashboardPage() {
 
           {/* Right: filters + back */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <FocusPlayerSelect players={data.players} focusPid={focusPid} onChange={changeFocus} />
             {isAll && allNights.length > 0 && (
               <NightFilter
                 nights={allNights}

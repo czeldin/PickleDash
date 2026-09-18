@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { DashboardData, NightTrendRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { TrendChartInline, MetricDef } from '@/components/TrendChart';
@@ -34,6 +35,14 @@ export function TrendsSection({ data }: Props) {
   const rows = data.nightTrends;
   const nightCount = new Set(rows.map((r) => r.night)).size;
 
+  // Players that actually have any trend data, and one SHARED selection that
+  // drives every chart at once.
+  const players = useMemo(() => {
+    const have = new Set(rows.map((r) => r.pid));
+    return data.players.filter((p) => have.has(p.pid));
+  }, [rows, data.players]);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(data.players.map((p) => p.pid)));
+
   if (nightCount <= 1) {
     return (
       <SectionCard title="Trends Over Time">
@@ -44,17 +53,42 @@ export function TrendsSection({ data }: Props) {
     );
   }
 
+  const toggle = (pid: string) => setSelected((s) => { const n = new Set(s); if (n.has(pid)) n.delete(pid); else n.add(pid); return n; });
+  const allOn = players.every((p) => selected.has(p.pid));
+
   return (
     <SectionCard title="Trends Over Time">
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Each point is one night. A line starts at the first night its metric has data, so newer stats simply begin later
-        rather than showing a misleading zero. Toggle players below each chart.
+        rather than showing a misleading zero. Toggle players once below — it applies to every chart.
       </p>
+
+      {/* Shared player selector — drives all charts */}
+      <div className="flex flex-wrap items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+        <button
+          type="button"
+          onClick={() => setSelected(allOn ? new Set() : new Set(players.map((p) => p.pid)))}
+          className="text-xs px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100"
+        >
+          {allOn ? 'Clear all' : 'Select all'}
+        </button>
+        {players.map((p) => {
+          const on = selected.has(p.pid);
+          return (
+            <button key={p.pid} type="button" onClick={() => toggle(p.pid)}
+              className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors ${on ? 'border-gray-300 bg-white text-gray-700' : 'border-gray-200 bg-gray-50 text-gray-300'}`}>
+              <span className="w-3 h-1.5 rounded-full" style={{ backgroundColor: on ? p.color.text : '#d4d2c9' }} />
+              {p.name}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <TrendChartInline title="Winning & rating" metrics={WIN_METRICS} rows={rows} players={data.players} />
-        <TrendChartInline title="Attacking & finishing" metrics={FINISH_METRICS} rows={rows} players={data.players} />
-        <TrendChartInline title="Kitchen arrival" metrics={KITCHEN_METRICS} rows={rows} players={data.players} />
-        <TrendChartInline title="Errors" metrics={ERROR_TREND_METRICS} rows={rows} players={data.players} />
+        <TrendChartInline title="Winning & rating" metrics={WIN_METRICS} rows={rows} players={data.players} selectedPids={selected} />
+        <TrendChartInline title="Attacking & finishing" metrics={FINISH_METRICS} rows={rows} players={data.players} selectedPids={selected} />
+        <TrendChartInline title="Kitchen arrival" metrics={KITCHEN_METRICS} rows={rows} players={data.players} selectedPids={selected} />
+        <TrendChartInline title="Errors" metrics={ERROR_TREND_METRICS} rows={rows} players={data.players} selectedPids={selected} />
       </div>
     </SectionCard>
   );
