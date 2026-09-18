@@ -124,7 +124,7 @@ export function HeroSection({ data }: Props) {
         </div>
 
         {/* Record tile */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-56 md:flex-shrink-0">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-60 md:flex-shrink-0">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Record</p>
           <div className="space-y-3">
             {[...sorted].sort((a, b) => {
@@ -186,7 +186,7 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
   if (mvps.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-64 md:flex-shrink-0">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-60 md:flex-shrink-0">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">MVP by Game 👑</p>
       <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
         {mvps.map((r, i) => {
