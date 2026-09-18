@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { setDashboardData } from '@/lib/store';
-import { parseMultipleNights } from '@/lib/parser';
+import { parseNightsAuto } from '@/lib/parseNights';
 import { DashboardData, SessionInfo } from '@/types/dashboard';
 import { Night } from '@/types/nights';
 import { GameFilter } from '@/components/GameFilter';
@@ -86,7 +86,7 @@ export default function DashboardPage() {
       });
 
     const applyNights = (nights: Night[]) => {
-      const allData = parseMultipleNights(nights);
+      const allData = parseNightsAuto(nights);
       setData(allData);
       setAvailableSessions(allData.sessions);
       setSelectedGameKeys(new Set(allData.sessions.map((s) => s.key)));
@@ -122,8 +122,8 @@ export default function DashboardPage() {
     setSelectedNightIds(ids);
     const selected = allNights.filter((n) => ids.includes(n.id));
     if (selected.length === 0) return;
-    const allData = parseMultipleNights(selected);
-    const allSessions = parseMultipleNights(allNights).sessions; // keep full session list
+    const allData = parseNightsAuto(selected);
+    const allSessions = parseNightsAuto(allNights).sessions; // keep full session list
     const withSessions = { ...allData, sessions: allSessions };
     setData(withSessions);
     setAvailableSessions(allSessions);
@@ -136,11 +136,11 @@ export default function DashboardPage() {
     // Nights currently loaded for viewing (single night, or the selected nights in all-nights mode).
     const nights = isAll ? allNights.filter((n) => selectedNightIds.includes(n.id)) : (night ? [night] : []);
     if (nights.length === 0) return;
-    const base = parseMultipleNights(nights);
+    const base = parseNightsAuto(nights);
     const validKeys = new Set(base.sessions.map((s) => s.key));
     const filteredKeys = new Set([...gameKeys].filter((k) => validKeys.has(k)));
     const allSelected = filteredKeys.size === validKeys.size;
-    const newData = parseMultipleNights(nights, allSelected ? undefined : filteredKeys);
+    const newData = parseNightsAuto(nights, allSelected ? undefined : filteredKeys);
     // Keep the full session list so the game-filter dropdown still shows every game.
     const fullSessions = availableSessions.length ? availableSessions : base.sessions;
     const withSessions = { ...newData, sessions: fullSessions };

@@ -7,7 +7,8 @@ export interface PaddleTag {
 export interface Night {
   id: string;         // stable unique ID
   label: string;      // e.g. "4/22/26"
-  raw: unknown;       // original parsed JSON
+  raw: unknown;       // original parsed JSON (compact pb.vision export)
+  augmentedSessions?: unknown[]; // cached pb.vision augmented insights, one per session (may be partial/absent)
   sessionCount: number;
   playerNames: string[];
   uploadedAt: number;

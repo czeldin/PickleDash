@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { getNightMeta, saveNightMeta, getRawData, deleteNightFromBlob } from '@/lib/blobStore';
+import { getAllAugmentedForNight } from '@/lib/augmentedInsights';
 import { PaddleTag } from '@/types/nights';
 
 // GET /api/nights/[id] — full night with raw data
@@ -34,7 +35,16 @@ export async function GET(
     return NextResponse.json({ error: 'Night not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ ...(meta ?? { id }), raw });
+  // Include any cached augmented insights so the client can use the richer
+  // parser. Sessions without a cached augmented file are simply omitted; the
+  // client falls back to the compact parser when augmented coverage is partial.
+  let augmentedSessions: unknown[] = [];
+  try {
+    const aug = await getAllAugmentedForNight(id, raw);
+    augmentedSessions = aug.map((a) => a.data);
+  } catch { /* non-fatal — fall back to compact */ }
+
+  return NextResponse.json({ ...(meta ?? { id }), raw, augmentedSessions });
 }
 
 // PATCH /api/nights/[id] — update meta fields (label, paddleTags)
