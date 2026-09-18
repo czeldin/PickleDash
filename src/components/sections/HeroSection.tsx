@@ -188,10 +188,16 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
         {mvps.map((r, i) => {
           const p = playerMap.get(r.pid);
           return (
-            <div key={r.sessionKey + i} className="flex items-center gap-2">
+            <div key={r.sessionKey + i} className="relative group flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-gray-50 cursor-default">
               <span className="text-xs" aria-hidden>👑</span>
-              <span className="text-sm font-semibold text-gray-800 truncate flex-1" style={{ color: p?.color.text }}>{p?.name ?? r.pid}</span>
+              <span className="text-sm font-semibold truncate flex-1" style={{ color: p?.color.text }}>{p?.name ?? r.pid}</span>
               <span className="text-xs text-gray-400 tabular-nums shrink-0">{r.overall.toFixed(2)}</span>
+              {r.sessionName && (
+                <span className="pointer-events-none absolute left-2 bottom-full mb-1 z-50 hidden group-hover:block whitespace-nowrap rounded-lg bg-gray-900 text-white text-xs px-2.5 py-1.5 shadow-lg">
+                  {r.sessionName}
+                  <span className="absolute left-4 top-full -mt-px border-4 border-transparent border-t-gray-900" />
+                </span>
+              )}
             </div>
           );
         })}
