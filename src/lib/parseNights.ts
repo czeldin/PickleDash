@@ -104,5 +104,9 @@ function mergeDashboards(a: DashboardData, c: DashboardData): DashboardData {
     kitchenSR: byPid(a.kitchenSR, c.kitchenSR),
     driveDrop: byPid(a.driveDrop, c.driveDrop),
     nightTrends: [...a.nightTrends, ...c.nightTrends],
+    // Augmented-only rows: only the augmented side produces these.
+    courtShots: a.courtShots,
+    outcomeStats: a.outcomeStats,
+    lossReasons: a.lossReasons,
   };
 }

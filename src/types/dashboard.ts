@@ -276,6 +276,32 @@ export interface KitchenSRRow {
   recvNum: number; recvDen: number;
 }
 
+// Per-player outcome record across the three lenses: games, points, rallies.
+// A player can win games but lose the rally battle (partner-carried) — showing
+// all three separates individual contribution from team results.
+export interface OutcomeStatsRow {
+  pid: string;
+  gamesPlayed: number;
+  gamesWon: number; gamesLost: number;
+  pointsWon: number; pointsLost: number;
+  ralliesWon: number; ralliesLost: number;
+  netPointsPerGame: number; // (pointsWon - pointsLost) / gamesPlayed
+}
+
+// Why a player's team lost rallies — attribution by cause. Each lost rally is
+// charged to exactly one cause based on its final shot. Outcome-anchored.
+export interface LossReasonRow {
+  pid: string;
+  ralliesLost: number;      // total rallies this player's team lost
+  ownNet: number;           // team hit into the net
+  ownOut: number;           // team hit out
+  ownKitchen: number;       // team kitchen/short fault
+  ownUnforced: number;      // team unforced error (not net/out specific)
+  popupExploited: number;   // team popped it up, opponent put it away
+  oppWinner: number;        // opponent hit a clean winner (not our error)
+  other: number;            // uncategorized
+}
+
 // One plotted shot for the Court Maps view. Coordinates are in absolute court
 // feet (far-left corner origin): x across width 0-20, y along length 0-44 with
 // the net at 22. Only produced by the augmented parser (compact lacks coords).
@@ -322,4 +348,6 @@ export interface DashboardData {
   driveDrop: DriveDropRow[];
   nightTrends: NightTrendRow[];
   courtShots?: CourtShotRow[]; // only present for augmented nights (needs coordinates)
+  outcomeStats?: OutcomeStatsRow[];
+  lossReasons?: LossReasonRow[];
 }

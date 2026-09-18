@@ -90,6 +90,8 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     // Court Maps has its own player picker, and pids here are keyed differently
     // than courtShots.pid in edge cases; pass through and let the section filter.
     courtShots: data.courtShots,
+    outcomeStats: data.outcomeStats?.filter((r) => pids.has(r.pid)),
+    lossReasons: data.lossReasons?.filter((r) => pids.has(r.pid)),
   };
 }
 

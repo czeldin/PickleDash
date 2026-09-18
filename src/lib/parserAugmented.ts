@@ -8,7 +8,7 @@ import {
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
   CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow, DriveDropRow, NightTrendRow,
-  CourtShotRow,
+  CourtShotRow, OutcomeStatsRow, LossReasonRow,
 } from '@/types/dashboard';
 
 /**
@@ -398,6 +398,10 @@ export function parseAugmentedNights(
   const ntMap = new Map<string, NT>();
   const nt = (pid: string, night: string, ts: number) => { const k = pid + '|' + night; let v = ntMap.get(k); if (!v) { v = { pid, night, ts, gp: 0, gw: 0, rS: 0, rW: 0, ksN: 0, ksD: 0, krN: 0, krD: 0, dropN: 0, driveN: 0, dropK: 0, driveK: 0, dropW: 0, dndN: 0, dndW: 0, dndP: 0, offN: 0, offW: 0, finA: 0, finC: 0, atk: 0, atkW: 0, pop: 0, got: 0, riW: 0, riL: 0, riS: 0, accIn: 0, accNet: 0, accOut: 0, accW: 0, sqEx: 0, sqW: 0, sdDeep: 0, sdW: 0, rdDeep: 0, rdW: 0, ssSum: 0, ssW2: 0, dvSum: 0, dvN: 0, errTot: 0, errNet: 0, errOut: 0, errUf: 0, dinkN: 0, dinkEx: 0 }; ntMap.set(k, v); } return v; };
   const ri = (f: string) => { let v = riMap.get(f); if (!v) { v = { games: 0, won: 0, lostDirect: 0, setup: 0 }; riMap.set(f, v); } return v; };
+  const osMap = new Map<string, { gp: number; gw: number; gl: number; pw: number; pl: number; rw: number; rl: number }>();
+  const os = (f: string) => { let v = osMap.get(f); if (!v) { v = { gp: 0, gw: 0, gl: 0, pw: 0, pl: 0, rw: 0, rl: 0 }; osMap.set(f, v); } return v; };
+  const lrMap = new Map<string, { rl: number; net: number; out: number; kit: number; uf: number; pop: number; opp: number; other: number }>();
+  const lr = (f: string) => { let v = lrMap.get(f); if (!v) { v = { rl: 0, net: 0, out: 0, kit: 0, uf: 0, pop: 0, opp: 0, other: 0 }; lrMap.set(f, v); } return v; };
   const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
 
@@ -422,6 +426,74 @@ export function parseAugmentedNights(
       // Per-game kitchen arrival for pairing analysis.
       for (const [pid, stats] of getSessionKitchenByPlayer(ins).entries()) {
         kitchenByGame.push({ pid, sessionKey: key, ...stats });
+      }
+
+      // ── Outcomes (games / points / rallies) and loss attribution ──────────
+      // Which players are on each team this game.
+      const teamPlayers: Record<number, string[]> = { 0: [], 1: [] };
+      for (const p of pd) {
+        const f = p?.name?.trim()?.toLowerCase();
+        if (f && (p!.team === 0 || p!.team === 1)) teamPlayers[p!.team].push(f);
+      }
+      // Game result from game_data.game_outcome ([team0, team1] final scores).
+      const outcome = ins.game_data?.game_outcome;
+      let gameWinner: number | undefined;
+      if (Array.isArray(outcome) && typeof outcome[0] === 'number' && typeof outcome[1] === 'number') {
+        gameWinner = outcome[0] > outcome[1] ? 0 : outcome[1] > outcome[0] ? 1 : undefined;
+      }
+      for (const t of [0, 1] as const) {
+        for (const f of teamPlayers[t]) {
+          const v = os(f); v.gp++;
+          if (gameWinner === t) v.gw++; else if (gameWinner != null) v.gl++;
+        }
+      }
+      // Points: derive from running_score deltas across rallies (side-out safe —
+      // only the serving team can score, so a point is a running_score increase).
+      let prevScore: [number, number] = [0, 0];
+      for (const rally of ral) {
+        const rs = rally.scoring_info?.running_score;
+        if (Array.isArray(rs) && typeof rs[0] === 'number' && typeof rs[1] === 'number') {
+          for (const t of [0, 1] as const) {
+            const gained = rs[t] - prevScore[t];
+            if (gained > 0) {
+              for (const f of teamPlayers[t]) os(f).pw += gained;
+              for (const f of teamPlayers[1 - t]) os(f).pl += gained;
+            }
+          }
+          prevScore = [rs[0], rs[1]];
+        }
+      }
+      // Rallies won/lost + loss attribution by the losing rally's final shot.
+      for (const rally of ral) {
+        const wt = rally.winning_team;
+        if (wt !== 0 && wt !== 1) continue;
+        const lt = 1 - wt;
+        for (const f of teamPlayers[wt]) os(f).rw++;
+        for (const f of teamPlayers[lt]) os(f).rl++;
+        // Attribute the loss.
+        const shots = rally.shots ?? [];
+        const last = shots[shots.length - 1];
+        const lastTeam = last?.player_id != null ? pd[last.player_id]?.team : undefined;
+        const cat = (k: 'net' | 'out' | 'kit' | 'uf' | 'pop' | 'opp' | 'other') => {
+          for (const f of teamPlayers[lt]) { const v = lr(f); v.rl++; v[k]++; }
+        };
+        // Find whether the losing team popped it up and got exploited this rally.
+        const exploitedByLoser = shots.some((s) =>
+          s.errors?.popup === 'exploited' && (s.player_id != null ? pd[s.player_id]?.team : undefined) === lt);
+        if (last && lastTeam === lt && last.errors?.faults) {
+          const fl = last.errors.faults;
+          if (fl.net) cat('net');
+          else if (fl.out) cat('out');
+          else if (fl.short) cat('kit');
+          else if (last.errors.unforced) cat('uf');
+          else cat('other');
+        } else if (exploitedByLoser) {
+          cat('pop');
+        } else if (last && lastTeam === wt && (last.is_putaway || last.winner_type === 'clean')) {
+          cat('opp');
+        } else {
+          cat('other');
+        }
       }
 
       // Per-rally serving data for left/right side pairing analysis. Court side
@@ -720,7 +792,23 @@ export function parseAugmentedNights(
       errTot: v.errTot, errNet: v.errNet, errOut: v.errOut, errUf: v.errUf, dinkN: v.dinkN, dinkEx: v.dinkEx,
     }));
 
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends, courtShots };
+  const outcomeStats: OutcomeStatsRow[] = data.players.map((p) => {
+    const v = os(p.pid) ?? { gp: 0, gw: 0, gl: 0, pw: 0, pl: 0, rw: 0, rl: 0 };
+    return {
+      pid: p.pid, gamesPlayed: v.gp, gamesWon: v.gw, gamesLost: v.gl,
+      pointsWon: v.pw, pointsLost: v.pl, ralliesWon: v.rw, ralliesLost: v.rl,
+      netPointsPerGame: v.gp > 0 ? (v.pw - v.pl) / v.gp : 0,
+    };
+  });
+  const lossReasons: LossReasonRow[] = data.players.map((p) => {
+    const v = lrMap.get(p.pid) ?? { rl: 0, net: 0, out: 0, kit: 0, uf: 0, pop: 0, opp: 0, other: 0 };
+    return {
+      pid: p.pid, ralliesLost: v.rl, ownNet: v.net, ownOut: v.out, ownKitchen: v.kit,
+      ownUnforced: v.uf, popupExploited: v.pop, oppWinner: v.opp, other: v.other,
+    };
+  });
+
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends, courtShots, outcomeStats, lossReasons };
 }
 
 // Convenience wrapper for a single augmented game.
