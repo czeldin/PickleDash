@@ -184,7 +184,7 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-60 md:flex-shrink-0">
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">MVP by Game 👑</p>
-      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+      <div className="space-y-2">
         {mvps.map((r, i) => {
           const p = playerMap.get(r.pid);
           return (
