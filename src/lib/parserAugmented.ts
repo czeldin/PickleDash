@@ -478,29 +478,40 @@ export function parseAugmentedNights(
           const tp = teamPlayers[t];
           if (tp.length === 2) { pair(tp[0], tp[1]); pair(tp[1], tp[0]); }
         }
-        // Attribute the loss.
+        // Attribute the loss to a cause (charged to both losing-team players).
         const shots = rally.shots ?? [];
         const last = shots[shots.length - 1];
         const lastTeam = last?.player_id != null ? pd[last.player_id]?.team : undefined;
         const cat = (k: 'net' | 'out' | 'kit' | 'uf' | 'pop' | 'opp' | 'other') => {
           for (const f of teamPlayers[lt]) { const v = lr(f); v.rl++; v[k]++; }
         };
-        // Find whether the losing team popped it up and got exploited this rally.
         const exploitedByLoser = shots.some((s) =>
           s.errors?.popup === 'exploited' && (s.player_id != null ? pd[s.player_id]?.team : undefined) === lt);
-        if (last && lastTeam === lt && last.errors?.faults) {
-          const fl = last.errors.faults;
-          if (fl.net) cat('net');
-          else if (fl.out) cat('out');
-          else if (fl.short) cat('kit');
-          else cat('other'); // any other own-fault → unattributed (no distinct "unforced" bucket: it was always empty since net/out/short catch every fault first)
-        } else if (exploitedByLoser) {
-          cat('pop');
-        } else if (last && lastTeam === wt && (last.is_putaway || last.winner_type === 'clean')) {
-          cat('opp');
-        } else {
-          cat('other');
-        }
+        // The rally-ending shot's own outcome, read from the ball itself rather
+        // than assuming which team hit it. end zone "net"/"out" are unambiguous
+        // faults on THAT shot; fault flags and putaway/winner tags corroborate.
+        const endZone = last?.resulting_ball_movement?.trajectory?.end?.zone;
+        const fl = last?.errors?.faults;
+        const wonBy = last && lastTeam === wt;                 // winner hit the last shot
+        const lostBy = last && lastTeam === lt;                // loser hit the last shot
+        const isFaultOut = endZone === 'out' || fl?.out;
+        const isFaultNet = endZone === 'net' || fl?.net;
+        const isFaultShort = fl?.short;
+        const isWinnerShot = last?.is_putaway || last?.winner_type === 'clean';
+
+        if (lostBy && isFaultNet) cat('net');
+        else if (lostBy && isFaultOut) cat('out');
+        else if (lostBy && isFaultShort) cat('kit');
+        else if (exploitedByLoser) cat('pop');
+        else if (wonBy && isWinnerShot) cat('opp');
+        // The last shot is the loser's with only a putaway/winner tag (no fault) —
+        // the opponents put it away off our feed. Defensible as an opponent winner.
+        else if (lostBy && isWinnerShot) cat('opp');
+        // NOTE: a winning-team last shot tagged out/net is contradictory (you don't
+        // win by faulting) — the real rally-ender was likely the prior shot or the
+        // tags are noisy. We do NOT invent a cause; it stays unattributed. Same for
+        // anything else. Keeping this honest matters more than a fuller-looking chart.
+        else cat('other');
       }
 
       // Per-rally serving data for left/right side pairing analysis. Court side
