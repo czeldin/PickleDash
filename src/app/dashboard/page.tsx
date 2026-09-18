@@ -321,10 +321,10 @@ export default function DashboardPage() {
 
           {tab === 'kitchen' && (
             <>
+              <ShotBreakdownSection data={visibleData} />
               <KitchenArrivalSection data={visibleData} />
               <KitchenServeReceiveSection data={visibleData} />
               <DriveDropSection data={visibleData} />
-              <ShotBreakdownSection data={visibleData} />
             </>
           )}
 

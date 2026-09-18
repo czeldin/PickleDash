@@ -6,12 +6,12 @@ import { join } from 'path';
 // public/data/_devaug so Court Maps and other augmented views can be previewed
 // locally without B2. Returns 404 in production. Load via ?night=devaug.
 export async function GET() {
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
-  }
+  // Only serves the local, gitignored sample files in public/data/_devaug — that
+  // directory never exists in the real deployment, so this 404s there naturally.
   try {
     const dir = join(process.cwd(), 'public/data/_devaug');
     const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+    if (files.length === 0) return NextResponse.json({ error: 'not found' }, { status: 404 });
     const augmentedSessions = files.map((f) => JSON.parse(readFileSync(join(dir, f), 'utf-8')));
     return NextResponse.json({
       id: 'devaug',
