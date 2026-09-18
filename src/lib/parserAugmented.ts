@@ -8,6 +8,7 @@ import {
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
   CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow, DriveDropRow, NightTrendRow,
+  CourtShotRow,
 } from '@/types/dashboard';
 
 /**
@@ -385,6 +386,7 @@ export function parseAugmentedNights(
   const kitchenByGame: KitchenByGameRow[] = [];
   const servingRallies: ServingRallyRow[] = [];
   const rallySides: RallySideRow[] = [];
+  const courtShots: CourtShotRow[] = [];
 
   const riMap = new Map<string, { games: number; won: number; lostDirect: number; setup: number }>();
   const tgtMap = new Map<string, { games: number; attacks: number; fin: number; clean: number; pop: number; gotAttacked: number }>();
@@ -448,6 +450,38 @@ export function parseAugmentedNights(
           const reached = teamReachedKitchen(rally, pd, servingTeam);
           const won = rally.winning_team === servingTeam;
           servingRallies.push({ sessionKey: key, servingTeam, servedByPid, sides, reached, won });
+
+          // Court-map shots: every shot with reconstructed trajectory, in
+          // absolute court feet, tagged with hitter, type, outcome and pop-up.
+          if (rally.winning_team === 0 || rally.winning_team === 1) {
+            for (let si2 = 0; si2 < shots.length; si2++) {
+              const sh = shots[si2];
+              const hitter = sh.player_id != null ? pd[sh.player_id] : undefined;
+              const nm = hitter?.name?.trim()?.toLowerCase();
+              if (!nm) continue;
+              const traj = sh.resulting_ball_movement?.trajectory;
+              const from = traj?.start?.location;
+              const end = traj?.end?.location;
+              if (!from || !end || from.x == null || from.y == null || end.x == null || end.y == null) continue;
+              // Trajectory x/y are already in a single ABSOLUTE court frame (verified
+              // from the data): team 0 serves from y≈0, team 1 from y≈44, net at 22,
+              // x across the width 0-20. No per-team mirroring needed. Values slightly
+              // outside [0,44]/[0,20] are players reaching behind a baseline/sideline.
+              courtShots.push({
+                pid: nm,
+                sessionKey: key,
+                shotNum: si2 + 1,
+                type: sh.shot_type ?? (si2 === 0 ? 'serve' : si2 === 1 ? 'return' : 'other'),
+                fromX: from.x, fromY: from.y,
+                toX: end.x, toY: end.y,
+                endZone: traj?.end?.zone ?? 'unknown',
+                won: rally.winning_team === hitter?.team,
+                isPutaway: sh.is_putaway === true,
+                popup: sh.errors?.popup ?? null,
+                quality: sh.quality?.overall ?? null,
+              });
+            }
+          }
 
           // Per-team side rows (both teams) for the win-by-side section.
           if (rally.winning_team === 0 || rally.winning_team === 1) {
@@ -686,7 +720,7 @@ export function parseAugmentedNights(
       errTot: v.errTot, errNet: v.errNet, errOut: v.errOut, errUf: v.errUf, dinkN: v.dinkN, dinkEx: v.dinkEx,
     }));
 
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends };
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends, courtShots };
 }
 
 // Convenience wrapper for a single augmented game.

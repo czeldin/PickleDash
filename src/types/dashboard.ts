@@ -276,6 +276,23 @@ export interface KitchenSRRow {
   recvNum: number; recvDen: number;
 }
 
+// One plotted shot for the Court Maps view. Coordinates are in absolute court
+// feet (far-left corner origin): x across width 0-20, y along length 0-44 with
+// the net at 22. Only produced by the augmented parser (compact lacks coords).
+export interface CourtShotRow {
+  pid: string;
+  sessionKey: string;
+  shotNum: number;                 // 1-based shot index in the rally (serve = 1)
+  type: string;                    // "drive" | "drop" | "dink" | "lob" | "atp" | ...
+  fromX: number; fromY: number;    // contact point (abs court feet)
+  toX: number; toY: number;        // landing point (abs court feet)
+  endZone: string;                 // "deep"|"mid"|"short"|"kitchen"|"net"|"out"
+  won: boolean;                    // did the hitter's team win the rally
+  isPutaway: boolean;
+  popup: 'exploited' | 'potential' | null;
+  quality: number | null;          // shot.quality.overall (0-1)
+}
+
 export interface DashboardData {
   sessions: SessionInfo[];
   highlights: HighlightRally[];
@@ -304,4 +321,5 @@ export interface DashboardData {
   kitchenSR: KitchenSRRow[];
   driveDrop: DriveDropRow[];
   nightTrends: NightTrendRow[];
+  courtShots?: CourtShotRow[]; // only present for augmented nights (needs coordinates)
 }
