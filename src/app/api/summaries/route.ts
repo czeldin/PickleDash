@@ -9,8 +9,10 @@ export const maxDuration = 60;
 // Bump when the SYSTEM prompt or post-processing changes so old cached summaries
 // are regenerated. v2 = no-invented-metrics + sample-size guardrails; v3 = added
 // code-level fabrication scrub backstop; v4 = hard reset-ban (prompt + widened
-// scrub) after "19% of rallies won on resets" slipped through.
-const PROMPT_VERSION = 'v4';
+// scrub) after "19% of rallies won on resets" slipped through; v5 = shot-quality
+// context now 1-decimal + explicit best/worst tags (model had called a mid-pack
+// poor% the group's highest). Bumped so v4 caches regenerate with the new context.
+const PROMPT_VERSION = 'v5';
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
@@ -34,6 +36,8 @@ HARD RULES — never break these:
 - Do NOT translate a popup/error/defense stat into an invented reset or resetting claim. If someone gives up popups, say exactly that; do not infer a "weak reset game".
 - Do NOT infer a hidden skill from an adjacent number and state it as measured (e.g. do not turn "gives up pop-ups" into "poor reset rate"). Describe only what the provided stat literally measures.
 - Every claim must be traceable to a specific row you were given. If you cannot point to the number behind a sentence, delete the sentence.
+- NEVER say someone is the "best/worst/highest/lowest/weakest in the group" on a stat unless the data actually shows they lead or trail it. Some rows are tagged with the true group leader/laggard (e.g. "WORST poor% (group high)", "best poor% (group low)") — trust those tags, and do NOT attach a superlative to a player the tag does not point to. When in doubt, describe the number plainly without a rank ("gives up more poor shots than most" only if true; otherwise just state the value).
+- Quote numbers at the precision given. If a value is 9.7%, do not round it to 10% and then call it a round-number milestone or a group high.
 
 SAMPLE SIZE — calibrate confidence to how much data there is:
 - You are told the number of games in view. FEW games (roughly < 8) = a SNAPSHOT of a short stretch, NOT the player's fixed identity. Use tentative language ("over these games…", "in this stretch he…", "small sample, but…") and set smallSample=true.

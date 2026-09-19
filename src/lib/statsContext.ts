@@ -100,12 +100,26 @@ export function buildStatsContext(data: DashboardData): string {
   }
   out.push('');
 
-  // Shot quality
+  // Shot quality. Use 1-decimal precision (0.1%): rounding to whole percents
+  // erased the gap between e.g. 9.7% and 11.0% and let the model over-read a
+  // near-tie. Also annotate the group's actual best/worst on each column so the
+  // model never has to guess who "leads" — a superlative it derived itself was
+  // wrong (it called a mid-pack poor% the group's highest).
   if (data.shotQuality.some((r) => r.excellentPct > 0)) {
+    const rated = data.shotQuality.filter((r) => r.excellentPct > 0);
+    const hiExc = Math.max(...rated.map((r) => r.excellentPct));
+    const hiPoor = Math.max(...rated.map((r) => r.poorPct));
+    const loPoor = Math.min(...rated.map((r) => r.poorPct));
     out.push('### Shot quality');
+    out.push('(higher excellent% = better; higher poor% = worse)');
     out.push('name | excellent% | poor% | drop excellent% | clean winners');
-    for (const r of data.shotQuality) {
-      out.push(`${name(r.pid)} | ${r.excellentPct.toFixed(0)}% | ${r.poorPct.toFixed(0)}% | ${r.dropTotal >= 5 ? r.dropExcellentPct.toFixed(0) + '%' : '—'} | ${r.winnerTotal}`);
+    for (const r of rated) {
+      const tags: string[] = [];
+      if (r.excellentPct === hiExc) tags.push('best excellent%');
+      if (r.poorPct === hiPoor) tags.push('WORST poor% (group high)');
+      if (r.poorPct === loPoor) tags.push('best poor% (group low)');
+      const tag = tags.length ? `  <- ${tags.join(', ')}` : '';
+      out.push(`${name(r.pid)} | ${r.excellentPct.toFixed(1)}% | ${r.poorPct.toFixed(1)}% | ${r.dropTotal >= 5 ? r.dropExcellentPct.toFixed(0) + '%' : '—'} | ${r.winnerTotal}${tag}`);
     }
     out.push('');
   }
