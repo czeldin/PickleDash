@@ -6,9 +6,10 @@ import { getSummaryCache, saveSummaryCache } from '@/lib/summaryCache';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Bump when the SYSTEM prompt changes so old cached summaries are regenerated.
-// v2 = added no-invented-metrics + sample-size guardrails.
-const PROMPT_VERSION = 'v2';
+// Bump when the SYSTEM prompt or post-processing changes so old cached summaries
+// are regenerated. v2 = no-invented-metrics + sample-size guardrails; v3 = added
+// code-level fabrication scrub backstop.
+const PROMPT_VERSION = 'v3';
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
@@ -74,9 +75,9 @@ export async function POST(req: NextRequest) {
   const cached = await getSummaryCache(key);
   if (cached) return NextResponse.json({ summaries: cached, cached: true });
 
-  // Generous token budget — the v2 prompt writes longer cards, so give ~700/
-  // player and a high cap so the JSON array doesn't truncate mid-object.
-  const maxTokens = Math.min(16000, 1200 + players.length * 700);
+  // ~600 tokens/player card + headroom, capped so the JSON array doesn't
+  // truncate mid-object on an all-nights (11-player) view.
+  const maxTokens = Math.min(9000, 1000 + players.length * 600);
   const userMsg = `Players (in order): ${players.join(', ')}\n\n## Current stats\n\n${context}\n\nWrite the JSON array now.`;
 
   try {
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
       const parsed = parseSummaries(raw);
       // Accept a full or partial result; the salvage parser recovers complete
       // objects even from a truncated array. Only retry if we got nothing usable.
-      if (parsed && parsed.length > 0) summaries = parsed;
+      if (parsed && parsed.length > 0) summaries = parsed.map(scrubFabrications);
     }
     if (!summaries) return NextResponse.json({ error: 'Could not parse the model output.' }, { status: 502 });
     await saveSummaryCache(key, summaries).catch(() => {});
@@ -106,6 +107,26 @@ export async function POST(req: NextRequest) {
     const status = e instanceof Anthropic.APIError && e.status === 401 ? 401 : 500;
     return NextResponse.json({ error: status === 401 ? 'Invalid Anthropic API key.' : 'Summary generation failed.' }, { status });
   }
+}
+
+// Belt-and-suspenders backstop to the prompt guardrail: metrics that pb.vision
+// does NOT expose and we NEVER put in the context. Any sentence that cites one
+// is a fabrication, so we drop that sentence. Narrow denylist (not a blanket
+// filter) so legitimate synthesis prose is never mangled.
+const NEVER_METRICS = /\b(reset rate|resets?\s+(?:won|win|rate)|reset rallies|reset percentage|spin rate|dink success|third[-\s]?shot speed)\b/i;
+function dropFabricated(text: string): string {
+  if (!text || !NEVER_METRICS.test(text)) return text;
+  const kept = text.split(/(?<=[.!?])\s+/).filter((sent) => !NEVER_METRICS.test(sent));
+  return kept.join(' ').trim();
+}
+function scrubFabrications(s: PlayerSummary): PlayerSummary {
+  return {
+    ...s,
+    best: dropFabricated(s.best),
+    vsGroup: dropFabricated(s.vsGroup),
+    style: dropFabricated(s.style),
+    improve: s.improve.map(dropFabricated).filter((t) => t.length > 0),
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
