@@ -74,7 +74,7 @@ export function ErrorSection({ data }: Props) {
     },
     {
       key: 'kitchen',
-      header: 'Kitchen / game',
+      header: 'Short / game',
       getValue: (row) => row.kitchen,
       render: (row) => errCell(row.kitchen, 'text-purple-600'),
     },
@@ -101,7 +101,7 @@ export function ErrorSection({ data }: Props) {
   return (
     <SectionCard title="Error Breakdown" action={<TrendButton title="Errors" metrics={ERROR_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        All values normalized per game. Popups (amber) = ball stayed in but set up the opponent.
+        All values normalized per game. <strong>Short</strong> = a ball that landed short on your own side (didn&apos;t clear the net) — not a kitchen foot fault, which pb.vision doesn&apos;t track. Popups (amber) = ball stayed in but set up the opponent.
       </p>
       <TotalChart errors={errors} players={players} />
       <SortableTable
