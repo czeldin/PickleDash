@@ -6,6 +6,10 @@ import { getSummaryCache, saveSummaryCache } from '@/lib/summaryCache';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// Bump when the SYSTEM prompt changes so old cached summaries are regenerated.
+// v2 = added no-invented-metrics + sample-size guardrails.
+const PROMPT_VERSION = 'v2';
+
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
 export interface PlayerSummary {
@@ -60,11 +64,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing stats context.' }, { status: 400 });
   }
 
-  // Cache key: hash of the exact stats context (so any filter change → new key,
-  // and an unchanged view is served instantly). Client may pass its own signature.
-  const key = body.signature
-    ? `sum_${createHash('sha256').update(body.signature).digest('hex').slice(0, 24)}`
-    : `sum_${createHash('sha256').update(context).digest('hex').slice(0, 24)}`;
+  // Cache key: prompt version + hash of the exact stats context. Bumping
+  // PROMPT_VERSION busts every cached summary from an older prompt, so a fix to
+  // the wording (e.g. the no-invented-metrics guardrails) takes effect instead
+  // of serving stale pre-fix text. Client may pass its own data signature.
+  const basis = body.signature ?? context;
+  const key = `sum_${PROMPT_VERSION}_${createHash('sha256').update(basis).digest('hex').slice(0, 24)}`;
 
   const cached = await getSummaryCache(key);
   if (cached) return NextResponse.json({ summaries: cached, cached: true });
