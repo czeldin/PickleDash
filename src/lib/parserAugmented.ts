@@ -273,12 +273,17 @@ function processSession(ins: AugInsights, accumMap: Map<string, PlayerAccum>) {
       const e = shot.errors;
       if (e) {
         const f = e.faults ?? {};
+        // Count an OUT only when the ball actually LANDED out. pb.vision also
+        // flags balls that were headed out but an opponent played anyway
+        // (outcome === 'intercepted') — those are near-misses, not lost points,
+        // so they must NOT count as errors (this was inflating the out count).
+        const outLanded = f.out && f.out.outcome !== 'intercepted';
         if (f.net) acc.errNet++;
-        if (f.out) acc.errOut++;
+        if (outLanded) acc.errOut++;
         if (f.short) acc.errShort++;
         if (e.popup) acc.errPop++;
         if (e.unforced) acc.errUf++;
-        if ((f.net || f.out || f.short) && !e.unforced) acc.errForced++;
+        if ((f.net || outLanded || f.short) && !e.unforced) acc.errForced++;
       }
       // Drop quality
       if (isDrop(shot)) { const ex = shotEx(shot); if (ex != null) { acc.dropExSum += ex; acc.dropExW++; } }
@@ -356,7 +361,10 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
   });
   const serveDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.sdW || 1; return { pid: players[i].pid, deepPct: (acc.sdDeep / w) * 100, medPct: (acc.sdMed / w) * 100, shallowPct: (acc.sdShallow / w) * 100 }; });
   const returnDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.rdW || 1; return { pid: players[i].pid, deepPct: (acc.rdDeep / w) * 100, medPct: (acc.rdMed / w) * 100, shallowPct: (acc.rdShallow / w) * 100 }; });
-  const errors: ErrorRow[] = accums.map((acc, i) => { const g = acc.sessionCount || 1; return { pid: players[i].pid, gamesPlayed: acc.sessionCount, total: acc.errNet + acc.errOut + acc.errShort + acc.errPop, totalPerGame: (acc.errNet + acc.errOut + acc.errShort + acc.errPop) / g, net: acc.errNet / g, out: acc.errOut / g, kitchen: acc.errShort / g, popups: acc.errPop / g, unforced: acc.errUf / g, forced: acc.errForced / g }; });
+  // Total = actual faults only (net + landed-out + short). Popups are NOT errors
+  // (the ball stayed in — it just set up the opponent), so they are reported as
+  // their own column but excluded from the error total.
+  const errors: ErrorRow[] = accums.map((acc, i) => { const g = acc.sessionCount || 1; const tot = acc.errNet + acc.errOut + acc.errShort; return { pid: players[i].pid, gamesPlayed: acc.sessionCount, total: tot, totalPerGame: tot / g, net: acc.errNet / g, out: acc.errOut / g, kitchen: acc.errShort / g, popups: acc.errPop / g, unforced: acc.errUf / g, forced: acc.errForced / g }; });
   const attacks: AttackRow[] = accums.map((acc, i) => {
     const t = acc.attackTotal;
     return { pid: players[i].pid, attackTotal: t, attackWins: acc.attackWins, attackWinPct: t > 0 ? (acc.attackWins / t) * 100 : 0, attackExcellentPct: acc.attackExW > 0 ? (acc.attackExSum / acc.attackExW) * 100 : 0 };
@@ -689,7 +697,14 @@ export function parseAugmentedNights(
               if (sh.is_putaway) v.finA++; if (sh.winner_type === 'clean') v.finC++;
               if (isAttack(sh)) { v.atk++; if ((rally.winning_team === 0 || rally.winning_team === 1) && rally.winning_team === teamOf(pd, sh.player_id)) v.atkW++; }
               if (sh.errors?.popup) v.pop++;
-              if (sh.errors?.faults) { v.errTot++; if (sh.errors.faults.net) v.errNet++; if (sh.errors.faults.out) v.errOut++; if (sh.errors.unforced) v.errUf++; }
+              if (sh.errors?.faults) {
+                const ff = sh.errors.faults;
+                const oL = ff.out && ff.out.outcome !== 'intercepted'; // landed out only
+                if (ff.net) v.errNet++;
+                if (oL) v.errOut++;
+                if (ff.net || oL || ff.short) v.errTot++; // actual faults only (no intercepted near-misses)
+                if (sh.errors.unforced) v.errUf++;
+              }
               if (isDink(sh)) { v.dinkN++; v.dinkEx += shotEx(sh) ?? 0; }
               if (si >= 2 && isDrive(sh)) { const spd = shotSpeedMph(sh); if (spd !== null) { v.dvSum += spd; v.dvN++; } }
               // gotAttacked → exploited pop-up (authoritative).
