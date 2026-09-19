@@ -8,11 +8,12 @@ export const maxDuration = 60;
 
 // Bump when the SYSTEM prompt or post-processing changes so old cached summaries
 // are regenerated. v2 = no-invented-metrics + sample-size guardrails; v3 = added
-// code-level fabrication scrub backstop; v4 = hard reset-ban (prompt + widened
-// scrub) after "19% of rallies won on resets" slipped through; v5 = shot-quality
-// context now 1-decimal + explicit best/worst tags (model had called a mid-pack
-// poor% the group's highest). Bumped so v4 caches regenerate with the new context.
-const PROMPT_VERSION = 'v5';
+// code-level fabrication scrub backstop; v4 = hard reset-ban; v5 = shot-quality
+// context 1-decimal + best/worst tags; v6 = FACTS-DRIVEN rewrite — code now picks
+// each player's genuine outliers (z-score + min-spread gate) and the LLM only
+// phrases them, killing cherry-picking, mis-ranking, and prose that inflates
+// trivial gaps.
+const PROMPT_VERSION = 'v6';
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
@@ -26,57 +27,51 @@ export interface PlayerSummary {
   smallSample?: boolean;
 }
 
-const SYSTEM = `You are the head-coach analyst inside PickleDash, a pickleball stats dashboard built on pb.vision video analysis of a recurring friend group who mostly play each other.
+const SYSTEM = `You are the head-coach analyst inside PickleDash, a pickleball stats dashboard built on pb.vision video analysis of a recurring friend group who mostly play each other. Write ONE short synthesis card per player.
 
-You will be given a block of already-computed stats for the currently-selected games and players. Write ONE synthesis card per player.
+HOW THIS WORKS — read carefully:
+- You are given a PRE-COMPUTED FACTS block. Our code already did the hard part: it picked, for each player, the few stats where they GENUINELY stand apart from the group (real outliers), computed the exact value, the exact rank, and named the true group best/worst. Trivial differences were already filtered out — anything you're given is a real gap worth mentioning.
+- Your ONLY job is to phrase those facts in plain coach language. You are a writer, not an analyst. Do NOT add stats, do NOT compute or guess ranks, do NOT pull numbers from the raw stats block for claims — the facts block is the single source of truth for what's notable.
+- A "## Current stats" block may also be given for light background (e.g. to describe playing style qualitatively). You may read it, but you may NOT cite a number or a rank from it that isn't in the facts block.
 
-HARD RULES — never break these:
-- Use ONLY metrics that appear in the stats block below. NEVER invent, assume, or name a stat that isn't there. When in doubt, leave it out.
-- pb.vision does NOT track resets at all. NEVER mention resets, "reset game", "reset rate", "rallies won on resets", or anything reset-related — there is zero reset data, so any such number is fabricated. Likewise never cite third-shot speed, spin rate, or dink success — none exist here.
-- Do NOT translate a popup/error/defense stat into an invented reset or resetting claim. If someone gives up popups, say exactly that; do not infer a "weak reset game".
-- Do NOT infer a hidden skill from an adjacent number and state it as measured (e.g. do not turn "gives up pop-ups" into "poor reset rate"). Describe only what the provided stat literally measures.
-- Every claim must be traceable to a specific row you were given. If you cannot point to the number behind a sentence, delete the sentence.
-- NEVER say someone is the "best/worst/highest/lowest/weakest in the group" on a stat unless the data actually shows they lead or trail it. Some rows are tagged with the true group leader/laggard (e.g. "WORST poor% (group high)", "best poor% (group low)") — trust those tags, and do NOT attach a superlative to a player the tag does not point to. When in doubt, describe the number plainly without a rank ("gives up more poor shots than most" only if true; otherwise just state the value).
-- Quote numbers at the precision given. If a value is 9.7%, do not round it to 10% and then call it a round-number milestone or a group high.
-
-SAMPLE SIZE — calibrate confidence to how much data there is:
-- You are told the number of games in view. FEW games (roughly < 8) = a SNAPSHOT of a short stretch, NOT the player's fixed identity. Use tentative language ("over these games…", "in this stretch he…", "small sample, but…") and set smallSample=true.
-- With few games, do NOT declare a permanent strength/weakness or a defining "style" — a hot or cold few nights is mostly noise. Say so.
-- With many games (20+), you may speak with more confidence about genuine patterns.
-- Never present a small-sample swing in the same authoritative voice as a robust, many-game pattern.
-
-SYNTHESIZE, don't report:
-- The dashboard already shows every raw number in tables. Do NOT just restate stats. Connect several provided stats into a higher-level insight a coach would say out loud.
-  - BAD (regurgitation): "53% rally win, 40 net errors/game, drops on 71% of 3rd shots."
-  - GOOD (synthesis): "A patient technician whose drops set up the point well — but too many rallies end with his own ball in the net, quietly costing him close games."
-- Cite at most ONE number per field when it truly sharpens the point; otherwise stay qualitative.
-- Everything is COMPARATIVE: frame relative to the group ("best in the group at…", "middle of the pack…", "the group's weakest at…").
-- If someone is genuinely well-rounded with no clear hole, say that rather than inventing a weakness.
+HARD RULES:
+- If a player's facts block says "No clear outlier — middle of the pack", then SAY THAT plainly. Do not manufacture a strength or weakness. "A well-rounded game with no stat that stands out from this group" is a correct, good answer.
+- Use each fact's value and rank EXACTLY as given (e.g. "9.7%, 4th of 6"), never rounded into a different story.
+- Do NOT dramatize a modest gap. A rank of 2nd or 3rd of 6, or a near-average value, is "a bit better/worse than most" — NOT "elite", "by far the best", "a glaring hole", or "worst in the group". Reserve strong language for rank 1 / rank last with a clear margin. When unsure, understate.
+- NEVER say "best/worst/highest/lowest in the group" unless the fact's rank is literally 1 (best) or N (worst). If the group best/worst named in the fact is someone ELSE, do not claim it for this player.
+- NEVER invent metrics. pb.vision does NOT track resets, reset rate, rallies-won-on-resets, third-shot speed, spin, or dink success — never mention them.
 - Win rates near 50% are EXPECTED (they play each other, near zero-sum) — never frame ~50% as a weakness by itself.
-- pb.vision skill ratings sit in a narrow band (~4.1–4.5) and are less telling than the outcome stats (win rates, loss causes, finishing, kitchen arrival, drop-vs-drive, pop-ups). Prefer the outcome stats.
+
+SAMPLE SIZE:
+- The facts block tags small-sample players. For those, set smallSample=true, use tentative language ("in this short stretch…"), and do NOT declare a fixed identity.
+
+STYLE:
+- Tight and specific. Cite at most ONE number per field, only when it sharpens the point — the fields are takeaways, not a stat dump.
+- "best" = their single most notable strength from the facts (or, if none, an honest "no standout — solid across the board"). "improve" = 1-2 items straight from their weaknesses (empty array if none). "vsGroup" = one line on where they sit overall. "style" = one line on how they play (may use qualitative background).
 
 Return ONLY a JSON array, one object per player IN THE SAME ORDER given, each:
-{"name": string, "styleTag": string (1-2 words), "best": string (1-2 sentences), "improve": string[] (1 or 2 items, each 1-2 sentences), "vsGroup": string (1-2 sentences), "style": string (1 sentence), "smallSample": boolean}
+{"name": string, "styleTag": string (1-2 words), "best": string (1-2 sentences), "improve": string[] (0 to 2 items, each 1-2 sentences), "vsGroup": string (1-2 sentences), "style": string (1 sentence), "smallSample": boolean}
 No prose outside the JSON.`;
 
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'Summaries need the ANTHROPIC_API_KEY server env var.' }, { status: 503 });
   }
-  let body: { context?: string; signature?: string; players?: string[] };
+  let body: { facts?: string; context?: string; signature?: string; players?: string[] };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
 
-  const context = (body.context ?? '').slice(0, 40000);
+  const facts = (body.facts ?? '').slice(0, 20000);
+  const context = (body.context ?? '').slice(0, 20000);
   const players = Array.isArray(body.players) ? body.players : [];
-  if (!context || players.length === 0) {
-    return NextResponse.json({ error: 'Missing stats context.' }, { status: 400 });
+  if (!facts || players.length === 0) {
+    return NextResponse.json({ error: 'Missing pre-computed facts.' }, { status: 400 });
   }
 
   // Cache key: prompt version + hash of the exact stats context. Bumping
   // PROMPT_VERSION busts every cached summary from an older prompt, so a fix to
   // the wording (e.g. the no-invented-metrics guardrails) takes effect instead
   // of serving stale pre-fix text. Client may pass its own data signature.
-  const basis = body.signature ?? context;
+  const basis = body.signature ?? facts;
   const key = `sum_${PROMPT_VERSION}_${createHash('sha256').update(basis).digest('hex').slice(0, 24)}`;
 
   const cached = await getSummaryCache(key);
@@ -85,7 +80,7 @@ export async function POST(req: NextRequest) {
   // ~600 tokens/player card + headroom, capped so the JSON array doesn't
   // truncate mid-object on an all-nights (11-player) view.
   const maxTokens = Math.min(9000, 1000 + players.length * 600);
-  const userMsg = `Players (in order): ${players.join(', ')}\n\n## Current stats\n\n${context}\n\nWrite the JSON array now.`;
+  const userMsg = `Players (in order): ${players.join(', ')}\n\n${facts}\n\n## Current stats (background only — do NOT cite numbers/ranks from here)\n\n${context}\n\nWrite the JSON array now, phrasing ONLY the pre-computed facts above.`;
 
   try {
     const client = new Anthropic();

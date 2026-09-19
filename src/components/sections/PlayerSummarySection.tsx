@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { DashboardData, PlayerMeta, HeroStats } from '@/types/dashboard';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { buildStatsContext, statsSignature } from '@/lib/statsContext';
+import { factsForPrompt } from '@/lib/playerFacts';
 
 interface Props { data: DashboardData }
 
@@ -36,7 +37,7 @@ export function PlayerSummarySection({ data }: Props) {
     fetch('/api/summaries', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ context: buildStatsContext(data), signature: sig, players: players.map((p) => p.name) }),
+      body: JSON.stringify({ facts: factsForPrompt(data), context: buildStatsContext(data), signature: sig, players: players.map((p) => p.name) }),
       signal: controller.signal,
     })
       .then(async (r) => {
@@ -63,7 +64,7 @@ export function PlayerSummarySection({ data }: Props) {
         {loading && <span className="text-xs text-gray-400">Analyzing…</span>}
       </div>
       <p className="text-xs text-gray-400">
-        Coach-style synthesis of everything above, written by Claude from the currently-selected games. Not a re-listing of the stats — the takeaways.
+        The stats that actually set each player apart from the group — picked and ranked by code (only genuine outliers, trivial gaps filtered out), then written up by Claude. If someone&apos;s middle-of-the-pack, it says so rather than inventing a strength.
       </p>
 
       {error && (
