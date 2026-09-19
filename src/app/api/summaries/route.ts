@@ -8,8 +8,9 @@ export const maxDuration = 60;
 
 // Bump when the SYSTEM prompt or post-processing changes so old cached summaries
 // are regenerated. v2 = no-invented-metrics + sample-size guardrails; v3 = added
-// code-level fabrication scrub backstop.
-const PROMPT_VERSION = 'v3';
+// code-level fabrication scrub backstop; v4 = hard reset-ban (prompt + widened
+// scrub) after "19% of rallies won on resets" slipped through.
+const PROMPT_VERSION = 'v4';
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
@@ -28,7 +29,9 @@ const SYSTEM = `You are the head-coach analyst inside PickleDash, a pickleball s
 You will be given a block of already-computed stats for the currently-selected games and players. Write ONE synthesis card per player.
 
 HARD RULES — never break these:
-- Use ONLY metrics that appear in the stats block below. NEVER invent, assume, or name a stat that isn't there. If the data doesn't contain something (e.g. "reset rate", "third-shot speed", "dink success"), you may NOT mention it — not even as a guess or inference dressed up as fact. When in doubt, leave it out.
+- Use ONLY metrics that appear in the stats block below. NEVER invent, assume, or name a stat that isn't there. When in doubt, leave it out.
+- pb.vision does NOT track resets at all. NEVER mention resets, "reset game", "reset rate", "rallies won on resets", or anything reset-related — there is zero reset data, so any such number is fabricated. Likewise never cite third-shot speed, spin rate, or dink success — none exist here.
+- Do NOT translate a popup/error/defense stat into an invented reset or resetting claim. If someone gives up popups, say exactly that; do not infer a "weak reset game".
 - Do NOT infer a hidden skill from an adjacent number and state it as measured (e.g. do not turn "gives up pop-ups" into "poor reset rate"). Describe only what the provided stat literally measures.
 - Every claim must be traceable to a specific row you were given. If you cannot point to the number behind a sentence, delete the sentence.
 
@@ -113,7 +116,12 @@ export async function POST(req: NextRequest) {
 // does NOT expose and we NEVER put in the context. Any sentence that cites one
 // is a fabrication, so we drop that sentence. Narrow denylist (not a blanket
 // filter) so legitimate synthesis prose is never mangled.
-const NEVER_METRICS = /\b(reset rate|resets?\s+(?:won|win|rate)|reset rallies|reset percentage|spin rate|dink success|third[-\s]?shot speed)\b/i;
+// pb.vision exposes NO reset data whatsoever, so ANY mention of "reset(s)" in a
+// summary is a fabrication (the model keeps inventing "19% of rallies won on
+// resets", "weakest reset game", "reset rate", etc.). Ban the word outright,
+// plus the other metrics we never provide. Kept narrow to these known-absent
+// stats so genuine synthesis prose is untouched.
+const NEVER_METRICS = /\b(resets?|spin rate|dink success|third[-\s]?shot speed)\b/i;
 function dropFabricated(text: string): string {
   if (!text || !NEVER_METRICS.test(text)) return text;
   const kept = text.split(/(?<=[.!?])\s+/).filter((sent) => !NEVER_METRICS.test(sent));
