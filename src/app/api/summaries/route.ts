@@ -74,21 +74,29 @@ export async function POST(req: NextRequest) {
   const cached = await getSummaryCache(key);
   if (cached) return NextResponse.json({ summaries: cached, cached: true });
 
+  // Generous token budget — the v2 prompt writes longer cards, so give ~700/
+  // player and a high cap so the JSON array doesn't truncate mid-object.
+  const maxTokens = Math.min(16000, 1200 + players.length * 700);
+  const userMsg = `Players (in order): ${players.join(', ')}\n\n## Current stats\n\n${context}\n\nWrite the JSON array now.`;
+
   try {
     const client = new Anthropic();
-    const resp = await client.messages.create({
-      model: 'claude-sonnet-5',
-      // ~450 tokens/player card; scale with player count so an all-nights view
-      // (11 players) doesn't truncate the JSON mid-array. Capped at 8k.
-      max_tokens: Math.min(8000, 800 + players.length * 500),
-      system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: [{
-        role: 'user',
-        content: `Players (in order): ${players.join(', ')}\n\n## Current stats\n\n${context}\n\nWrite the JSON array now.`,
-      }],
-    });
-    const raw = resp.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('').trim();
-    const summaries = parseSummaries(raw);
+    // Try up to twice — model output length is non-deterministic, so a rare
+    // truncation usually succeeds on a retry.
+    let summaries: PlayerSummary[] | null = null;
+    for (let attempt = 0; attempt < 2 && !summaries; attempt++) {
+      const resp = await client.messages.create({
+        model: 'claude-sonnet-5',
+        max_tokens: maxTokens,
+        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: userMsg }],
+      });
+      const raw = resp.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('').trim();
+      const parsed = parseSummaries(raw);
+      // Accept a full or partial result; the salvage parser recovers complete
+      // objects even from a truncated array. Only retry if we got nothing usable.
+      if (parsed && parsed.length > 0) summaries = parsed;
+    }
     if (!summaries) return NextResponse.json({ error: 'Could not parse the model output.' }, { status: 502 });
     await saveSummaryCache(key, summaries).catch(() => {});
     return NextResponse.json({ summaries });
