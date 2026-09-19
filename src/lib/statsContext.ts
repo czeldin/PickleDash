@@ -143,14 +143,20 @@ export function buildStatsContext(data: DashboardData): string {
 export function statsSignature(data: DashboardData): string {
   const parts: string[] = [];
   parts.push('P:' + data.players.map((p) => p.pid).sort().join(','));
-  parts.push('S:' + data.sessions.map((s) => s.key).sort().join(','));
-  const r0 = (n: number) => Math.round(n);
+  // NOTE: data.sessions is intentionally the FULL session list (for the game
+  // dropdown), so it does NOT vary with the night/game selection — don't rely on
+  // it. Instead sign every per-player stat that reflects the actual selection,
+  // with enough precision that two different selections can't collide.
   const r1 = (n: number) => Math.round(n * 10);
   for (const o of (data.outcomeStats ?? []).slice().sort((a, b) => a.pid.localeCompare(b.pid))) {
-    parts.push(`${o.pid}:${o.gamesWon}-${o.gamesLost}:${r0(o.pointsWon)}:${r0(o.ralliesWon)}:${r1(o.netPointsPerGame)}`);
+    parts.push(`${o.pid}:g${o.gamesWon}-${o.gamesLost}:p${o.pointsWon}-${o.pointsLost}:r${o.ralliesWon}-${o.ralliesLost}`);
   }
   for (const s of data.skillRatings.slice().sort((a, b) => a.pid.localeCompare(b.pid))) {
-    parts.push(`${s.pid}:o${r1(s.overall)}`);
+    parts.push(`${s.pid}:o${r1(s.overall)}:k${r1(s.kitchenGame)}:t${r1(s.targeting)}`);
+  }
+  // Per-player error/shot totals also pin the selection down further.
+  for (const e of data.errors.slice().sort((a, b) => a.pid.localeCompare(b.pid))) {
+    parts.push(`${e.pid}:e${e.total}:g${e.gamesPlayed}`);
   }
   return parts.join('|');
 }

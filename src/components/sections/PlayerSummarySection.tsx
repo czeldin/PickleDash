@@ -29,6 +29,7 @@ export function PlayerSummarySection({ data }: Props) {
     const sig = statsSignature(data);
     if (sig === lastSig.current) return; // same view — keep current summaries
     lastSig.current = sig;
+    setSummaries(null);   // clear stale cards so the new selection visibly regenerates
     setLoading(true);
     setError(null);
     const controller = new AbortController();
