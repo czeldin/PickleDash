@@ -325,7 +325,11 @@ function accumsToData(accums: PlayerAccum[], allSessions: SessionInfo[]): Dashbo
   });
   const serveDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.sdW || 1; return { pid: players[i].pid, deepPct: (acc.sdDeep / w) * 100, medPct: (acc.sdMed / w) * 100, shallowPct: (acc.sdShallow / w) * 100 }; });
   const returnDepth: DepthRow[] = accums.map((acc, i) => { const w = acc.rdW || 1; return { pid: players[i].pid, deepPct: (acc.rdDeep / w) * 100, medPct: (acc.rdMed / w) * 100, shallowPct: (acc.rdShallow / w) * 100 }; });
-  const errors: ErrorRow[] = accums.map((acc, i) => { const g = acc.sessionCount || 1; return { pid: players[i].pid, gamesPlayed: acc.sessionCount, total: acc.errNet + acc.errOut + acc.errShort + acc.errPop, totalPerGame: (acc.errNet + acc.errOut + acc.errShort + acc.errPop) / g, net: acc.errNet / g, out: acc.errOut / g, kitchen: acc.errShort / g, popups: acc.errPop / g, unforced: acc.errUf / g, forced: acc.errForced / g }; });
+  // Total = actual faults only (net + out + short). Popups are NOT errors — the
+  // ball stayed in, it just set up the opponent — so they are their own column,
+  // excluded from the total. (Legacy schema has no landed/intercepted flag on
+  // `out`, so the intercepted-near-miss exclusion applies only to augmented data.)
+  const errors: ErrorRow[] = accums.map((acc, i) => { const g = acc.sessionCount || 1; const tot = acc.errNet + acc.errOut + acc.errShort; return { pid: players[i].pid, gamesPlayed: acc.sessionCount, total: tot, totalPerGame: tot / g, net: acc.errNet / g, out: acc.errOut / g, kitchen: acc.errShort / g, popups: acc.errPop / g, unforced: acc.errUf / g, forced: acc.errForced / g }; });
   const attacks: AttackRow[] = accums.map((acc, i) => {
     const t = acc.attackTotal;
     return { pid: players[i].pid, attackTotal: t, attackWins: acc.attackWins, attackWinPct: t > 0 ? (acc.attackWins / t) * 100 : 0, attackExcellentPct: acc.attackExW > 0 ? (acc.attackExSum / acc.attackExW) * 100 : 0 };

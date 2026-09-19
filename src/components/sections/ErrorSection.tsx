@@ -1,6 +1,6 @@
 'use client';
 
-import { DashboardData, ErrorRow, PlayerMeta } from '@/types/dashboard';
+import { DashboardData, ErrorRow, ShotAccuracyRow, PlayerMeta } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
 import { TrendButton } from '@/components/TrendChart';
@@ -16,32 +16,42 @@ function errCell(perGame: number, color = 'text-gray-700') {
   return <span className={`text-sm font-medium ${color}`}>{perGame.toFixed(1)}</span>;
 }
 
-function TotalChart({ errors, players }: { errors: ErrorRow[]; players: PlayerMeta[] }) {
+// Headline tile = pb.vision's own Shot Accuracy % (share of shots that landed
+// IN — `trends.shot_accuracy.in`, a direct pb.vision metric, category A in
+// PROVENANCE.md). This is the same number pb.vision headlines on its own
+// leaderboard, so it lines up exactly. Higher is better, so sort descending.
+function AccuracyChart({ shotAccuracy, players }: { shotAccuracy: ShotAccuracyRow[]; players: PlayerMeta[] }) {
   const playerMap = new Map(players.map((p) => [p.pid, p]));
-  const sorted = [...errors].sort((a, b) => b.totalPerGame - a.totalPerGame);
+  const sorted = [...shotAccuracy].sort((a, b) => b.inPct - a.inPct);
   const chartData = sorted.map((r) => {
     const p = playerMap.get(r.pid);
-    return { name: p?.name ?? r.pid, value: parseFloat(r.totalPerGame.toFixed(1)), color: p?.color.text ?? '#185FA5', bg: p?.color.bg ?? '#E6F1FB' };
+    return { name: p?.name ?? r.pid, value: parseFloat((r.inPct * 100).toFixed(1)), color: p?.color.text ?? '#185FA5' };
   });
-  const maxVal = Math.max(...chartData.map((d) => d.value)) * 1.2 || 1;
+  if (chartData.length === 0) return null;
+  const minVal = Math.min(...chartData.map((d) => d.value));
+  // Zoom the axis to the players' band (accuracy clusters high, ~85-95%),
+  // so small real differences are visible instead of a wall of near-full bars.
+  const lo = Math.max(0, Math.floor((minVal - 5) / 5) * 5);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Total errors per game</p>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Shot accuracy — % of shots that landed in</p>
       <ResponsiveContainer width="100%" height={chartData.length * 48 + 32}>
-        <BarChart layout="vertical" data={chartData} margin={{ top: 0, right: 48, left: 0, bottom: 0 }} barCategoryGap="35%">
-          <XAxis type="number" domain={[0, maxVal]} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+        <BarChart layout="vertical" data={chartData} margin={{ top: 0, right: 52, left: 0, bottom: 0 }} barCategoryGap="35%">
+          <XAxis type="number" domain={[lo, 100]} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            tickFormatter={(v: any) => `${v}%`} />
           <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: '#374151', fontWeight: 500 }} axisLine={false} tickLine={false} width={110} />
           <Tooltip
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(val: any) => [`${val} / game`, 'Total errors']}
+            formatter={(val: any) => [`${val}%`, 'Shot accuracy']}
             contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
             {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
             <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#6b7280' }}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(v: any) => `${v}`}
+              formatter={(v: any) => `${v}%`}
             />
           </Bar>
         </BarChart>
@@ -51,7 +61,7 @@ function TotalChart({ errors, players }: { errors: ErrorRow[]; players: PlayerMe
 }
 
 export function ErrorSection({ data }: Props) {
-  const { errors, players } = data;
+  const { errors, shotAccuracy, players } = data;
 
   const columns: ColumnDef<ErrorRow>[] = [
     {
@@ -101,9 +111,9 @@ export function ErrorSection({ data }: Props) {
   return (
     <SectionCard title="Error Breakdown" action={<TrendButton title="Errors" metrics={ERROR_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        All values normalized per game. <strong>Short</strong> = a ball that landed short on your own side (didn&apos;t clear the net) — not a kitchen foot fault, which pb.vision doesn&apos;t track. Popups (amber) = ball stayed in but set up the opponent.
+        Headline is pb.vision&apos;s own <strong>shot accuracy</strong> (share of shots that landed in) — the exact number on pb.vision&apos;s leaderboard. The table below breaks the misses down per game: <strong>Short</strong> = a ball that landed short on your own side (didn&apos;t clear the net) — not a kitchen foot fault, which pb.vision doesn&apos;t track. Popups (amber) stayed in but set up the opponent, so they&apos;re shown separately and not counted as faults.
       </p>
-      <TotalChart errors={errors} players={players} />
+      <AccuracyChart shotAccuracy={shotAccuracy} players={players} />
       <SortableTable
         rows={errors}
         columns={columns}

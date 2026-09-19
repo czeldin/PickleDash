@@ -128,7 +128,9 @@ Each lost rally charged to one cause from its final shot.
 | Kitchen/g | A→B | `faults.short` | **Mislabeled "Kitchen" — it's the `short` fault (own-side short), not an NVZ foot fault.** |
 | Popups/g, Unforced/g | A→B | `errors.popup` / `errors.unforced` | Direct flags. |
 | Forced/g | B | (net\|out\|short) & !unforced | Our classification. |
-| Total / per game | B | net+out+short+popup ÷ games | Excludes unforced/forced from the total. |
+| Out/g (corrected) | A→B | `faults.out` **only when `outcome !== 'intercepted'`** | pb.vision also flags balls headed out that an opponent intercepted before they landed; those near-misses are NOT lost points and are now excluded. |
+| Total / per game | B | net + landed-out + short ÷ games | **Popups and unforced/forced are NOT in the total** (a popup stayed in). Prior version wrongly summed popups and intercepted-outs, inflating counts ~2.5×. |
+| Headline tile: Shot accuracy % | A | `trends.shot_accuracy.in` (shot-weighted) | **Direct pb.vision metric** — the same % on pb.vision's leaderboard. Replaced the old derived "total errors / game" headline. |
 
 ## Attacking & Dinking
 | Metric | Cat | Source | Caveats |
