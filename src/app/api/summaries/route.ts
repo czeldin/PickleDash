@@ -62,7 +62,9 @@ export async function POST(req: NextRequest) {
     const client = new Anthropic();
     const resp = await client.messages.create({
       model: 'claude-sonnet-5',
-      max_tokens: 3000,
+      // ~450 tokens/player card; scale with player count so an all-nights view
+      // (11 players) doesn't truncate the JSON mid-array. Capped at 8k.
+      max_tokens: Math.min(8000, 800 + players.length * 500),
       system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
@@ -82,23 +84,56 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function coerce(x: any): PlayerSummary {
+  return {
+    name: String(x.name ?? ''),
+    styleTag: String(x.styleTag ?? '').slice(0, 24),
+    best: String(x.best ?? ''),
+    improve: Array.isArray(x.improve) ? x.improve.slice(0, 2).map((s: unknown) => String(s)) : [],
+    vsGroup: String(x.vsGroup ?? ''),
+    style: String(x.style ?? ''),
+    smallSample: Boolean(x.smallSample),
+  };
+}
+
 function parseSummaries(raw: string): PlayerSummary[] | null {
-  // Strip code fences if present, then find the JSON array.
   const cleaned = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   const start = cleaned.indexOf('[');
-  const end = cleaned.lastIndexOf(']');
-  if (start < 0 || end < 0) return null;
-  try {
-    const arr = JSON.parse(cleaned.slice(start, end + 1));
-    if (!Array.isArray(arr)) return null;
-    return arr.map((x): PlayerSummary => ({
-      name: String(x.name ?? ''),
-      styleTag: String(x.styleTag ?? '').slice(0, 24),
-      best: String(x.best ?? ''),
-      improve: Array.isArray(x.improve) ? x.improve.slice(0, 2).map((s: unknown) => String(s)) : [],
-      vsGroup: String(x.vsGroup ?? ''),
-      style: String(x.style ?? ''),
-      smallSample: Boolean(x.smallSample),
-    }));
-  } catch { return null; }
+  if (start < 0) return null;
+  const body = cleaned.slice(start);
+
+  // 1) Happy path: the whole array parses.
+  const end = body.lastIndexOf(']');
+  if (end > 0) {
+    try {
+      const arr = JSON.parse(body.slice(0, end + 1));
+      if (Array.isArray(arr) && arr.length) return arr.map(coerce);
+    } catch { /* fall through to salvage */ }
+  }
+
+  // 2) Salvage path (e.g. output truncated mid-array): scan for complete
+  // top-level {...} objects and parse each individually. Recovers the players
+  // that DID come through instead of failing the whole card.
+  const objs: PlayerSummary[] = [];
+  let depth = 0, objStart = -1, inStr = false, esc = false;
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{') { if (depth === 0) objStart = i; depth++; }
+    else if (c === '}') {
+      depth--;
+      if (depth === 0 && objStart >= 0) {
+        try { objs.push(coerce(JSON.parse(body.slice(objStart, i + 1)))); } catch { /* skip */ }
+        objStart = -1;
+      }
+    }
+  }
+  return objs.length ? objs : null;
 }
