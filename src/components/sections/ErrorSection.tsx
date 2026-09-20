@@ -72,21 +72,18 @@ export function ErrorSection({ data }: Props) {
     },
     {
       key: 'net',
-      header: 'Net / game',
-      getValue: (row) => row.net,
-      render: (row) => errCell(row.net, 'text-red-600'),
+      header: 'Net+short / game',
+      // Net and short are combined: pb.vision can't reliably separate a ball
+      // that hit the net from one that fell just short of it (it tags many net
+      // balls as "short"), so we no longer present them as distinct.
+      getValue: (row) => row.net + row.kitchen,
+      render: (row) => errCell(row.net + row.kitchen, 'text-red-600'),
     },
     {
       key: 'out',
       header: 'Out / game',
       getValue: (row) => row.out,
       render: (row) => errCell(row.out, 'text-orange-600'),
-    },
-    {
-      key: 'kitchen',
-      header: 'Short / game',
-      getValue: (row) => row.kitchen,
-      render: (row) => errCell(row.kitchen, 'text-purple-600'),
     },
     {
       key: 'popups',
@@ -111,7 +108,7 @@ export function ErrorSection({ data }: Props) {
   return (
     <SectionCard title="Error Breakdown" action={<TrendButton title="Errors" metrics={ERROR_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        Headline is pb.vision&apos;s own <strong>shot accuracy</strong> (share of shots that landed in) — the exact number on pb.vision&apos;s leaderboard. The table below breaks the misses down per game: <strong>Short</strong> = a ball that landed short on your own side (didn&apos;t clear the net) — not a kitchen foot fault, which pb.vision doesn&apos;t track. Popups (amber) stayed in but set up the opponent, so they&apos;re shown separately and not counted as faults.
+        Headline is pb.vision&apos;s own <strong>shot accuracy</strong> (share of shots that landed in) — the exact number on pb.vision&apos;s leaderboard. The table breaks the misses down per game. <strong>Net+short</strong> combines balls into the net with balls that fell short of it — pb.vision can&apos;t reliably tell them apart near the net, so they&apos;re grouped (neither is a kitchen foot fault, which pb.vision doesn&apos;t track). Popups (amber) stayed in but set up the opponent, so they&apos;re shown separately and not counted as faults.
       </p>
       <AccuracyChart shotAccuracy={shotAccuracy} players={players} />
       <SortableTable

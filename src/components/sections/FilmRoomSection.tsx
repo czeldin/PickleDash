@@ -13,15 +13,14 @@ interface Props {
   onFocusChange: (pid: string | null) => void;
 }
 
-// Deep-link that seeks pb.vision to THIS specific shot (not the rally start).
-// The old `?shots=${rallyNum}.1&numAfter=999` form played the whole rally from
-// shot 1 to its end, so a mid-rally fault (e.g. a short 3rd shot) was watched as
-// the entire point — often ending on a different shot (a net ball), which read
-// as "this short clip went into the net". A PBQL `?q=` URL — the exact form
-// pb.vision's own Shot Explorer emits — pins the highlighted shot to the one we
-// mean, with pb.vision's default lead-in/out around it.
+// Deep-link that seeks pb.vision to THIS specific shot. The `?shots=RALLY.SHOT`
+// form seeks the player to that exact shot (verified: shots=46.17 lands the
+// video at the shot's hit time); numBefore/After give a 1-shot lead-in/out.
+// (The old form used `.1` — shot 1 — with numAfter=999, which played the whole
+// rally instead of the shot. A `?q=` URL does not seek on direct load — pb.vision
+// strips it — so it is NOT usable here.)
 const deepLink = (s: CourtShotRow) =>
-  `https://pb.vision/video/${s.vid}/${s.si}/explore?q=${encodeURIComponent(`WHERE rally.num = ${s.rallyNum} AND shot.num = ${s.shotNum}`)}`;
+  `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.${s.shotNum}&numBefore=1&numAfter=1`;
 
 // Modal that embeds the pb.vision rally in an iframe. pb.vision's explore route
 // sends no X-Frame-Options / frame-ancestors block, so the embed loads — but it
@@ -141,19 +140,14 @@ const CATEGORIES: Category[] = [
     match: (s) => s.isPutaway && s.won,
   },
   {
-    id: 'net-errors', label: 'Balls into the net',
-    blurb: 'Rally-ending shots of yours that hit the net — the group’s biggest loss cause.',
-    match: (s) => !!s.isFinal && (s.faultNet || s.endZone === 'net') && !s.won,
+    id: 'net-errors', label: 'Into the net / short',
+    blurb: 'Rally-ending shots of yours that didn’t make it over — the net stopped it, or it fell short of the net on your own side. pb.vision can’t reliably tell these two apart near the net, so they’re combined. The group’s biggest loss cause.',
+    match: (s) => !!s.isFinal && !!(s.faultNet || s.endZone === 'net' || s.faultShort) && !s.won,
   },
   {
     id: 'out-errors', label: 'Balls hit out',
     blurb: 'Rally-ending shots of yours that landed out (excludes balls headed out that an opponent played anyway).',
     match: (s) => !!s.isFinal && (s.faultOut || s.endZone === 'out') && !s.won,
-  },
-  {
-    id: 'short-errors', label: 'Balls hit short',
-    blurb: 'Rally-ending shots of yours that fell short of the net and landed on your own side (the ball never crossed — pb.vision’s “short” fault). Looks a lot like hitting the net, but the ball didn’t reach it. NOT a kitchen foot fault.',
-    match: (s) => !!s.isFinal && !!s.faultShort && !s.won,
   },
   {
     id: 'popped-up', label: 'Pop-ups you gave up',

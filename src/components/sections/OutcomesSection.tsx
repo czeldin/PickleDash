@@ -118,13 +118,17 @@ const partnerCols: ColumnDef<PartnerAdjRow>[] = [
   },
 ];
 
-const REASONS: { key: keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>; label: string; tone: string; hint: string }[] = [
-  { key: 'ownNet', label: 'We hit into net', tone: 'bg-red-500', hint: 'The rally-ending shot was ours and went into the net.' },
-  { key: 'ownOut', label: 'We hit out', tone: 'bg-orange-500', hint: 'The rally-ending shot was ours and landed out.' },
-  { key: 'ownKitchen', label: 'We hit it short', tone: 'bg-amber-500', hint: 'The rally-ending shot was ours and landed on our own side before clearing the net (a drop/dink that fell short) — not a net-cord, and not a kitchen-line foot fault, which pb.vision does not track.' },
-  { key: 'popupExploited', label: 'We popped it up', tone: 'bg-fuchsia-500', hint: 'A dink/drop of ours popped up and the opponents attacked it out of the air.' },
-  { key: 'oppWinner', label: 'They hit a winner', tone: 'bg-slate-400', hint: 'The opponents ended the rally with a clean winner or putaway — not our error.' },
-  { key: 'other', label: 'Unattributed', tone: 'bg-gray-300', hint: 'The rally ended but the final shot could not be classified from the data (no fault or winner tag).' },
+type ReasonKey = keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>;
+// `keys` is summed — 'into net / short' combines ownNet + ownKitchen because
+// pb.vision cannot reliably separate a ball that hit the net from one that fell
+// just short of it (its near-net tracking tags many net balls as "short"), so we
+// stopped presenting them as distinct causes.
+const REASONS: { keys: ReasonKey[]; label: string; tone: string; hint: string }[] = [
+  { keys: ['ownNet', 'ownKitchen'], label: 'We hit into net / short', tone: 'bg-red-500', hint: 'The rally-ending shot was ours and didn’t make it over — the net stopped it, or it fell short of the net on our own side. pb.vision can’t reliably tell these apart near the net (it tags many net-cords as "short"), so they’re combined here.' },
+  { keys: ['ownOut'], label: 'We hit out', tone: 'bg-orange-500', hint: 'The rally-ending shot was ours and landed out.' },
+  { keys: ['popupExploited'], label: 'We popped it up', tone: 'bg-fuchsia-500', hint: 'A dink/drop of ours popped up and the opponents attacked it out of the air.' },
+  { keys: ['oppWinner'], label: 'They hit a winner', tone: 'bg-slate-400', hint: 'The opponents ended the rally with a clean winner or putaway — not our error.' },
+  { keys: ['other'], label: 'Unattributed', tone: 'bg-gray-300', hint: 'The rally ended but the final shot could not be classified from the data (no fault or winner tag).' },
 ];
 
 /** Why We Lost — grouped by cause, one bar per player, for easy comparison. */
@@ -144,9 +148,9 @@ export function LossReasonsSection({ data, focusPid }: Props) {
   const gamesOf = new Map<string, number>((data.outcomeStats ?? []).map((o) => [o.pid, o.gamesPlayed]));
   const players = data.players.filter((p) => rows.some((r) => r.pid === p.pid && r.ralliesLost > 0));
 
-  // value for a (player, cause), raw or per-game
-  const val = (r: LossReasonRow, key: typeof REASONS[number]['key']) => {
-    const raw = r[key];
+  // value for a (player, cause), raw or per-game — sums the cause's keys.
+  const val = (r: LossReasonRow, keys: ReasonKey[]) => {
+    const raw = keys.reduce((sum, k) => sum + r[k], 0);
     if (!perGame) return raw;
     const g = gamesOf.get(r.pid) ?? 0;
     return g > 0 ? raw / g : 0;
@@ -154,7 +158,7 @@ export function LossReasonsSection({ data, focusPid }: Props) {
   const rowOf = (pid: string) => rows.find((r) => r.pid === pid)!;
   // max across everything for a shared x-scale
   const maxVal = Math.max(
-    ...players.flatMap((p) => REASONS.map(({ key }) => val(rowOf(p.pid), key))),
+    ...players.flatMap((p) => REASONS.map(({ keys }) => val(rowOf(p.pid), keys))),
     0.001,
   );
   const fmt = (v: number) => (perGame ? v.toFixed(1) : String(Math.round(v)));
@@ -175,8 +179,8 @@ export function LossReasonsSection({ data, focusPid }: Props) {
         {perGame ? ' Shown per game played (fair across different game counts).' : ' Raw totals this selection.'} Hover a cause for its definition.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-        {REASONS.map(({ key, label, tone, hint }) => (
-          <div key={key}>
+        {REASONS.map(({ keys, label, tone, hint }) => (
+          <div key={label}>
             <div className="flex items-center gap-1.5 mb-1">
               <span className={`w-2.5 h-2.5 rounded-sm ${tone}`} />
               <span className="text-sm font-semibold text-gray-700">{label}</span>
@@ -184,9 +188,9 @@ export function LossReasonsSection({ data, focusPid }: Props) {
             </div>
             <div className="space-y-1">
               {[...players]
-                .sort((a, b) => val(rowOf(b.pid), key) - val(rowOf(a.pid), key))
+                .sort((a, b) => val(rowOf(b.pid), keys) - val(rowOf(a.pid), keys))
                 .map((p) => {
-                  const v = val(rowOf(p.pid), key);
+                  const v = val(rowOf(p.pid), keys);
                   const w = (100 * v) / maxVal;
                   const isFocus = p.pid === focusPid;
                   return (
