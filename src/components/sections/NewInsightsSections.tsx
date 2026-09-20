@@ -14,7 +14,7 @@ const RALLY_METRICS: MetricDef<NightTrendRow>[] = [
   { key: 'net', label: 'Net/g', value: (r) => g(r.riWon - r.riLost - r.riSetup, r), pct: false },
   { key: 'winners', label: 'Winners/g', value: (r) => g(r.riWon, r), pct: false },
   { key: 'lost', label: 'Lost/g', value: (r) => g(r.riLost, r), pct: false },
-  { key: 'setup', label: 'Set up opp/g', value: (r) => g(r.riSetup, r), pct: false },
+  { key: 'setup', label: 'Popped up (lost)/g', value: (r) => g(r.riSetup, r), pct: false },
 ];
 const TARGETING_METRICS: MetricDef<NightTrendRow>[] = [
   { key: 'attacks', label: 'Attacks/g', value: (r) => g(r.attacks, r), pct: false },
@@ -114,7 +114,7 @@ export function RallyImpactSection({ data }: Props) {
   const columns: ColumnDef<RallyImpactRow>[] = [
     { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => <span className="tabular-nums font-semibold text-emerald-700">{per(r.won, r.games).toFixed(1)}</span> },
     { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => num(per(r.lostDirect, r.games)) },
-    { key: 'setup', header: 'Set up opp/g', getValue: (r) => per(r.setup, r.games), render: (r) => num(per(r.setup, r.games)) },
+    { key: 'setup', header: 'Popped up (lost)/g', getValue: (r) => per(r.setup, r.games), render: (r) => num(per(r.setup, r.games)) },
     {
       key: 'net', header: 'Net/g',
       getValue: (r) => per(r.won - r.lostDirect - r.setup, r.games),
@@ -125,7 +125,7 @@ export function RallyImpactSection({ data }: Props) {
   return (
     <SectionCard title="Rally Impact — Winners vs Points Given Away" action={<TrendButton title="Rally Impact" metrics={RALLY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
-        Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your rally-ending errors; <strong className="text-gray-600">Set up</strong> = your pop-ups the opponent put away. Net = winners − both.
+        Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your own rally-ending errors (net/out/short). <strong className="text-gray-600">Popped up (lost)</strong> = your pop-ups the opponent put away to end the rally — a different set of lost points from Lost, not double-counted. Net = winners − both.
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="net" />
     </SectionCard>
