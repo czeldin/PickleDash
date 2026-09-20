@@ -605,6 +605,7 @@ export function parseAugmentedNights(
                 isPutaway: sh.is_putaway === true,
                 isAttack: isAttack(sh),
                 isDefense: sh.is_reset === true || sh.vertical_type === 'dig',
+                isReset: sh.is_reset === true,
                 popup: sh.errors?.popup ?? null,
                 quality: sh.quality?.overall ?? null,
                 pressure: sh.quality?.pressure ?? null,
