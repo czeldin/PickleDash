@@ -73,6 +73,27 @@ export const CATEGORIES: Category[] = [
 
 export const categoryById = (id: string) => CATEGORIES.find((c) => c.id === id);
 
+// pb.vision's own classifications of a shot, as short pills — so you can see
+// exactly how a clip is categorized while watching it. Green = good, red = a
+// fault/leak, gray = neutral descriptor.
+export function shotTags(s: CourtShotRow): { text: string; tone: 'good' | 'bad' | 'neutral' }[] {
+  const t: { text: string; tone: 'good' | 'bad' | 'neutral' }[] = [];
+  if (s.type) t.push({ text: s.type, tone: 'neutral' });
+  t.push({ text: s.won ? 'won rally' : 'lost rally', tone: s.won ? 'good' : 'bad' });
+  if (s.isFinal) t.push({ text: 'rally-ending shot', tone: 'neutral' });
+  if (s.isPutaway) t.push({ text: 'put-away', tone: 'good' });
+  if (s.isAttack) t.push({ text: 'attack / speed-up', tone: 'neutral' });
+  if (s.popup === 'exploited') t.push({ text: 'popped up → attacked', tone: 'bad' });
+  else if (s.popup === 'potential') t.push({ text: 'popped up (not attacked)', tone: 'neutral' });
+  if (s.setupForOppWinner) t.push({ text: 'feed before their winner', tone: 'bad' });
+  if (s.faultNet) t.push({ text: 'into the net', tone: 'bad' });
+  if (s.faultOut) t.push({ text: 'landed out', tone: 'bad' });
+  if (s.faultShort) t.push({ text: 'short of the net', tone: 'bad' });
+  if (s.endZone && !['net', 'out', 'short'].includes(s.endZone)) t.push({ text: `landed ${s.endZone}`, tone: 'neutral' });
+  if (s.quality != null) t.push({ text: `quality ${Math.round(s.quality * 100)}`, tone: s.quality >= 0.75 ? 'good' : s.quality < 0.4 ? 'bad' : 'neutral' });
+  return t;
+}
+
 // A player's top-N highlights = their winners (put-aways that ended the rally),
 // best-quality first. Ranking by raw quality alone was useless — pb.vision caps
 // many ordinary clean shots at 1.0, so a random clean dink outranked an actual
@@ -133,13 +154,27 @@ function ClipModal({ shot, topic, detail, position, before, after, hasPrev, hasN
         className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-[1600px] max-h-[96vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200">
+        <div className="flex items-start justify-between gap-3 px-4 py-2.5 border-b border-gray-200">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
               <p className="text-sm font-bold text-gray-900 truncate">{topic}</p>
               <span className="text-xs text-gray-400 tabular-nums shrink-0">{position}</span>
             </div>
             <p className="text-xs text-gray-500 truncate">{detail}</p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {shotTags(shot).map((tag, i) => (
+                <span
+                  key={i}
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                    tag.tone === 'good' ? 'bg-emerald-50 text-emerald-700'
+                      : tag.tone === 'bad' ? 'bg-red-50 text-red-600'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {tag.text}
+                </span>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
