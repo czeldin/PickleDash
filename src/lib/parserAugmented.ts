@@ -607,6 +607,7 @@ export function parseAugmentedNights(
                 isDefense: sh.is_reset === true || sh.vertical_type === 'dig',
                 popup: sh.errors?.popup ?? null,
                 quality: sh.quality?.overall ?? null,
+                pressure: sh.quality?.pressure ?? null,
                 faultNet: sh.errors?.faults?.net === true,
                 // Landed-out only — exclude balls headed out that an opponent
                 // intercepted (outcome === 'intercepted'), matching the error/

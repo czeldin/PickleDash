@@ -46,8 +46,10 @@ export const CATEGORIES: Category[] = [
   },
   {
     id: 'epic-defense', label: 'Epic Defense', good: true,
-    blurb: 'Great defensive shots — resets and digs (pb.vision) — that you turned into a won rally. Scrambles and reset battles you came out on top of. Best first.',
-    match: (s) => !!s.isDefense && s.won && (s.quality ?? 0) >= 0.8,
+    blurb: 'Genuine defensive scrambles — a reset or dig hit under real pressure (pb.vision) that you turned into a won rally. Excludes serves/returns and routine low balls.',
+    // Under-pressure defensive get that paid off: reset/dig, not a serve/return
+    // (shotNum > 2), facing high positional pressure, in a rally you won.
+    match: (s) => !!s.isDefense && s.shotNum > 2 && (s.pressure ?? 0) >= 0.6 && s.won,
     before: 2, after: 20, // mid-rally — play through to see the whole stand
   },
   {
