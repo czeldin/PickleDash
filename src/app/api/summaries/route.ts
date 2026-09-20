@@ -16,7 +16,7 @@ export const maxDuration = 60;
 // fact-engine/attribution changes regenerate summaries instead of serving stale
 // ones (the pop-up/loss-attribution fixes had changed displayed numbers while a
 // pre-fix summary stayed cached).
-const PROMPT_VERSION = 'v9'; // v9 = kitchen-arrival is a frequency not a speed; label + prompt fixed
+const PROMPT_VERSION = 'v10'; // v10 = pickleball not tennis (prompt rule + word scrub)
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
@@ -45,6 +45,7 @@ HARD RULES:
 - Do NOT dramatize a modest gap. A rank of 2nd or 3rd of 6, or a near-average value, is "a bit better/worse than most" — NOT "elite", "by far the best", "a glaring hole", or "worst in the group". Reserve strong language for rank 1 / rank last with a clear margin. When unsure, understate.
 - NEVER say "best/worst/highest/lowest in the group" unless the fact's rank is literally 1 (best) or N (worst). If the group best/worst named in the fact is someone ELSE, do not claim it for this player.
 - NEVER invent metrics. pb.vision does NOT track resets, reset rate, rallies-won-on-resets, third-shot speed, spin, or dink success — never mention them.
+- This is PICKLEBALL. Never call it "tennis" or any other sport (no "low-error tennis", "tennis game", etc.). Say "pickleball", "game", or just describe the play.
 - Win rates near 50% are EXPECTED (they play each other, near zero-sum) — never frame ~50% as a weakness by itself.
 
 SAMPLE SIZE:
@@ -127,9 +128,15 @@ export async function POST(req: NextRequest) {
 // stats so genuine synthesis prose is untouched.
 const NEVER_METRICS = /\b(resets?|spin rate|dink success|third[-\s]?shot speed)\b/i;
 function dropFabricated(text: string): string {
-  if (!text || !NEVER_METRICS.test(text)) return text;
-  const kept = text.split(/(?<=[.!?])\s+/).filter((sent) => !NEVER_METRICS.test(sent));
-  return kept.join(' ').trim();
+  if (!text) return text;
+  // Wrong-sport slip: the model occasionally writes "tennis". Fix the word in
+  // place (don't delete the sentence — the surrounding synthesis is fine).
+  let t = text.replace(/\btennis\b/gi, 'pickleball');
+  if (NEVER_METRICS.test(t)) {
+    // Fabricated metric: drop the whole sentence that cites it.
+    t = t.split(/(?<=[.!?])\s+/).filter((sent) => !NEVER_METRICS.test(sent)).join(' ').trim();
+  }
+  return t;
 }
 function scrubFabrications(s: PlayerSummary): PlayerSummary {
   return {
