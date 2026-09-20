@@ -668,6 +668,16 @@ export function parseAugmentedNights(
             const last = shots[shots.length - 1];
             const lf = firstNameOf(pd, last.player_id);
             if (lf) { if (last.errors?.faults) ri(lf).lostDirect++; else ri(lf).won++; }
+            // "Popped up (lost)" is a POINTS ledger (subtracted from Net), so it
+            // must count RALLIES, not shots — a rally lost with two pop-ups is
+            // still one lost point, charged once to the first losing-team player
+            // who popped it up.
+            const lostPopup = rally.winning_team === 0 || rally.winning_team === 1
+              ? shots.find((sh) => sh.errors?.popup === 'exploited'
+                  && sh.player_id != null && pd[sh.player_id]?.team != null
+                  && pd[sh.player_id]!.team !== rally.winning_team)
+              : undefined;
+            if (lostPopup) { const pf = firstNameOf(pd, lostPopup.player_id); if (pf) ri(pf).setup++; }
             shots.forEach((sh) => {
               const f = firstNameOf(pd, sh.player_id); if (!f) return;
               const tt = tgt(f);
@@ -675,15 +685,10 @@ export function parseAugmentedNights(
               if (sh.is_putaway) tt.fin++;
               if (sh.winner_type === 'clean') tt.clean++;
               if (sh.errors?.popup) tt.pop++;
-              // Exploited pop-up → the opponent attacked it. `gotAttacked` is a
-              // behavior count (any exploited pop-up). But Rally Impact's
-              // "Popped up (lost)" is a POINTS ledger, so it only counts pop-ups
-              // where the popper's team actually LOST the rally — a pop-up you
-              // dug out and won is not a point given away.
+              // `gotAttacked` is a behavior count — every exploited pop-up counts,
+              // regardless of outcome or how many in a rally.
               if (sh.errors?.popup === 'exploited') {
                 tt.gotAttacked++;
-                const popperTeam = sh.player_id != null ? pd[sh.player_id]?.team : undefined;
-                if (popperTeam != null && popperTeam !== rally.winning_team) ri(f).setup++;
               }
             });
 
