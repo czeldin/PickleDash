@@ -206,12 +206,9 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
   const focusName = data.players.find((p) => p.pid === focusPid)?.name ?? 'Player';
 
   return (
-    <SectionCard title="Film Room" action={<FocusPlayerSelect players={data.players} focusPid={focusPid} onChange={onFocusChange} />}>
-      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        Clip queues for <strong>{focusName}</strong>. Click a clip to watch the rally in a pop-up (or open it on pb.vision). Review queues are sorted
-        weakest-first; these are shots to <em>watch</em>, not a scorecard.
-      </p>
-      <div className="flex flex-wrap gap-2 mb-4">
+    <SectionCard title="Film Room">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <FocusPlayerSelect players={data.players} focusPid={focusPid} onChange={onFocusChange} />
         {CATEGORIES.map((c) => {
           const n = courtShots.filter((s) => s.pid === focusPid && c.match(s)).length;
           return (
