@@ -55,11 +55,13 @@ export const CATEGORIES: Category[] = [
   },
   {
     id: 'epic-defense', label: 'Epic Defense', good: true,
-    blurb: 'Real defensive scrambles that won the rally — a reset, or a dig off a hard-hit ball (you got a bang back). Not routine low drops/dinks.',
-    // Genuinely epic: a reset (took pace off a hard ball), OR a dig where the
-    // incoming ball was hard (>=35 mph — you dug a bang). Not a serve/return,
-    // in a rally you won. Routine low drops/dinks (soft incoming) don't qualify.
+    blurb: 'Real defensive scrambles that won the rally — a reset, or a dig off a hard-hit ball (you got a bang back) that you actually put back in play. Not shanks or routine low balls.',
+    // Genuinely epic: a reset, OR a dig off a hard (>=35 mph) incoming ball, not
+    // a serve/return, in a rally you won. AND it must be a GOOD get — exclude
+    // faults (a dig shanked into the net isn't defense) and very low quality.
     match: (s) => !!s.won && s.shotNum > 2
+      && !s.faultNet && !s.faultOut && !s.faultShort && s.endZone !== 'net' && s.endZone !== 'out'
+      && (s.quality ?? 0) >= 0.5
       && !!(s.isReset || (s.isDefense && (s.incomingMph ?? 0) >= 35)),
     wholeRally: true, // show the whole point
   },
