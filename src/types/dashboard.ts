@@ -340,6 +340,10 @@ export interface CourtShotRow {
   faultOut?: boolean;              // landed out (excludes intercepted near-misses)
   faultShort?: boolean;
   isFinal?: boolean;               // was this the rally's last shot (the point-ender)
+  // This shot was the hitter's LAST shot before the opponents put the next ball
+  // away for a winner — the "feed" that got attacked. Powers the "They hit a
+  // winner" film queue (what you gave them, right before they finished it).
+  setupForOppWinner?: boolean;
 }
 
 export interface DashboardData {

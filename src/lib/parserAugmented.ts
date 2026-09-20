@@ -557,6 +557,13 @@ export function parseAugmentedNights(
           // Court-map shots: every shot with reconstructed trajectory, in
           // absolute court feet, tagged with hitter, type, outcome and pop-up.
           if (rally.winning_team === 0 || rally.winning_team === 1) {
+            // The rally-ending shot: an opponent "winner" is a putaway/clean
+            // winner hit by the WINNING team. The shot right before it, if the
+            // LOSING team hit it, is the setup we got punished on.
+            const lastSh = shots[shots.length - 1];
+            const lastWasWinner = lastSh?.is_putaway === true || lastSh?.winner_type === 'clean';
+            const lastHitterTeam = lastSh?.player_id != null ? pd[lastSh.player_id]?.team : undefined;
+            const oppWonWithWinner = lastWasWinner && lastHitterTeam === rally.winning_team;
             for (let si2 = 0; si2 < shots.length; si2++) {
               const sh = shots[si2];
               const hitter = sh.player_id != null ? pd[sh.player_id] : undefined;
@@ -590,6 +597,11 @@ export function parseAugmentedNights(
                 faultOut: !!(sh.errors?.faults?.out && sh.errors.faults.out.outcome !== 'intercepted'),
                 faultShort: sh.errors?.faults?.short === true,
                 isFinal: si2 === shots.length - 1,
+                // Setup shot: the losing team's last touch before the opponents'
+                // winner (i.e. the second-to-last shot, hit by the loser).
+                setupForOppWinner: oppWonWithWinner
+                  && si2 === shots.length - 2
+                  && hitter?.team !== rally.winning_team,
               });
             }
           }

@@ -131,7 +131,7 @@ const REASONS: { keys: ReasonKey[]; label: string; tone: string; hint: string; f
   { keys: ['ownNet', 'ownKitchen'], label: 'We hit into net / short', tone: 'bg-red-500', filmCat: 'net-errors', hint: 'The rally-ending shot was ours and didn’t make it over — the net stopped it, or it fell short of the net on our own side. pb.vision can’t reliably tell these apart near the net (it tags many net-cords as "short"), so they’re combined here.' },
   { keys: ['ownOut'], label: 'We hit out', tone: 'bg-orange-500', filmCat: 'out-errors', hint: 'The rally-ending shot was ours and landed out.' },
   { keys: ['popupExploited'], label: 'We popped it up', tone: 'bg-fuchsia-500', filmCat: 'popped-up', hint: 'A dink/drop of ours popped up and the opponents attacked it out of the air.' },
-  { keys: ['oppWinner'], label: 'They hit a winner', tone: 'bg-slate-400', hint: 'The opponents ended the rally with a clean winner or putaway — not our error.' },
+  { keys: ['oppWinner'], label: 'They hit a winner', tone: 'bg-slate-400', filmCat: 'fed-winners', hint: 'The opponents ended the rally with a clean winner or putaway — not our error. The film shows your feed right before it (the ball they attacked).' },
   // 'Unattributed' (the `other` residual) intentionally omitted — it's a
   // non-actionable "couldn't classify" bucket, not a cause worth showing.
 ];

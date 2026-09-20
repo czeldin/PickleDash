@@ -47,6 +47,11 @@ export const CATEGORIES: Category[] = [
     match: (s) => s.popup === 'exploited',
   },
   {
+    id: 'fed-winners', label: 'Feeds they put away',
+    blurb: 'Your last shot right before the opponents ended the rally with a winner — the ball you gave them that got attacked. Watch what look you were leaving them.',
+    match: (s) => !!s.setupForOppWinner,
+  },
+  {
     id: 'putaway-tries', label: 'Put-away attempts',
     blurb: 'Every ball you went big on. Review queue, not a verdict — watch which ones came back.',
     match: (s) => s.isPutaway,
