@@ -32,7 +32,7 @@ export const CATEGORIES: Category[] = [
     id: 'best-shots', label: 'Best shots', good: true,
     blurb: 'Your highest-quality shots by pb.vision’s shot-quality score — the nastiest dinks, drops, resets and put-aways, whether or not they won the point. Best first.',
     match: (s) => (s.quality ?? 0) >= 0.9,
-    before: 2, after: 20, // may be mid-rally — play through to the rally end
+    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
   },
   {
     id: 'clean-winners', label: 'Clean winners', good: true,
@@ -52,7 +52,7 @@ export const CATEGORIES: Category[] = [
     // in a rally you won. Routine low drops/dinks (soft incoming) don't qualify.
     match: (s) => !!s.won && s.shotNum > 2
       && !!(s.isReset || (s.isDefense && (s.incomingMph ?? 0) >= 35)),
-    before: 2, after: 20, // mid-rally — play through to see the whole stand
+    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
   },
   {
     id: 'net-errors', label: 'Into the net / short',
@@ -68,19 +68,19 @@ export const CATEGORIES: Category[] = [
     id: 'popped-up', label: 'Pop-ups you gave up',
     blurb: 'Dinks/drops of yours that popped up and got attacked (pb.vision "exploited"). The clip plays through to the end of the rally so you can see the attack and how the point finished.',
     match: (s) => s.popup === 'exploited',
-    before: 2, after: 20, // pop-up is mid-rally — play to the rally end
+    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
   },
   {
     id: 'fed-winners', label: 'Feeds they put away',
     blurb: 'Your last shot right before the opponents ended the rally with a winner — the ball you gave them that got attacked. The clip includes the shots leading in and plays through the put-away.',
     match: (s) => !!s.setupForOppWinner,
-    before: 4, after: 20, // through the finish
+    before: 4, after: 99, // play to the rally end (large numAfter reaches it for any length)
   },
   {
     id: 'putaway-tries', label: 'Put-away attempts',
     blurb: 'Every ball you went big on. Review queue, not a verdict — watch which ones came back.',
     match: (s) => s.isPutaway,
-    before: 2, after: 20, // may be mid-rally — play to the rally end
+    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
   },
 ];
 
