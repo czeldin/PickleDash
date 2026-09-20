@@ -121,6 +121,8 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
           topic={`${focusName}: ${cat.label}`}
           gameNum={gameNum}
           startIndex={activeIdx}
+          before={cat.before}
+          after={cat.after}
           onClose={() => setActiveIdx(null)}
         />
       )}

@@ -7,12 +7,12 @@ export const posterUrl = (vid: string) => `https://storage.googleapis.com/pbv-pr
 
 // Deep-link that seeks pb.vision to THIS specific shot. The `?shots=RALLY.SHOT`
 // form seeks the player to that exact shot (verified: shots=46.17 lands the
-// video at the shot's hit time); numBefore/After give a 1-shot lead-in/out.
-// (The old form used `.1` — shot 1 — with numAfter=999, which played the whole
-// rally instead of the shot. A `?q=` URL does not seek on direct load — pb.vision
-// strips it — so it is NOT usable here.)
-export const deepLink = (s: CourtShotRow) =>
-  `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.${s.shotNum}&numBefore=1&numAfter=1`;
+// video at the shot's hit time); numBefore/After add that many shots of lead-in
+// and lead-out so you can see the buildup. (The old form used `.1` — shot 1 —
+// with numAfter=999, which played the whole rally instead of the shot. A `?q=`
+// URL does not seek on direct load — pb.vision strips it — so it is NOT usable.)
+export const deepLink = (s: CourtShotRow, before = 2, after = 1) =>
+  `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.${s.shotNum}&numBefore=${before}&numAfter=${after}`;
 
 export interface Category {
   id: string;
@@ -20,6 +20,8 @@ export interface Category {
   blurb: string;
   match: (s: CourtShotRow) => boolean;
   good?: boolean; // highlight-reel (green) vs review (amber)
+  before?: number; // shots of lead-in in the clip (default 2)
+  after?: number;  // shots of lead-out in the clip (default 1)
 }
 
 // Outcome-anchored clip queues, not "verdicts". Error queues are gated on
@@ -48,8 +50,9 @@ export const CATEGORIES: Category[] = [
   },
   {
     id: 'fed-winners', label: 'Feeds they put away',
-    blurb: 'Your last shot right before the opponents ended the rally with a winner — the ball you gave them that got attacked. Watch what look you were leaving them.',
+    blurb: 'Your last shot right before the opponents ended the rally with a winner — the ball you gave them that got attacked. The clip includes the shots leading in so you can see how the point got set up, through the put-away.',
     match: (s) => !!s.setupForOppWinner,
+    before: 4, after: 2, // show the buildup and the finish
   },
   {
     id: 'putaway-tries', label: 'Put-away attempts',
@@ -73,11 +76,12 @@ export function clipsFor(courtShots: CourtShotRow[] | undefined, pid: string | n
 // IS their full interactive app (and may want a pb.vision login), so we always
 // offer an "open in a new tab" escape hatch and a graceful fallback if the frame
 // hasn't shown anything after a beat.
-function ClipModal({ shot, topic, detail, position, hasPrev, hasNext, onPrev, onNext, onClose }: {
+function ClipModal({ shot, topic, detail, position, before, after, hasPrev, hasNext, onPrev, onNext, onClose }: {
   shot: CourtShotRow; topic: string; detail: string; position: string;
+  before?: number; after?: number;
   hasPrev: boolean; hasNext: boolean; onPrev: () => void; onNext: () => void; onClose: () => void;
 }) {
-  const url = deepLink(shot);
+  const url = deepLink(shot, before, after);
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
@@ -169,11 +173,13 @@ function ClipModal({ shot, topic, detail, position, hasPrev, hasNext, onPrev, on
 // Self-contained controller: give it a clip queue, a topic, a game-number lookup
 // and a starting index; it owns prev/next paging and renders the modal. Used by
 // both Film Room and the Why-We-Lost bars.
-export function ClipModalController({ clips, topic, gameNum, startIndex, onClose }: {
+export function ClipModalController({ clips, topic, gameNum, startIndex, before, after, onClose }: {
   clips: CourtShotRow[];
   topic: string;
   gameNum: Map<string, number>;
   startIndex: number;
+  before?: number;
+  after?: number;
   onClose: () => void;
 }) {
   const [idx, setIdx] = useState(startIndex);
@@ -187,6 +193,8 @@ export function ClipModalController({ clips, topic, gameNum, startIndex, onClose
       topic={topic}
       detail={`G${gameNum.get(s.sessionKey) ?? '?'} · Rally ${s.rallyNum} · shot ${s.shotNum} · ${s.type}${s.won ? ' · won' : ' · lost'}`}
       position={`${idx + 1} / ${clips.length}`}
+      before={before}
+      after={after}
       hasPrev={idx > 0}
       hasNext={idx < clips.length - 1}
       onPrev={() => setIdx((i) => (i > 0 ? i - 1 : i))}
