@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DashboardData, CourtShotRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { FocusPlayerSelect } from '@/components/FocusPlayerSelect';
@@ -15,6 +15,79 @@ interface Props {
 
 const deepLink = (s: CourtShotRow) =>
   `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.1&numBefore=0&numAfter=999`;
+
+// Modal that embeds the pb.vision rally in an iframe. pb.vision's explore route
+// sends no X-Frame-Options / frame-ancestors block, so the embed loads — but it
+// IS their full interactive app (and may want a pb.vision login), so we always
+// offer an "open in a new tab" escape hatch and a graceful fallback if the frame
+// hasn't shown anything after a beat.
+function ClipModal({ shot, label, onClose }: { shot: CourtShotRow; label: string; onClose: () => void }) {
+  const url = deepLink(shot);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    // If the iframe hasn't fired onLoad in a few seconds (blocked embed / login
+    // wall), surface the "open in a tab" hint more prominently.
+    const t = setTimeout(() => setSlow(true), 4000);
+    // Lock background scroll while the modal is open.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); clearTimeout(t); document.body.style.overflow = prevOverflow; };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200">
+          <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
+          <div className="flex items-center gap-3 shrink-0">
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-medium text-blue-600 hover:underline whitespace-nowrap"
+            >
+              Open on pb.vision ↗
+            </a>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+        <div className="relative flex-1 bg-black min-h-[50vh]">
+          {/* Fallback sits behind the iframe; the iframe covers it once it paints. */}
+          <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+            <p className="text-sm text-gray-300">
+              {slow
+                ? <>Taking a while to load. If nothing appears, <a href={url} target="_blank" rel="noreferrer" className="text-blue-400 underline">open it on pb.vision ↗</a> — it may need you to be signed in there.</>
+                : 'Loading the rally…'}
+            </p>
+          </div>
+          <iframe
+            src={url}
+            title={label}
+            className="absolute inset-0 w-full h-full border-0"
+            allow="fullscreen; autoplay"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Category {
   id: string;
@@ -56,6 +129,7 @@ const CATEGORIES: Category[] = [
 export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
   const courtShots = data.courtShots;
   const [catId, setCatId] = useState<string>('clean-winners');
+  const [activeClip, setActiveClip] = useState<CourtShotRow | null>(null);
 
   // Game number per session (G1 = first game listed), for labeling each clip.
   const gameNum = useMemo(() => {
@@ -98,7 +172,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
   return (
     <SectionCard title="Film Room" action={<FocusPlayerSelect players={data.players} focusPid={focusPid} onChange={onFocusChange} />}>
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        Clip queues for <strong>{focusName}</strong>. Each link opens the rally on pb.vision. Review queues are sorted
+        Clip queues for <strong>{focusName}</strong>. Click a clip to watch the rally in a pop-up (or open it on pb.vision). Review queues are sorted
         weakest-first; these are shots to <em>watch</em>, not a scorecard.
       </p>
       <div className="flex flex-wrap gap-2 mb-4">
@@ -127,12 +201,11 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
       ) : (
         <div className="space-y-1.5">
           {clips.map((s, i) => (
-            <a
+            <button
               key={i}
-              href={deepLink(s)}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between gap-3 px-2 py-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 transition-colors group"
+              type="button"
+              onClick={() => setActiveClip(s)}
+              className="w-full text-left flex items-center justify-between gap-3 px-2 py-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 transition-colors group"
             >
               <span className="flex items-center gap-3 text-sm text-gray-700 min-w-0">
                 <img
@@ -158,9 +231,17 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
                 <span className={`text-xs font-medium ${s.won ? 'text-green-600' : 'text-red-500'}`}>{s.won ? 'won' : 'lost'}</span>
                 <span className="text-blue-600 text-sm group-hover:underline">watch →</span>
               </span>
-            </a>
+            </button>
           ))}
         </div>
+      )}
+
+      {activeClip && (
+        <ClipModal
+          shot={activeClip}
+          label={`${focusName} · G${gameNum.get(activeClip.sessionKey) ?? '?'} · Rally ${activeClip.rallyNum} · ${activeClip.type}${activeClip.won ? ' · won' : ' · lost'}`}
+          onClose={() => setActiveClip(null)}
+        />
       )}
     </SectionCard>
   );
