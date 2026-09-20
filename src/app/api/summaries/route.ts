@@ -16,7 +16,7 @@ export const maxDuration = 60;
 // fact-engine/attribution changes regenerate summaries instead of serving stale
 // ones (the pop-up/loss-attribution fixes had changed displayed numbers while a
 // pre-fix summary stayed cached).
-const PROMPT_VERSION = 'v7';
+const PROMPT_VERSION = 'v8'; // v8 = facts "net" now = table's Net/g (winners − errors − pop-ups), not the scoreboard margin, so summary & table agree
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.

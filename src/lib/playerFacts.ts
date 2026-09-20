@@ -61,8 +61,12 @@ const METRICS: MetricDef[] = [
     get: (pid, d) => { const r = d.outcomeStats?.find((x) => x.pid === pid); if (!r) return null; const n = r.ralliesWon + r.ralliesLost; return n ? { value: (r.ralliesWon / n) * 100, sample: n } : null; },
   },
   {
-    key: 'net_points', label: 'net points per game', category: 'outcome', direction: 'higher_better', minSample: 3, unit: '/g', minSpread: 3,
-    get: (pid, d) => { const r = d.outcomeStats?.find((x) => x.pid === pid); if (!r || !r.gamesPlayed) return null; return { value: r.netPointsPerGame, sample: r.gamesPlayed }; },
+    // Use the SAME "Net/g" the Rally Impact table shows (winners − own errors −
+    // pop-ups-lost, per game), not the scoreboard points margin — so a "lowest
+    // net" claim in the summary matches the table the reader sees. (Both were
+    // labeled "net" but computed differently, producing contradictory ranks.)
+    key: 'net_points', label: 'net (winners − points given away) per game', category: 'outcome', direction: 'higher_better', minSample: 3, unit: '/g', minSpread: 2,
+    get: (pid, d) => { const r = d.rallyImpact?.find((x) => x.pid === pid); if (!r || !r.games) return null; return { value: (r.won - r.lostDirect - r.setup) / r.games, sample: r.games }; },
   },
   {
     key: 'finish_win', label: 'finishing (putaway) win %', category: 'outcome', direction: 'higher_better', minSample: 8, unit: '%', minSpread: 12,
