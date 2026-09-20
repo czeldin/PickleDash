@@ -152,7 +152,7 @@ const CATEGORIES: Category[] = [
   },
   {
     id: 'short-errors', label: 'Balls hit short',
-    blurb: 'Rally-ending shots of yours that cleared the net but landed short on your own side (didn’t reach the opponent) — the “we hit it short” cause. NOT a kitchen foot fault.',
+    blurb: 'Rally-ending shots of yours that fell short of the net and landed on your own side (the ball never crossed — pb.vision’s “short” fault). Looks a lot like hitting the net, but the ball didn’t reach it. NOT a kitchen foot fault.',
     match: (s) => !!s.isFinal && !!s.faultShort && !s.won,
   },
   {

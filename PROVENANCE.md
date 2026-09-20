@@ -40,7 +40,7 @@ Each lost rally charged to one cause from its final shot.
 |---|---|---|---|
 | We hit into net | B | loser's last shot, `end.zone==='net'` or `faults.net` | Direct fields; attribution rule ours. |
 | We hit out | B | loser's last shot, `end.zone==='out'` or `faults.out` | Same. |
-| We hit it short | B | loser's last shot, `faults.short` | **Ball landing short on own side — NOT an NVZ foot fault** (pb.vision doesn't track those). |
+| We hit it short | B | loser's last shot, `faults.short` | **Ball fell short of the net and landed on the hitter's own side (`crossedNet=false`) — NOT an NVZ foot fault** (pb.vision doesn't track those). Visually similar to a net ball, but the ball never reached the net. |
 | We popped it up | B | any loser shot `errors.popup==='exploited'` | Direct exploited flag. |
 | They hit a winner | B | winner's last shot `is_putaway`/`winner_type==='clean'` | Direct winner flags. |
 | Unattributed | C | anything unclassifiable | Deliberate honest residual (contradictory/noisy tags left here, not invented). |
