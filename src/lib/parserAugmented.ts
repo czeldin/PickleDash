@@ -606,6 +606,9 @@ export function parseAugmentedNights(
                 isAttack: isAttack(sh),
                 isDefense: sh.is_reset === true || sh.vertical_type === 'dig',
                 isReset: sh.is_reset === true,
+                // Speed of the prior shot — the ball this shot is returning. Lets
+                // us tell a dig off a bang (real defense) from a low controlled shot.
+                incomingMph: si2 > 0 ? (shots[si2 - 1]?.resulting_ball_movement?.speed ?? null) : null,
                 popup: sh.errors?.popup ?? null,
                 quality: sh.quality?.overall ?? null,
                 pressure: sh.quality?.pressure ?? null,

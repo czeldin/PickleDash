@@ -46,12 +46,12 @@ export const CATEGORIES: Category[] = [
   },
   {
     id: 'epic-defense', label: 'Epic Defense', good: true,
-    blurb: 'Genuine defensive scrambles — a reset, or a low dig on a drive/drop, hit under real pressure and turned into a won rally. Excludes serves/returns and routine kitchen dinks.',
-    // A real defensive get: a reset, OR a dig that isn't a soft kitchen dink
-    // (drives/drops dug low count; dinks don't). Not a serve/return, under real
-    // positional pressure, in a rally you won.
-    match: (s) => !!s.won && s.shotNum > 2 && (s.pressure ?? 0) >= 0.6
-      && !!(s.isReset || (s.isDefense && s.type !== 'dink')),
+    blurb: 'Real defensive scrambles that won the rally — a reset, or a dig off a hard-hit ball (you got a bang back). Not routine low drops/dinks.',
+    // Genuinely epic: a reset (took pace off a hard ball), OR a dig where the
+    // incoming ball was hard (>=35 mph — you dug a bang). Not a serve/return,
+    // in a rally you won. Routine low drops/dinks (soft incoming) don't qualify.
+    match: (s) => !!s.won && s.shotNum > 2
+      && !!(s.isReset || (s.isDefense && (s.incomingMph ?? 0) >= 35)),
     before: 2, after: 20, // mid-rally — play through to see the whole stand
   },
   {

@@ -333,6 +333,7 @@ export interface CourtShotRow {
   isAttack?: boolean;              // speed-up / overhead (is_speedup or atp)
   isDefense?: boolean;            // a reset or a dig (defensive get)
   isReset?: boolean;              // pb.vision reset (volley that took pace off a hard ball)
+  incomingMph?: number | null;    // speed of the PRIOR shot (the ball being hit back) — for "dug a bang"
   popup: 'exploited' | 'potential' | null;
   quality: number | null;          // shot.quality.overall (0-1)
   pressure?: number | null;        // shot.quality.pressure (0-1, positional pressure faced)
