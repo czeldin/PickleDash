@@ -45,6 +45,12 @@ export const CATEGORIES: Category[] = [
     match: (s) => !!s.isAttack && s.won,
   },
   {
+    id: 'epic-defense', label: 'Epic Defense', good: true,
+    blurb: 'Great defensive shots — resets and digs (pb.vision) — that you turned into a won rally. Scrambles and reset battles you came out on top of. Best first.',
+    match: (s) => !!s.isDefense && s.won && (s.quality ?? 0) >= 0.8,
+    before: 2, after: 20, // mid-rally — play through to see the whole stand
+  },
+  {
     id: 'net-errors', label: 'Into the net / short',
     blurb: 'Rally-ending shots of yours that didn’t make it over — the net stopped it, or it fell short of the net on your own side. pb.vision can’t reliably tell these two apart near the net, so they’re combined. The group’s biggest loss cause.',
     match: (s) => !!s.isFinal && !!(s.faultNet || s.endZone === 'net' || s.faultShort) && !s.won,
@@ -86,6 +92,7 @@ export function shotTags(s: CourtShotRow): { text: string; tone: 'good' | 'bad' 
   if (s.isFinal) t.push({ text: 'rally-ending shot', tone: 'neutral' });
   if (s.isPutaway) t.push({ text: 'put-away', tone: 'good' });
   if (s.isAttack) t.push({ text: 'attack / speed-up', tone: 'neutral' });
+  if (s.isDefense) t.push({ text: 'reset / dig', tone: 'neutral' });
   if (s.popup === 'exploited') {
     t.push({ text: 'popped up → attacked', tone: 'bad' });
     // Did the pop-up cost the point, or did we recover? `won` = the popper's

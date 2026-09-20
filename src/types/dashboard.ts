@@ -331,6 +331,7 @@ export interface CourtShotRow {
   won: boolean;                    // did the hitter's team win the rally
   isPutaway: boolean;
   isAttack?: boolean;              // speed-up / overhead (is_speedup or atp)
+  isDefense?: boolean;            // a reset or a dig (defensive get)
   popup: 'exploited' | 'potential' | null;
   quality: number | null;          // shot.quality.overall (0-1)
   // pb.vision fault flags on this shot (from errors.faults). These drive the

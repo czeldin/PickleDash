@@ -604,6 +604,7 @@ export function parseAugmentedNights(
                 won: rally.winning_team === hitter?.team,
                 isPutaway: sh.is_putaway === true,
                 isAttack: isAttack(sh),
+                isDefense: sh.is_reset === true || sh.vertical_type === 'dig',
                 popup: sh.errors?.popup ?? null,
                 quality: sh.quality?.overall ?? null,
                 faultNet: sh.errors?.faults?.net === true,
