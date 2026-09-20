@@ -588,6 +588,7 @@ export function parseAugmentedNights(
                 endZone: traj?.end?.zone ?? 'unknown',
                 won: rally.winning_team === hitter?.team,
                 isPutaway: sh.is_putaway === true,
+                isAttack: isAttack(sh),
                 popup: sh.errors?.popup ?? null,
                 quality: sh.quality?.overall ?? null,
                 faultNet: sh.errors?.faults?.net === true,

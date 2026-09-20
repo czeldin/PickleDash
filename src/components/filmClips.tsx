@@ -29,9 +29,19 @@ export interface Category {
 // point), matching the Why-We-Lost attribution.
 export const CATEGORIES: Category[] = [
   {
+    id: 'best-shots', label: 'Best shots', good: true,
+    blurb: 'Your highest-quality shots by pb.vision’s shot-quality score — the nastiest dinks, drops, resets and put-aways, whether or not they won the point. Best first.',
+    match: (s) => (s.quality ?? 0) >= 0.9,
+  },
+  {
     id: 'clean-winners', label: 'Clean winners', good: true,
-    blurb: 'Put-aways that ended the rally cleanly — your highlight reel.',
+    blurb: 'Put-aways that ended the rally cleanly — your highlight reel. Best first.',
     match: (s) => s.isPutaway && s.won,
+  },
+  {
+    id: 'attacks-won', label: 'Attacks won', good: true,
+    blurb: 'Your speed-ups and overheads that won the rally — the aggressive highlights. Best first.',
+    match: (s) => !!s.isAttack && s.won,
   },
   {
     id: 'net-errors', label: 'Into the net / short',
@@ -63,12 +73,26 @@ export const CATEGORIES: Category[] = [
 
 export const categoryById = (id: string) => CATEGORIES.find((c) => c.id === id);
 
-// Build a player's clip queue for one category (weakest-first for review).
+// A player's top-N best shots by quality (winners break ties). For the quick
+// Highlights reel — ranking matters more than a fixed threshold, so this always
+// returns the player's genuine best few even on a light night.
+export function topHighlights(courtShots: CourtShotRow[] | undefined, pid: string, n = 4): CourtShotRow[] {
+  if (!courtShots) return [];
+  return courtShots
+    .filter((s) => s.pid === pid && s.quality != null)
+    .sort((a, b) => (b.quality ?? 0) - (a.quality ?? 0) || Number(b.won) - Number(a.won))
+    .slice(0, n);
+}
+
+// Build a player's clip queue for one category. Highlight categories (`good`)
+// sort BEST-first (top quality leads the reel); review categories sort
+// WEAKEST-first (the shots to fix lead).
 export function clipsFor(courtShots: CourtShotRow[] | undefined, pid: string | null, cat: Category): CourtShotRow[] {
   if (!courtShots || !pid) return [];
+  const dir = cat.good ? -1 : 1; // good → descending (best first)
   return courtShots
     .filter((s) => s.pid === pid && cat.match(s))
-    .sort((a, b) => (a.quality ?? 0) - (b.quality ?? 0));
+    .sort((a, b) => dir * ((a.quality ?? 0) - (b.quality ?? 0)));
 }
 
 // Modal that embeds the pb.vision rally in an iframe. pb.vision's explore route

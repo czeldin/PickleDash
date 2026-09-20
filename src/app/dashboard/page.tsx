@@ -11,6 +11,7 @@ import { PlayerFilter } from '@/components/PlayerFilter';
 import { NightFilter } from '@/components/NightFilter';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { HighlightsSection } from '@/components/sections/HighlightsSection';
+import { BestRalliesSection } from '@/components/sections/BestRalliesSection';
 import { SkillRatingsSection, PlayerSkillsByGame } from '@/components/sections/SkillRatingsSection';
 import { ShotAccuracySection } from '@/components/sections/ShotAccuracySection';
 import { SpeedSection } from '@/components/sections/SpeedSection';
@@ -303,6 +304,7 @@ export default function DashboardPage() {
               <ShotQualitySection data={visibleData} />
               <LossReasonsSection data={visibleData} focusPid={focusPid} />
               <HighlightsSection data={visibleData} />
+              <BestRalliesSection data={visibleData} />
               <PlayerSummarySection data={visibleData} />
             </>
           )}
