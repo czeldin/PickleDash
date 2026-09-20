@@ -120,18 +120,19 @@ export async function getAllNightMetas(): Promise<NightMeta[]> {
   const metaKeys = (listed.Contents ?? [])
     .map((o) => o.Key!)
     .filter((k) => k.endsWith('/meta.json'));
+  // Each listed key DOES exist (B2 just returned it), so a read that comes back
+  // empty is a transient failure (throttling / the cap), not a missing file.
+  // Fail the whole list in that case rather than returning a PARTIAL set — a
+  // partial list would silently drop real nights, which is the bug we're fixing.
   const results = metaKeys.length === 0 ? [] : await Promise.all(
     metaKeys.map(async (key) => {
       const buf = await getObjectBytes(key);
-      if (!buf) return null;
-      try {
-        return JSON.parse(buf.toString('utf-8')) as NightMeta;
-      } catch { return null; }
+      if (!buf) throw new Error(`meta read failed (transient): ${key}`);
+      return JSON.parse(buf.toString('utf-8')) as NightMeta; // a JSON error is real corruption — let it throw
     })
   );
-  const metas = results.filter((m): m is NightMeta => m !== null);
-  nightsCache = { at: Date.now(), metas };
-  return metas;
+  nightsCache = { at: Date.now(), metas: results };
+  return results;
 }
 
 /** The last successfully-listed nights, if any (used as a fallback on B2 error). */
