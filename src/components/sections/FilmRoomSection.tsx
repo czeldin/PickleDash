@@ -21,8 +21,8 @@ const deepLink = (s: CourtShotRow) =>
 // IS their full interactive app (and may want a pb.vision login), so we always
 // offer an "open in a new tab" escape hatch and a graceful fallback if the frame
 // hasn't shown anything after a beat.
-function ClipModal({ shot, label, position, hasPrev, hasNext, onPrev, onNext, onClose }: {
-  shot: CourtShotRow; label: string; position: string;
+function ClipModal({ shot, topic, detail, position, hasPrev, hasNext, onPrev, onNext, onClose }: {
+  shot: CourtShotRow; topic: string; detail: string; position: string;
   hasPrev: boolean; hasNext: boolean; onPrev: () => void; onNext: () => void; onClose: () => void;
 }) {
   const url = deepLink(shot);
@@ -56,9 +56,12 @@ function ClipModal({ shot, label, position, hasPrev, hasNext, onPrev, onNext, on
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200">
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
-            <span className="text-xs text-gray-400 tabular-nums shrink-0">{position}</span>
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <p className="text-sm font-bold text-gray-900 truncate">{topic}</p>
+              <span className="text-xs text-gray-400 tabular-nums shrink-0">{position}</span>
+            </div>
+            <p className="text-xs text-gray-500 truncate">{detail}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
@@ -105,7 +108,7 @@ function ClipModal({ shot, label, position, hasPrev, hasNext, onPrev, onNext, on
           </div>
           <iframe
             src={url}
-            title={label}
+            title={`${topic} — ${detail}`}
             className="absolute inset-0 w-full h-full border-0"
             allow="fullscreen; autoplay"
           />
@@ -132,13 +135,18 @@ const CATEGORIES: Category[] = [
   },
   {
     id: 'net-errors', label: 'Balls into the net',
-    blurb: 'Your shots that ended in the net — the group’s biggest loss cause. Worth a look for pattern.',
-    match: (s) => s.endZone === 'net' && !s.won,
+    blurb: 'Your shots that hit the net — the group’s biggest loss cause. Matches the “we hit into net” cause.',
+    match: (s) => (s.faultNet || s.endZone === 'net') && !s.won,
   },
   {
     id: 'out-errors', label: 'Balls hit out',
-    blurb: 'Your shots that sailed out.',
-    match: (s) => s.endZone === 'out' && !s.won,
+    blurb: 'Your shots that landed out (excludes balls headed out that an opponent played anyway). Matches the “we hit out” cause.',
+    match: (s) => (s.faultOut || s.endZone === 'out') && !s.won,
+  },
+  {
+    id: 'short-errors', label: 'Balls hit short',
+    blurb: 'Your shots that cleared the net but landed short on your own side (didn’t reach the opponent) — the “we hit it short” cause. NOT a kitchen foot fault.',
+    match: (s) => !!s.faultShort && !s.won,
   },
   {
     id: 'popped-up', label: 'Pop-ups you gave up',
@@ -269,7 +277,8 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
           <ClipModal
             key={`${s.vid}-${s.si}-${s.rallyNum}-${s.shotNum}`}
             shot={s}
-            label={`${focusName} · G${gameNum.get(s.sessionKey) ?? '?'} · Rally ${s.rallyNum} · ${s.type}${s.won ? ' · won' : ' · lost'}`}
+            topic={`${focusName}: ${cat.label}`}
+            detail={`G${gameNum.get(s.sessionKey) ?? '?'} · Rally ${s.rallyNum} · shot ${s.shotNum} · ${s.type}${s.won ? ' · won' : ' · lost'}`}
             position={`${activeIdx + 1} / ${clips.length}`}
             hasPrev={activeIdx > 0}
             hasNext={activeIdx < clips.length - 1}

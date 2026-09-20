@@ -332,6 +332,13 @@ export interface CourtShotRow {
   isPutaway: boolean;
   popup: 'exploited' | 'potential' | null;
   quality: number | null;          // shot.quality.overall (0-1)
+  // pb.vision fault flags on this shot (from errors.faults). These drive the
+  // "Why We Lost" causes, so Film Room's net/out/short queues match them exactly
+  // rather than relying on end-zone alone (a shot can be flagged short while its
+  // zone reads kitchen/mid).
+  faultNet?: boolean;
+  faultOut?: boolean;              // landed out (excludes intercepted near-misses)
+  faultShort?: boolean;
 }
 
 export interface DashboardData {

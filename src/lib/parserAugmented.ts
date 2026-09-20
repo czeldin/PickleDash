@@ -583,6 +583,12 @@ export function parseAugmentedNights(
                 isPutaway: sh.is_putaway === true,
                 popup: sh.errors?.popup ?? null,
                 quality: sh.quality?.overall ?? null,
+                faultNet: sh.errors?.faults?.net === true,
+                // Landed-out only — exclude balls headed out that an opponent
+                // intercepted (outcome === 'intercepted'), matching the error/
+                // loss-cause counting elsewhere.
+                faultOut: !!(sh.errors?.faults?.out && sh.errors.faults.out.outcome !== 'intercepted'),
+                faultShort: sh.errors?.faults?.short === true,
               });
             }
           }
