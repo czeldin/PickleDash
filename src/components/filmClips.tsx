@@ -16,7 +16,12 @@ export const posterUrl = (vid: string) => `https://storage.googleapis.com/pbv-pr
 //    whole point.
 export const deepLink = (s: CourtShotRow, wholeRally = false) =>
   wholeRally
-    ? `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.1&numBefore=0&numAfter=999`
+    // A shot RANGE (rally.1 to a large upper bound) selects EVERY shot of the
+    // rally, so pb.vision plays the whole point start-to-finish. The bare
+    // `shots=RALLY.SHOT` form (even with numAfter) only ever selects/plays that
+    // ONE shot — a few seconds — which is why clips kept stopping early. The
+    // 99 upper bound clamps to the real rally length.
+    ? `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.1-${s.rallyNum}.99`
     : `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.${s.shotNum}&numBefore=1&numAfter=1`;
 
 export interface Category {
