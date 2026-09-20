@@ -5,14 +5,19 @@ import { CourtShotRow } from '@/types/dashboard';
 
 export const posterUrl = (vid: string) => `https://storage.googleapis.com/pbv-pro/${vid}/poster.jpg`;
 
-// Deep-link that seeks pb.vision to THIS specific shot. The `?shots=RALLY.SHOT`
-// form seeks the player to that exact shot (verified: shots=46.17 lands the
-// video at the shot's hit time); numBefore/After add that many shots of lead-in
-// and lead-out so you can see the buildup. (The old form used `.1` — shot 1 —
-// with numAfter=999, which played the whole rally instead of the shot. A `?q=`
-// URL does not seek on direct load — pb.vision strips it — so it is NOT usable.)
-export const deepLink = (s: CourtShotRow, before = 2, after = 1) =>
-  `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.${s.shotNum}&numBefore=${before}&numAfter=${after}`;
+// Deep-link into pb.vision. Two modes, because pb.vision's `?shots=RALLY.SHOT`
+// form shows ONLY that one shot as a ~4s clip — numBefore/After do NOT extend it
+// on load. So:
+//  - wholeRally=false → seek to the exact shot (good for rally-ENDING clips: the
+//    shot is the point-ender, so a short clip is fine).
+//  - wholeRally=true  → `shots=RALLY.1&numBefore=0&numAfter=999`, which pb.vision
+//    plays as the entire rally (verified: it auto-skips to the rally start and
+//    runs straight through to the end). Used for mid-rally clips so you see the
+//    whole point.
+export const deepLink = (s: CourtShotRow, wholeRally = false) =>
+  wholeRally
+    ? `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.1&numBefore=0&numAfter=999`
+    : `https://pb.vision/video/${s.vid}/${s.si}/explore?shots=${s.rallyNum}.${s.shotNum}&numBefore=1&numAfter=1`;
 
 export interface Category {
   id: string;
@@ -20,8 +25,7 @@ export interface Category {
   blurb: string;
   match: (s: CourtShotRow) => boolean;
   good?: boolean; // highlight-reel (green) vs review (amber)
-  before?: number; // shots of lead-in in the clip (default 2)
-  after?: number;  // shots of lead-out in the clip (default 1)
+  wholeRally?: boolean; // play the entire point (for mid-rally clips), not just the shot
 }
 
 // Outcome-anchored clip queues, not "verdicts". Error queues are gated on
@@ -32,7 +36,7 @@ export const CATEGORIES: Category[] = [
     id: 'best-shots', label: 'Best shots', good: true,
     blurb: 'Your highest-quality shots by pb.vision’s shot-quality score — the nastiest dinks, drops, resets and put-aways, whether or not they won the point. Best first.',
     match: (s) => (s.quality ?? 0) >= 0.9,
-    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
+    wholeRally: true, // show the whole point
   },
   {
     id: 'clean-winners', label: 'Clean winners', good: true,
@@ -52,7 +56,7 @@ export const CATEGORIES: Category[] = [
     // in a rally you won. Routine low drops/dinks (soft incoming) don't qualify.
     match: (s) => !!s.won && s.shotNum > 2
       && !!(s.isReset || (s.isDefense && (s.incomingMph ?? 0) >= 35)),
-    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
+    wholeRally: true, // show the whole point
   },
   {
     id: 'net-errors', label: 'Into the net / short',
@@ -68,19 +72,19 @@ export const CATEGORIES: Category[] = [
     id: 'popped-up', label: 'Pop-ups you gave up',
     blurb: 'Dinks/drops of yours that popped up and got attacked (pb.vision "exploited"). The clip plays through to the end of the rally so you can see the attack and how the point finished.',
     match: (s) => s.popup === 'exploited',
-    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
+    wholeRally: true, // show the whole point
   },
   {
     id: 'fed-winners', label: 'Feeds they put away',
     blurb: 'Your last shot right before the opponents ended the rally with a winner — the ball you gave them that got attacked. The clip includes the shots leading in and plays through the put-away.',
     match: (s) => !!s.setupForOppWinner,
-    before: 4, after: 99, // play to the rally end (large numAfter reaches it for any length)
+    wholeRally: true, // show the whole point
   },
   {
     id: 'putaway-tries', label: 'Put-away attempts',
     blurb: 'Every ball you went big on. Review queue, not a verdict — watch which ones came back.',
     match: (s) => s.isPutaway,
-    before: 2, after: 99, // play to the rally end (large numAfter reaches it for any length)
+    wholeRally: true, // show the whole point
   },
 ];
 
@@ -144,12 +148,12 @@ export function clipsFor(courtShots: CourtShotRow[] | undefined, pid: string | n
 // IS their full interactive app (and may want a pb.vision login), so we always
 // offer an "open in a new tab" escape hatch and a graceful fallback if the frame
 // hasn't shown anything after a beat.
-function ClipModal({ shot, topic, detail, position, before, after, hasPrev, hasNext, onPrev, onNext, onClose }: {
+function ClipModal({ shot, topic, detail, position, wholeRally, hasPrev, hasNext, onPrev, onNext, onClose }: {
   shot: CourtShotRow; topic: string; detail: string; position: string;
-  before?: number; after?: number;
+  wholeRally?: boolean;
   hasPrev: boolean; hasNext: boolean; onPrev: () => void; onNext: () => void; onClose: () => void;
 }) {
-  const url = deepLink(shot, before, after);
+  const url = deepLink(shot, wholeRally);
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
@@ -255,13 +259,12 @@ function ClipModal({ shot, topic, detail, position, before, after, hasPrev, hasN
 // Self-contained controller: give it a clip queue, a topic, a game-number lookup
 // and a starting index; it owns prev/next paging and renders the modal. Used by
 // both Film Room and the Why-We-Lost bars.
-export function ClipModalController({ clips, topic, gameNum, startIndex, before, after, onClose }: {
+export function ClipModalController({ clips, topic, gameNum, startIndex, wholeRally, onClose }: {
   clips: CourtShotRow[];
   topic: string;
   gameNum: Map<string, number>;
   startIndex: number;
-  before?: number;
-  after?: number;
+  wholeRally?: boolean;
   onClose: () => void;
 }) {
   const [idx, setIdx] = useState(startIndex);
@@ -275,8 +278,7 @@ export function ClipModalController({ clips, topic, gameNum, startIndex, before,
       topic={topic}
       detail={`G${gameNum.get(s.sessionKey) ?? '?'} · Rally ${s.rallyNum} · shot ${s.shotNum} · ${s.type}${s.won ? ' · won' : ' · lost'}`}
       position={`${idx + 1} / ${clips.length}`}
-      before={before}
-      after={after}
+      wholeRally={wholeRally}
       hasPrev={idx > 0}
       hasNext={idx < clips.length - 1}
       onPrev={() => setIdx((i) => (i > 0 ? i - 1 : i))}

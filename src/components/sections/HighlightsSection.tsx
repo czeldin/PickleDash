@@ -81,8 +81,7 @@ export function HighlightsSection({ data }: Props) {
             topic={`${name}: Highlights`}
             gameNum={gameNum}
             startIndex={0}
-            before={2}
-            after={2}
+            wholeRally
             onClose={() => setFilm(null)}
           />
         );

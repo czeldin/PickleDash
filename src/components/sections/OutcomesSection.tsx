@@ -256,8 +256,7 @@ export function LossReasonsSection({ data, focusPid }: Props) {
             topic={`${name}: ${cat.label}`}
             gameNum={gameNum}
             startIndex={0}
-            before={cat.before}
-            after={cat.after}
+            wholeRally={cat.wholeRally}
             onClose={() => setFilm(null)}
           />
         );
