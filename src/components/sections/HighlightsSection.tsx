@@ -33,7 +33,7 @@ export function HighlightsSection({ data }: Props) {
   return (
     <SectionCard title="Highlights">
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        Each player&apos;s best shots this selection, by pb.vision&apos;s shot-quality score. Click one to watch.
+        Each player&apos;s best winners this selection — put-aways that ended the rally, top-quality first. Click one to watch.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {reels.map(({ p, clips }) => (
@@ -63,9 +63,7 @@ export function HighlightsSection({ data }: Props) {
                   <span className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
                     <span className="text-white opacity-0 group-hover:opacity-100 text-lg">▶</span>
                   </span>
-                  <span className="absolute bottom-0.5 left-1 text-[9px] font-semibold text-white drop-shadow">
-                    q{Math.round((s.quality ?? 0) * 100)}
-                  </span>
+                  <span className="absolute bottom-0.5 left-1 text-[10px] drop-shadow">🏆</span>
                 </button>
               ))}
             </div>

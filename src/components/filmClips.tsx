@@ -73,14 +73,15 @@ export const CATEGORIES: Category[] = [
 
 export const categoryById = (id: string) => CATEGORIES.find((c) => c.id === id);
 
-// A player's top-N best shots by quality (winners break ties). For the quick
-// Highlights reel — ranking matters more than a fixed threshold, so this always
-// returns the player's genuine best few even on a light night.
+// A player's top-N highlights = their winners (put-aways that ended the rally),
+// best-quality first. Ranking by raw quality alone was useless — pb.vision caps
+// many ordinary clean shots at 1.0, so a random clean dink outranked an actual
+// put-away. Winners are the shots that are genuinely special.
 export function topHighlights(courtShots: CourtShotRow[] | undefined, pid: string, n = 4): CourtShotRow[] {
   if (!courtShots) return [];
   return courtShots
-    .filter((s) => s.pid === pid && s.quality != null)
-    .sort((a, b) => (b.quality ?? 0) - (a.quality ?? 0) || Number(b.won) - Number(a.won))
+    .filter((s) => s.pid === pid && s.isPutaway && s.won)
+    .sort((a, b) => (b.quality ?? 0) - (a.quality ?? 0))
     .slice(0, n);
 }
 
