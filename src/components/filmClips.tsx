@@ -96,7 +96,9 @@ export function shotTags(s: CourtShotRow): { text: string; tone: 'good' | 'bad' 
   if (s.isFinal) t.push({ text: 'rally-ending shot', tone: 'neutral' });
   if (s.isPutaway) t.push({ text: 'put-away', tone: 'good' });
   if (s.isAttack) t.push({ text: 'attack / speed-up', tone: 'neutral' });
-  if (s.isDefense) t.push({ text: 'reset / dig', tone: 'neutral' });
+  if (s.isReset) t.push({ text: 'reset', tone: 'good' });
+  else if (s.isDefense) t.push({ text: 'dig', tone: 'neutral' });
+  if (s.isDefense && (s.incomingMph ?? 0) >= 35) t.push({ text: `dug a ${Math.round(s.incomingMph!)} mph ball`, tone: 'good' });
   if (s.popup === 'exploited') {
     t.push({ text: 'popped up → attacked', tone: 'bad' });
     // Did the pop-up cost the point, or did we recover? `won` = the popper's
