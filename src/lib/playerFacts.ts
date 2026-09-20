@@ -121,7 +121,9 @@ const METRICS: MetricDef[] = [
     get: (pid, d) => { const r = d.attacks?.find((x) => x.pid === pid); if (!r || !r.attackTotal) return null; return { value: r.attackWinPct, sample: r.attackTotal }; },
   },
   {
-    key: 'dink_quality', label: 'dink quality', category: 'positioning', direction: 'higher_better', minSample: 20, unit: '', minSpread: 8,
+    // Shown as an integer "%" in Attacking & Dinking → Dink Quality; use unit
+    // '%' so the fact reads "63%" like the table, not "62.50".
+    key: 'dink_quality', label: 'dink quality %', category: 'positioning', direction: 'higher_better', minSample: 20, unit: '%', minSpread: 8,
     get: (pid, d) => { const r = d.dinks?.find((x) => x.pid === pid); if (!r || r.dinkTotal < 1) return null; return { value: r.dinkExcellentPct, sample: r.dinkTotal }; },
   },
 
