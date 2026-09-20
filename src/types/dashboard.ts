@@ -339,6 +339,7 @@ export interface CourtShotRow {
   faultNet?: boolean;
   faultOut?: boolean;              // landed out (excludes intercepted near-misses)
   faultShort?: boolean;
+  isFinal?: boolean;               // was this the rally's last shot (the point-ender)
 }
 
 export interface DashboardData {

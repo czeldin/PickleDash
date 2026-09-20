@@ -589,6 +589,7 @@ export function parseAugmentedNights(
                 // loss-cause counting elsewhere.
                 faultOut: !!(sh.errors?.faults?.out && sh.errors.faults.out.outcome !== 'intercepted'),
                 faultShort: sh.errors?.faults?.short === true,
+                isFinal: si2 === shots.length - 1,
               });
             }
           }
