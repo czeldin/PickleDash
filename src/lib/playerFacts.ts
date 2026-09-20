@@ -105,11 +105,14 @@ const METRICS: MetricDef[] = [
 
   // --- Positioning & shot selection (weight 0.75) ---
   {
-    key: 'kitchen_serve', label: 'kitchen arrival on serve %', category: 'positioning', direction: 'higher_better', minSample: 15, unit: '%', minSpread: 10,
+    // % of SERVING rallies where they reached the kitchen line — a FREQUENCY,
+    // not a speed. Label says "% of serves" so the model doesn't call a low
+    // value "slow".
+    key: 'kitchen_serve', label: '% of serves where they reached the kitchen line', category: 'positioning', direction: 'higher_better', minSample: 15, unit: '%', minSpread: 10,
     get: (pid, d) => { const r = d.kitchenSR?.find((x) => x.pid === pid); if (!r || !r.serveDen) return null; return { value: (r.serveNum / r.serveDen) * 100, sample: r.serveDen }; },
   },
   {
-    key: 'kitchen_recv', label: 'kitchen arrival on return %', category: 'positioning', direction: 'higher_better', minSample: 15, unit: '%', minSpread: 10,
+    key: 'kitchen_recv', label: '% of returns where they reached the kitchen line', category: 'positioning', direction: 'higher_better', minSample: 15, unit: '%', minSpread: 10,
     get: (pid, d) => { const r = d.kitchenSR?.find((x) => x.pid === pid); if (!r || !r.recvDen) return null; return { value: (r.recvNum / r.recvDen) * 100, sample: r.recvDen }; },
   },
   {

@@ -16,7 +16,7 @@ export const maxDuration = 60;
 // fact-engine/attribution changes regenerate summaries instead of serving stale
 // ones (the pop-up/loss-attribution fixes had changed displayed numbers while a
 // pre-fix summary stayed cached).
-const PROMPT_VERSION = 'v8'; // v8 = facts "net" now = table's Net/g (winners − errors − pop-ups), not the scoreboard margin, so summary & table agree
+const PROMPT_VERSION = 'v9'; // v9 = kitchen-arrival is a frequency not a speed; label + prompt fixed
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
@@ -37,6 +37,7 @@ HOW THIS WORKS — read carefully:
 - Your ONLY job is to phrase those facts in plain coach language. You are a writer, not an analyst. Do NOT add stats, do NOT compute or guess ranks, do NOT pull numbers from the raw stats block for claims — the facts block is the single source of truth for what's notable.
 - A "## Current stats" block may also be given for light background (e.g. to describe playing style qualitatively). You may read it, but you may NOT cite a number or a rank from it that isn't in the facts block.
 - Every fact you're given corresponds to a number the user can see in a table on the same page. When you cite a value, use it AS GIVEN (same metric name, same number) so it matches the table — never rephrase "net (winners − points given away)" as some other "net", and never invent a metric name.
+- Kitchen-arrival % is a FREQUENCY (how OFTEN they reached the kitchen line), NOT a speed. Say "reaches the kitchen less/more often" — never "slow/fast to the kitchen", which wrongly implies foot speed.
 
 HARD RULES:
 - If a player's facts block says "No clear outlier — middle of the pack", then SAY THAT plainly. Do not manufacture a strength or weakness. "A well-rounded game with no stat that stands out from this group" is a correct, good answer.
