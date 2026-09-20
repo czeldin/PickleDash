@@ -253,7 +253,7 @@ export interface NightTrendRow {
   attacks: number; attackWins: number; pop: number; gotAttacked: number; // targeting / attacks
   riWon: number; riLost: number; riSetup: number;              // rally impact
   accIn: number; accNet: number; accOut: number; accW: number; // shot accuracy (shot-weighted)
-  sqEx: number; sqW: number;                                   // shot quality (excellent)
+  sqEx: number; sqPoor: number; sqW: number;                   // shot quality (excellent / poor, shot-weighted)
   sdDeep: number; sdW: number; rdDeep: number; rdW: number;    // serve/return depth (deep)
   ssSum: number; ssW: number; dvSum: number; dvN: number;      // serve/drive speed
   errTot: number; errNet: number; errOut: number; errUf: number; // errors

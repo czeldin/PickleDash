@@ -37,4 +37,5 @@ export const ATTACK_DINK_METRICS: MetricDef<NightTrendRow>[] = [
 
 export const SHOT_QUALITY_METRICS: MetricDef<NightTrendRow>[] = [
   { key: 'excellent', label: 'Excellent %', value: (r) => rt(r.sqEx, r.sqW), pct: true },
+  { key: 'poor', label: 'Poor %', value: (r) => rt(r.sqPoor, r.sqW), pct: true },
 ];
