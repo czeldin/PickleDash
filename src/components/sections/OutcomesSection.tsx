@@ -130,7 +130,7 @@ type ReasonKey = keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>;
 const REASONS: { keys: ReasonKey[]; label: string; tone: string; hint: string; filmCat?: string }[] = [
   { keys: ['ownNet', 'ownKitchen'], label: 'We hit into net / short', tone: 'bg-red-500', filmCat: 'net-errors', hint: 'The rally-ending shot was ours and didn’t make it over — the net stopped it, or it fell short of the net on our own side. pb.vision can’t reliably tell these apart near the net (it tags many net-cords as "short"), so they’re combined here.' },
   { keys: ['ownOut'], label: 'We hit out', tone: 'bg-orange-500', filmCat: 'out-errors', hint: 'The rally-ending shot was ours and landed out.' },
-  { keys: ['popupExploited'], label: 'We popped it up', tone: 'bg-fuchsia-500', filmCat: 'popped-up', hint: 'A dink/drop of ours popped up and the opponents attacked it to END the rally. This is a TEAM stat — both partners are charged, whoever popped it — and each rally is charged to just one cause, so this is only the rallies where the pop-up was the reason we lost. (Rally Impact’s "Popped up (lost)" is the same idea counted per-player.)' },
+  { keys: ['popupExploited'], label: 'We popped it up', tone: 'bg-fuchsia-500', filmCat: 'popped-up', hint: 'The player who popped a dink/drop up that the opponents then attacked to END the rally. Charged to whoever hit the pop-up (not their partner). Each rally counts once, under its primary cause.' },
   { keys: ['oppWinner'], label: 'They hit a winner', tone: 'bg-slate-400', filmCat: 'fed-winners', hint: 'The opponents ended the rally with a clean winner or putaway — not our error. The film shows your feed right before it (the ball they attacked).' },
   // 'Unattributed' (the `other` residual) intentionally omitted — it's a
   // non-actionable "couldn't classify" bucket, not a cause worth showing.
@@ -186,8 +186,8 @@ export function LossReasonsSection({ data, focusPid }: Props) {
       }
     >
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        Every lost rally charged to the cause of its final shot — a <strong>team</strong> stat, so both partners share each loss.
-        &ldquo;We…&rdquo; are your side&apos;s own errors (the fixable ones); &ldquo;They hit a winner&rdquo; is earned against you.
+        Each lost rally charged to the <strong>individual</strong> whose shot caused it — the player who hit the fault or the pop-up, not their partner.
+        &ldquo;We…&rdquo; are your own errors (the fixable ones); &ldquo;They hit a winner&rdquo; is earned against you (charged to whoever fed the ball they put away).
         {perGame ? ' Shown per game played (fair across different game counts).' : ' Raw totals this selection.'} Hover a cause for its definition.
         {data.courtShots && <> Click a <strong>&ldquo;We…&rdquo;</strong> bar to watch those rallies.</>}
       </p>
