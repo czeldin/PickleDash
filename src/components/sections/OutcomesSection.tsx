@@ -168,11 +168,11 @@ export function LossReasonsSection({ data, focusPid }: Props) {
     return g > 0 ? raw / g : 0;
   };
   const rowOf = (pid: string) => rows.find((r) => r.pid === pid)!;
-  // max across everything for a shared x-scale
-  const maxVal = Math.max(
-    ...players.flatMap((p) => REASONS.map(({ keys }) => val(rowOf(p.pid), keys))),
-    0.001,
-  );
+  // Each cause scales to its OWN max, so a small cause (pop-ups) is still
+  // readable next to a big one (net errors) — the leader fills the track. The
+  // numeric labels remain for comparing magnitudes across causes.
+  const maxFor = (keys: ReasonKey[]) =>
+    Math.max(...players.map((p) => val(rowOf(p.pid), keys)), 0.001);
   const fmt = (v: number) => (perGame ? v.toFixed(1) : String(Math.round(v)));
 
   return (
@@ -194,6 +194,7 @@ export function LossReasonsSection({ data, focusPid }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
         {REASONS.map(({ keys, label, tone, hint, filmCat }) => {
           const cat = filmCat ? categoryById(filmCat) : undefined;
+          const maxVal = maxFor(keys);
           return (
           <div key={label}>
             <div className="flex items-center gap-1.5 mb-1">
