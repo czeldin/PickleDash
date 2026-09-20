@@ -39,13 +39,13 @@ function ClipModal({ shot, label, onClose }: { shot: CourtShotRow; label: string
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-[1600px] max-h-[96vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200">
@@ -71,9 +71,9 @@ function ClipModal({ shot, label, onClose }: { shot: CourtShotRow; label: string
         <div className="relative flex-1 bg-black min-h-[50vh]">
           {/* Fallback sits behind the iframe; the iframe covers it once it paints. */}
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-            <p className="text-sm text-gray-300">
+            <p className="text-sm text-gray-300 max-w-md">
               {slow
-                ? <>Taking a while to load. If nothing appears, <a href={url} target="_blank" rel="noreferrer" className="text-blue-400 underline">open it on pb.vision ↗</a> — it may need you to be signed in there.</>
+                ? <>Still loading. If it doesn&apos;t appear, <a href={url} target="_blank" rel="noreferrer" className="text-blue-400 underline">open it on pb.vision ↗</a>.</>
                 : 'Loading the rally…'}
             </p>
           </div>
