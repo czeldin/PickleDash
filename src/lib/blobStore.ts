@@ -90,29 +90,53 @@ export async function getNightMeta(id: string): Promise<NightMeta | null> {
   } catch { return null; }
 }
 
-/** List all uploaded nights by scanning meta.json files. */
+// In-memory cache of the nights list, to avoid re-hitting B2 (and burning
+// Class B transactions / the daily cap) on every page load. Server instances
+// are reused across requests on Vercel, so a short TTL meaningfully cuts reads.
+// Invalidated on upload (see invalidateNightsCache).
+let nightsCache: { at: number; metas: NightMeta[] } | null = null;
+const NIGHTS_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function invalidateNightsCache(): void { nightsCache = null; }
+
+/**
+ * List all uploaded nights by scanning meta.json files.
+ * THROWS on a genuine B2 failure (e.g. the daily cap / a 429) so callers can
+ * tell "storage unreachable" apart from "no nights uploaded" — never silently
+ * returns [] on error, which would make a user's nights appear to vanish.
+ * Served from a short in-memory cache to limit B2 reads.
+ */
 export async function getAllNightMetas(): Promise<NightMeta[]> {
-  try {
-    const client = b2Client();
-    const listed = await client.send(new ListObjectsV2Command({
-      Bucket: BUCKET(),
-      Prefix: 'nights/',
-    }));
-    const metaKeys = (listed.Contents ?? [])
-      .map((o) => o.Key!)
-      .filter((k) => k.endsWith('/meta.json'));
-    if (metaKeys.length === 0) return [];
-    const results = await Promise.all(
-      metaKeys.map(async (key) => {
-        const buf = await getObjectBytes(key);
-        if (!buf) return null;
-        try {
-          return JSON.parse(buf.toString('utf-8')) as NightMeta;
-        } catch { return null; }
-      })
-    );
-    return results.filter((m): m is NightMeta => m !== null);
-  } catch { return []; }
+  if (nightsCache && Date.now() - nightsCache.at < NIGHTS_TTL_MS) {
+    return nightsCache.metas;
+  }
+  // A B2 error here propagates (no catch) — the route decides how to surface it,
+  // e.g. serve the last cached list or return an error instead of hiding data.
+  const client = b2Client();
+  const listed = await client.send(new ListObjectsV2Command({
+    Bucket: BUCKET(),
+    Prefix: 'nights/',
+  }));
+  const metaKeys = (listed.Contents ?? [])
+    .map((o) => o.Key!)
+    .filter((k) => k.endsWith('/meta.json'));
+  const results = metaKeys.length === 0 ? [] : await Promise.all(
+    metaKeys.map(async (key) => {
+      const buf = await getObjectBytes(key);
+      if (!buf) return null;
+      try {
+        return JSON.parse(buf.toString('utf-8')) as NightMeta;
+      } catch { return null; }
+    })
+  );
+  const metas = results.filter((m): m is NightMeta => m !== null);
+  nightsCache = { at: Date.now(), metas };
+  return metas;
+}
+
+/** The last successfully-listed nights, if any (used as a fallback on B2 error). */
+export function getCachedNightMetas(): NightMeta[] | null {
+  return nightsCache?.metas ?? null;
 }
 
 /**
@@ -153,22 +177,38 @@ export async function saveRawData(id: string, raw: unknown): Promise<void> {
   }));
 }
 
+// Raw night data is immutable once uploaded (keyed by a UUID), so cache it in
+// memory to avoid re-downloading from B2 on every dashboard load — the single
+// biggest source of Class B reads. Bounded so a long-running instance can't grow
+// without limit.
+const rawCache = new Map<string, unknown>();
+const RAW_CACHE_MAX = 40;
+
 export async function getRawData(id: string): Promise<unknown | null> {
+  if (rawCache.has(id)) return rawCache.get(id)!;
   try {
+    let parsed: unknown | null = null;
     // Try compressed first
     const gz = await getObjectBytes(`nights/${id}/raw.json.gz`);
     if (gz) {
       const decompressed = await gunzipAsync(gz);
-      return JSON.parse(decompressed.toString('utf-8'));
+      parsed = JSON.parse(decompressed.toString('utf-8'));
+    } else {
+      // Fall back to legacy uncompressed
+      const raw = await getObjectBytes(`nights/${id}/raw.json`);
+      if (raw) parsed = JSON.parse(raw.toString('utf-8'));
     }
-    // Fall back to legacy uncompressed
-    const raw = await getObjectBytes(`nights/${id}/raw.json`);
-    if (!raw) return null;
-    return JSON.parse(raw.toString('utf-8'));
+    if (parsed != null) {
+      if (rawCache.size >= RAW_CACHE_MAX) rawCache.delete(rawCache.keys().next().value!);
+      rawCache.set(id, parsed);
+    }
+    return parsed;
   } catch { return null; }
 }
 
 export async function deleteNightFromBlob(id: string): Promise<void> {
+  rawCache.delete(id);
+  invalidateNightsCache();
   try {
     const client = b2Client();
     const listed = await client.send(new ListObjectsV2Command({

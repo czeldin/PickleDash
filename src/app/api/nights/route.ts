@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
-  getAllNightMetas, saveNightMeta, saveRawData, getRawData,
+  getAllNightMetas, getCachedNightMetas, invalidateNightsCache,
+  saveNightMeta, saveRawData, getRawData,
   getOrphanedRawIds, getManifest, NightMeta,
 } from '@/lib/blobStore';
 import { ensureAugmentedForNight } from '@/lib/augmentedInsights';
@@ -62,38 +63,69 @@ function getPreloadedMeta(): NightMeta {
 
 // GET /api/nights — list all nights (meta only, no raw)
 export async function GET() {
-  // 1. Fetch all per-night meta.json files
-  let nights = await getAllNightMetas();
+  const preloaded = getPreloadedMeta();
 
-  // 2. Migrate legacy manifest entries that don't have meta.json yet
-  if (nights.length === 0) {
-    const legacy = await getManifest();
-    if (legacy.length > 0) {
-      await Promise.all(legacy.map((m) => saveNightMeta(m.id, m)));
-      nights = legacy;
+  // 1. Fetch all per-night meta.json files. If B2 is unreachable (e.g. the daily
+  //    Class B cap / a 429), DON'T silently drop the user's nights — fall back to
+  //    the last cached list, or signal an error so the client can retry, rather
+  //    than showing only the preloaded night as if everything else vanished.
+  let nights: NightMeta[];
+  try {
+    nights = await getAllNightMetas();
+  } catch (e) {
+    console.error('GET /api/nights: B2 list failed:', e);
+    const cached = getCachedNightMetas();
+    if (cached) {
+      nights = cached; // serve stale rather than "lose" nights
+    } else {
+      // No cache yet and B2 is down — tell the client it's a transient storage
+      // error (with the one night we can always serve) instead of pretending
+      // the rest don't exist.
+      return NextResponse.json(
+        { error: 'storage_unavailable', nights: [preloaded] },
+        { status: 503 },
+      );
     }
   }
 
-  // 3. Recover orphaned nights (raw.json exists but no meta.json — caused by
-  //    old race-condition manifest approach)
-  const orphanIds = await getOrphanedRawIds();
-  if (orphanIds.length > 0) {
-    const recovered = await Promise.all(
-      orphanIds.map(async (id) => {
-        try {
-          const raw = await getRawData(id);
-          if (!raw) return null;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const meta = metaFromRaw(id, raw as any);
-          await saveNightMeta(id, meta); // persist so we don't re-fetch next time
-          return meta;
-        } catch { return null; }
-      })
-    );
-    nights = [...nights, ...recovered.filter((m): m is NightMeta => m !== null)];
+  // 2. Migrate legacy manifest entries that don't have meta.json yet. Only when
+  //    we truly have no nights — and this reads B2 too, so gate it.
+  if (nights.length === 0) {
+    try {
+      const legacy = await getManifest();
+      if (legacy.length > 0) {
+        await Promise.all(legacy.map((m) => saveNightMeta(m.id, m)));
+        invalidateNightsCache();
+        nights = legacy;
+      }
+    } catch { /* transient — leave nights as-is */ }
   }
 
-  const preloaded = getPreloadedMeta();
+  // 3. Recover orphaned nights (raw.json exists but no meta.json — from the old
+  //    race-condition manifest approach). This is an extra B2 list + raw reads,
+  //    so only run it when we found NO meta-backed nights (i.e. a genuine repair
+  //    case), not on every normal load.
+  if (nights.length === 0) {
+    try {
+      const orphanIds = await getOrphanedRawIds();
+      if (orphanIds.length > 0) {
+        const recovered = await Promise.all(
+          orphanIds.map(async (id) => {
+            try {
+              const raw = await getRawData(id);
+              if (!raw) return null;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const meta = metaFromRaw(id, raw as any);
+              await saveNightMeta(id, meta); // persist so we don't re-fetch next time
+              return meta;
+            } catch { return null; }
+          })
+        );
+        const found = recovered.filter((m): m is NightMeta => m !== null);
+        if (found.length) { invalidateNightsCache(); nights = found; }
+      }
+    } catch { /* transient */ }
+  }
 
   // Parse "M/D/YY" label into a sortable timestamp
   function labelToDate(label: string): number {
@@ -125,6 +157,7 @@ export async function POST(req: NextRequest) {
       saveRawData(meta.id, raw),
       saveNightMeta(meta.id, meta),
     ]);
+    invalidateNightsCache(); // so the new night shows up on the next list
     // Best-effort: fetch & cache pb.vision augmented insights for this night's
     // sessions so the richer parser has real coordinates/putaways. Never blocks
     // or fails the upload — backfill can fill any gaps later.

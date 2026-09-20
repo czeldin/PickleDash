@@ -154,8 +154,12 @@ export default function DashboardPage() {
 
     if (nightId === 'all') {
       fetch('/api/nights', { cache: 'no-store' })
-        .then((r) => r.json())
-        .then(async (metas: { id: string }[]) => {
+        .then(async (r) => {
+          if (r.status === 503) throw new Error('storage_unavailable');
+          if (!r.ok) throw new Error('list_failed');
+          return r.json() as Promise<{ id: string }[]>;
+        })
+        .then(async (metas) => {
           const nights = await Promise.all(metas.map((m) => loadOne(m.id)));
           setAllNights(nights);
           setSelectedNightIds(nights.map((n) => n.id));
@@ -163,7 +167,11 @@ export default function DashboardPage() {
         })
         .catch((err) => {
           console.error('Failed to load all nights:', err);
-          setLoadError('Could not load all nights.');
+          setLoadError(
+            (err as Error)?.message === 'storage_unavailable'
+              ? 'Storage is temporarily unavailable (likely the daily read cap) — your nights are safe. Try again shortly.'
+              : 'Could not load all nights.',
+          );
         });
     } else {
       loadOne(nightId)

@@ -11,6 +11,12 @@ import { anonymizePlayerNames } from '@/lib/anonymize';
 
 async function apiFetchNights(): Promise<NightMeta[]> {
   const res = await fetch('/api/nights', { cache: 'no-store' });
+  if (res.status === 503) {
+    // Storage (B2) temporarily unreachable — e.g. daily read cap. The nights
+    // still exist; signal a transient error so the UI says "try again" rather
+    // than making them look deleted.
+    throw new Error('storage_unavailable');
+  }
   if (!res.ok) throw new Error('Failed to load nights');
   return res.json();
 }
@@ -165,8 +171,16 @@ export default function HomePage() {
     try {
       const list = await apiFetchNights();
       setNights(list);
-    } catch {
-      setError('Could not load nights from server.');
+      setError(null);
+    } catch (e) {
+      // Your nights are safe in storage — this is a transient read failure
+      // (often the daily storage cap), not deletion. Don't wipe any list we
+      // already have; just surface a retry-able message.
+      setError(
+        (e as Error)?.message === 'storage_unavailable'
+          ? 'Storage is temporarily unavailable (likely the daily read cap) — your nights are safe. Try again shortly.'
+          : 'Could not load nights from server.',
+      );
     } finally {
       setNightsLoading(false);
     }
