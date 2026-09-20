@@ -86,8 +86,14 @@ export function shotTags(s: CourtShotRow): { text: string; tone: 'good' | 'bad' 
   if (s.isFinal) t.push({ text: 'rally-ending shot', tone: 'neutral' });
   if (s.isPutaway) t.push({ text: 'put-away', tone: 'good' });
   if (s.isAttack) t.push({ text: 'attack / speed-up', tone: 'neutral' });
-  if (s.popup === 'exploited') t.push({ text: 'popped up → attacked', tone: 'bad' });
-  else if (s.popup === 'potential') t.push({ text: 'popped up (not attacked)', tone: 'neutral' });
+  if (s.popup === 'exploited') {
+    t.push({ text: 'popped up → attacked', tone: 'bad' });
+    // Did the pop-up cost the point, or did we recover? `won` = the popper's
+    // team won the rally despite it.
+    t.push(s.won ? { text: 'recovered — won anyway', tone: 'good' } : { text: 'cost the point', tone: 'bad' });
+  } else if (s.popup === 'potential') {
+    t.push({ text: 'popped up (not attacked)', tone: 'neutral' });
+  }
   if (s.setupForOppWinner) t.push({ text: 'feed before their winner', tone: 'bad' });
   if (s.faultNet) t.push({ text: 'into the net', tone: 'bad' });
   if (s.faultOut) t.push({ text: 'landed out', tone: 'bad' });
