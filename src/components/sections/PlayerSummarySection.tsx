@@ -6,6 +6,13 @@ import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { buildStatsContext, statsSignature } from '@/lib/statsContext';
 import { factsForPrompt } from '@/lib/playerFacts';
 
+// Small non-crypto hash of the facts string, to fold into the cache signature.
+function simpleHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
 interface Props { data: DashboardData }
 
 interface PlayerSummary {
@@ -27,7 +34,12 @@ export function PlayerSummarySection({ data }: Props) {
 
   useEffect(() => {
     if (players.length === 0) return;
-    const sig = statsSignature(data);
+    const facts = factsForPrompt(data);
+    // Sign the FACTS the summary is actually built from (plus the selection),
+    // so any change to what the model is fed — including logic changes to the
+    // fact engine — busts the cache. Signing only raw stats let the summary go
+    // stale when the facts changed but those raw stats didn't.
+    const sig = `${statsSignature(data)}|F:${facts.length}:${simpleHash(facts)}`;
     if (sig === lastSig.current) return; // same view — keep current summaries
     lastSig.current = sig;
     setSummaries(null);   // clear stale cards so the new selection visibly regenerates
@@ -37,7 +49,7 @@ export function PlayerSummarySection({ data }: Props) {
     fetch('/api/summaries', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ facts: factsForPrompt(data), context: buildStatsContext(data), signature: sig, players: players.map((p) => p.name) }),
+      body: JSON.stringify({ facts, context: buildStatsContext(data), signature: sig, players: players.map((p) => p.name) }),
       signal: controller.signal,
     })
       .then(async (r) => {

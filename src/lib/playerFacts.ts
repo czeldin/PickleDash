@@ -69,8 +69,12 @@ const METRICS: MetricDef[] = [
     get: (pid, d) => { const r = d.targeting?.find((x) => x.pid === pid); if (!r || !r.fin) return null; return { value: (r.clean / r.fin) * 100, sample: r.fin }; },
   },
   {
-    key: 'popups_given', label: 'pop-ups given up per game', category: 'outcome', direction: 'lower_better', minSample: 3, unit: '/g', minSpread: 1.2,
-    get: (pid, d) => { const r = d.targeting?.find((x) => x.pid === pid); if (!r || !r.games) return null; return { value: r.pop / r.games, sample: r.games }; },
+    // Use the LOST-point pop-up count (rallyImpact.setup) — the same "Popped up
+    // (lost)" number the Rally Impact table shows — not the raw exploited-pop-up
+    // behavior count, so the summary can't claim "most pop-ups" while the table
+    // shows the player mid-pack.
+    key: 'popups_lost', label: 'points lost to pop-ups per game', category: 'outcome', direction: 'lower_better', minSample: 3, unit: '/g', minSpread: 0.8,
+    get: (pid, d) => { const r = d.rallyImpact?.find((x) => x.pid === pid); if (!r || !r.games) return null; return { value: r.setup / r.games, sample: r.games }; },
   },
   {
     key: 'got_attacked', label: 'times attacked per game', category: 'outcome', direction: 'lower_better', minSample: 3, unit: '/g', minSpread: 1.2,

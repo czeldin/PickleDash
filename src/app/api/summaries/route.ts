@@ -12,8 +12,11 @@ export const maxDuration = 60;
 // context 1-decimal + best/worst tags; v6 = FACTS-DRIVEN rewrite — code now picks
 // each player's genuine outliers (z-score + min-spread gate) and the LLM only
 // phrases them, killing cherry-picking, mis-ranking, and prose that inflates
-// trivial gaps.
-const PROMPT_VERSION = 'v6';
+// trivial gaps; v7 = cache signature now includes the facts block itself, so
+// fact-engine/attribution changes regenerate summaries instead of serving stale
+// ones (the pop-up/loss-attribution fixes had changed displayed numbers while a
+// pre-fix summary stayed cached).
+const PROMPT_VERSION = 'v7';
 
 // One synthesized card per player. Text is HIGH-LEVEL synthesis of the stats —
 // coach-style takeaways, NOT a re-listing of numbers already shown in tables.
