@@ -21,12 +21,19 @@ const deepLink = (s: CourtShotRow) =>
 // IS their full interactive app (and may want a pb.vision login), so we always
 // offer an "open in a new tab" escape hatch and a graceful fallback if the frame
 // hasn't shown anything after a beat.
-function ClipModal({ shot, label, onClose }: { shot: CourtShotRow; label: string; onClose: () => void }) {
+function ClipModal({ shot, label, position, hasPrev, hasNext, onPrev, onNext, onClose }: {
+  shot: CourtShotRow; label: string; position: string;
+  hasPrev: boolean; hasNext: boolean; onPrev: () => void; onNext: () => void; onClose: () => void;
+}) {
   const url = deepLink(shot);
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowRight' && hasNext) onNext();
+      else if (e.key === 'ArrowLeft' && hasPrev) onPrev();
+    };
     document.addEventListener('keydown', onKey);
     // If the iframe hasn't fired onLoad in a few seconds (blocked embed / login
     // wall), surface the "open in a tab" hint more prominently.
@@ -35,7 +42,7 @@ function ClipModal({ shot, label, onClose }: { shot: CourtShotRow; label: string
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', onKey); clearTimeout(t); document.body.style.overflow = prevOverflow; };
-  }, [onClose]);
+  }, [onClose, onNext, onPrev, hasNext, hasPrev]);
 
   return (
     <div
@@ -49,13 +56,32 @@ function ClipModal({ shot, label, onClose }: { shot: CourtShotRow; label: string
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200">
-          <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
+            <span className="text-xs text-gray-400 tabular-nums shrink-0">{position}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onPrev}
+              disabled={!hasPrev}
+              className="px-2.5 py-1 text-xs font-medium rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Previous clip"
+            >
+              ← Prev
+            </button>
+            <button
+              onClick={onNext}
+              disabled={!hasNext}
+              className="px-2.5 py-1 text-xs font-medium rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Next clip"
+            >
+              Next →
+            </button>
             <a
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="text-xs font-medium text-blue-600 hover:underline whitespace-nowrap"
+              className="text-xs font-medium text-blue-600 hover:underline whitespace-nowrap ml-1"
             >
               Open on pb.vision ↗
             </a>
@@ -129,7 +155,8 @@ const CATEGORIES: Category[] = [
 export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
   const courtShots = data.courtShots;
   const [catId, setCatId] = useState<string>('clean-winners');
-  const [activeClip, setActiveClip] = useState<CourtShotRow | null>(null);
+  // Index of the open clip within the current `clips` queue (null = closed).
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   // Game number per session (G1 = first game listed), for labeling each clip.
   const gameNum = useMemo(() => {
@@ -181,7 +208,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
           return (
             <button
               key={c.id}
-              onClick={() => setCatId(c.id)}
+              onClick={() => { setCatId(c.id); setActiveIdx(null); }}
               className={`px-3 py-1.5 text-xs font-medium rounded-full border ${
                 catId === c.id
                   ? c.good ? 'bg-green-600 text-white border-green-600' : 'bg-gray-800 text-white border-gray-800'
@@ -204,7 +231,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
             <button
               key={i}
               type="button"
-              onClick={() => setActiveClip(s)}
+              onClick={() => setActiveIdx(i)}
               className="w-full text-left flex items-center justify-between gap-3 px-2 py-2 rounded-lg bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 transition-colors group"
             >
               <span className="flex items-center gap-3 text-sm text-gray-700 min-w-0">
@@ -236,13 +263,22 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
         </div>
       )}
 
-      {activeClip && (
-        <ClipModal
-          shot={activeClip}
-          label={`${focusName} · G${gameNum.get(activeClip.sessionKey) ?? '?'} · Rally ${activeClip.rallyNum} · ${activeClip.type}${activeClip.won ? ' · won' : ' · lost'}`}
-          onClose={() => setActiveClip(null)}
-        />
-      )}
+      {activeIdx != null && clips[activeIdx] && (() => {
+        const s = clips[activeIdx];
+        return (
+          <ClipModal
+            key={`${s.vid}-${s.si}-${s.rallyNum}-${s.shotNum}`}
+            shot={s}
+            label={`${focusName} · G${gameNum.get(s.sessionKey) ?? '?'} · Rally ${s.rallyNum} · ${s.type}${s.won ? ' · won' : ' · lost'}`}
+            position={`${activeIdx + 1} / ${clips.length}`}
+            hasPrev={activeIdx > 0}
+            hasNext={activeIdx < clips.length - 1}
+            onPrev={() => setActiveIdx((i) => (i != null && i > 0 ? i - 1 : i))}
+            onNext={() => setActiveIdx((i) => (i != null && i < clips.length - 1 ? i + 1 : i))}
+            onClose={() => setActiveIdx(null)}
+          />
+        );
+      })()}
     </SectionCard>
   );
 }
