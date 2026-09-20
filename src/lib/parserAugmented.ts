@@ -671,11 +671,15 @@ export function parseAugmentedNights(
               if (sh.is_putaway) tt.fin++;
               if (sh.winner_type === 'clean') tt.clean++;
               if (sh.errors?.popup) tt.pop++;
-              // Exploited pop-up → the opponent put it away. Use the authoritative
-              // errors.popup==='exploited' flag (no next-shot lookahead needed).
+              // Exploited pop-up → the opponent attacked it. `gotAttacked` is a
+              // behavior count (any exploited pop-up). But Rally Impact's
+              // "Popped up (lost)" is a POINTS ledger, so it only counts pop-ups
+              // where the popper's team actually LOST the rally — a pop-up you
+              // dug out and won is not a point given away.
               if (sh.errors?.popup === 'exploited') {
                 tt.gotAttacked++;
-                ri(f).setup++;
+                const popperTeam = sh.player_id != null ? pd[sh.player_id]?.team : undefined;
+                if (popperTeam != null && popperTeam !== rally.winning_team) ri(f).setup++;
               }
             });
 
