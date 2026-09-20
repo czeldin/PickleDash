@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DashboardData, OutcomeStatsRow, LossReasonRow, PartnerAdjRow, PlayerMeta } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { InfoTip } from '@/components/InfoTip';
 import { qualifiedPids } from '@/lib/qualified';
+import { categoryById, clipsFor, ClipModalController } from '@/components/filmClips';
 
 interface Props {
   data: DashboardData;
@@ -123,17 +124,28 @@ type ReasonKey = keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>;
 // pb.vision cannot reliably separate a ball that hit the net from one that fell
 // just short of it (its near-net tracking tags many net balls as "short"), so we
 // stopped presenting them as distinct causes.
-const REASONS: { keys: ReasonKey[]; label: string; tone: string; hint: string }[] = [
-  { keys: ['ownNet', 'ownKitchen'], label: 'We hit into net / short', tone: 'bg-red-500', hint: 'The rally-ending shot was ours and didn’t make it over — the net stopped it, or it fell short of the net on our own side. pb.vision can’t reliably tell these apart near the net (it tags many net-cords as "short"), so they’re combined here.' },
-  { keys: ['ownOut'], label: 'We hit out', tone: 'bg-orange-500', hint: 'The rally-ending shot was ours and landed out.' },
-  { keys: ['popupExploited'], label: 'We popped it up', tone: 'bg-fuchsia-500', hint: 'A dink/drop of ours popped up and the opponents attacked it out of the air.' },
+// `filmCat` is the Film Room category id whose clip queue matches this cause —
+// clicking a player's bar opens that queue in the video modal. Causes with no
+// matching queue (opponent winners, unattributed) are not clickable.
+const REASONS: { keys: ReasonKey[]; label: string; tone: string; hint: string; filmCat?: string }[] = [
+  { keys: ['ownNet', 'ownKitchen'], label: 'We hit into net / short', tone: 'bg-red-500', filmCat: 'net-errors', hint: 'The rally-ending shot was ours and didn’t make it over — the net stopped it, or it fell short of the net on our own side. pb.vision can’t reliably tell these apart near the net (it tags many net-cords as "short"), so they’re combined here.' },
+  { keys: ['ownOut'], label: 'We hit out', tone: 'bg-orange-500', filmCat: 'out-errors', hint: 'The rally-ending shot was ours and landed out.' },
+  { keys: ['popupExploited'], label: 'We popped it up', tone: 'bg-fuchsia-500', filmCat: 'popped-up', hint: 'A dink/drop of ours popped up and the opponents attacked it out of the air.' },
   { keys: ['oppWinner'], label: 'They hit a winner', tone: 'bg-slate-400', hint: 'The opponents ended the rally with a clean winner or putaway — not our error.' },
-  { keys: ['other'], label: 'Unattributed', tone: 'bg-gray-300', hint: 'The rally ended but the final shot could not be classified from the data (no fault or winner tag).' },
+  // 'Unattributed' (the `other` residual) intentionally omitted — it's a
+  // non-actionable "couldn't classify" bucket, not a cause worth showing.
 ];
 
 /** Why We Lost — grouped by cause, one bar per player, for easy comparison. */
 export function LossReasonsSection({ data, focusPid }: Props) {
   const [perGame, setPerGame] = useState(true);
+  // Which (player, cause) film queue is open, if any.
+  const [film, setFilm] = useState<{ pid: string; catId: string } | null>(null);
+  const gameNum = useMemo(() => {
+    const m = new Map<string, number>();
+    data.sessions.forEach((s, i) => m.set(s.key, i + 1));
+    return m;
+  }, [data.sessions]);
   const rows = data.lossReasons;
   if (!rows || rows.length === 0) {
     return (
@@ -177,9 +189,12 @@ export function LossReasonsSection({ data, focusPid }: Props) {
         Every lost rally charged to the cause of its final shot — a <strong>team</strong> stat, so both partners share each loss.
         &ldquo;We…&rdquo; are your side&apos;s own errors (the fixable ones); &ldquo;They hit a winner&rdquo; is earned against you.
         {perGame ? ' Shown per game played (fair across different game counts).' : ' Raw totals this selection.'} Hover a cause for its definition.
+        {data.courtShots && <> Click a <strong>&ldquo;We…&rdquo;</strong> bar to watch those rallies.</>}
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-        {REASONS.map(({ keys, label, tone, hint }) => (
+        {REASONS.map(({ keys, label, tone, hint, filmCat }) => {
+          const cat = filmCat ? categoryById(filmCat) : undefined;
+          return (
           <div key={label}>
             <div className="flex items-center gap-1.5 mb-1">
               <span className={`w-2.5 h-2.5 rounded-sm ${tone}`} />
@@ -193,20 +208,57 @@ export function LossReasonsSection({ data, focusPid }: Props) {
                   const v = val(rowOf(p.pid), keys);
                   const w = (100 * v) / maxVal;
                   const isFocus = p.pid === focusPid;
+                  const nClips = cat ? clipsFor(data.courtShots, p.pid, cat).length : 0;
+                  const clickable = !!cat && nClips > 0;
+                  const bar = (
+                    <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden relative group">
+                      <div className={`h-full ${tone} ${isFocus ? '' : 'opacity-80'}`} style={{ width: `${Math.max(w, v > 0 ? 2 : 0)}%` }} />
+                      {clickable && (
+                        <span className="absolute inset-0 hidden group-hover:flex items-center justify-center text-[10px] font-semibold text-white bg-black/45 rounded">
+                          ▶ View Film ({nClips})
+                        </span>
+                      )}
+                    </div>
+                  );
                   return (
                     <div key={p.pid} className="flex items-center gap-2">
                       <span className={`w-16 text-xs shrink-0 text-right ${isFocus ? 'font-semibold text-blue-700' : 'text-gray-500'}`}>{p.name}</span>
-                      <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
-                        <div className={`h-full ${tone} ${isFocus ? '' : 'opacity-80'}`} style={{ width: `${Math.max(w, v > 0 ? 2 : 0)}%` }} />
-                      </div>
+                      {clickable ? (
+                        <button
+                          type="button"
+                          onClick={() => setFilm({ pid: p.pid, catId: filmCat! })}
+                          className="flex-1 cursor-pointer"
+                          aria-label={`Watch ${p.name}'s ${label} rallies`}
+                        >
+                          {bar}
+                        </button>
+                      ) : bar}
                       <span className={`w-9 text-xs tabular-nums shrink-0 ${isFocus ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>{fmt(v)}</span>
                     </div>
                   );
                 })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
+
+      {film && (() => {
+        const cat = categoryById(film.catId);
+        if (!cat) return null;
+        const clips = clipsFor(data.courtShots, film.pid, cat);
+        if (clips.length === 0) return null;
+        const name = data.players.find((p) => p.pid === film.pid)?.name ?? 'Player';
+        return (
+          <ClipModalController
+            clips={clips}
+            topic={`${name}: ${cat.label}`}
+            gameNum={gameNum}
+            startIndex={0}
+            onClose={() => setFilm(null)}
+          />
+        );
+      })()}
     </SectionCard>
   );
 }
