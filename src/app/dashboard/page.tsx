@@ -38,10 +38,10 @@ const TABS = [
   { id: 'finishing', label: 'Finishing & Attacking' },
   { id: 'kitchen', label: 'Kitchen & Positioning' },
   { id: 'reference', label: 'Shot Details' },
+  { id: 'filmroom', label: '🎬 Film Room' },
   { id: 'courtmaps', label: 'Court Maps' },
   { id: 'partners', label: 'Partners & Matchups' },
   { id: 'trends', label: 'Trends' },
-  { id: 'filmroom', label: 'Film Room' },
   { id: 'players', label: 'By Game' },
 ] as const;
 type TabId = typeof TABS[number]['id'];
