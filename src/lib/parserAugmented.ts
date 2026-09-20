@@ -520,10 +520,14 @@ export function parseAugmentedNights(
         const setupShot = shots.length >= 2 ? shots[shots.length - 2] : undefined;
         const setupBy = setupShot && (setupShot.player_id != null ? pd[setupShot.player_id]?.team : undefined) === lt ? nameOfShot(setupShot) : undefined;
 
-        if (lostBy && isFaultNet) catTo('net', loserLast);
+        // Pop-up FIRST: an exploited pop-up in a lost rally is the root cause —
+        // it put us on defense, and whatever ended the rally (their attack, or
+        // our scramble error) stems from it. So it wins the tiebreak over a
+        // later net/out fault, and this matches Rally Impact's "Popped up (lost)".
+        if (popupShot) catTo('pop', nameOfShot(popupShot));
+        else if (lostBy && isFaultNet) catTo('net', loserLast);
         else if (lostBy && isFaultOut) catTo('out', loserLast);
         else if (lostBy && isFaultShort) catTo('kit', loserLast);
-        else if (popupShot) catTo('pop', nameOfShot(popupShot));
         else if (wonBy && isWinnerShot) catTo('opp', setupBy);
         // The last shot is the loser's with only a putaway/winner tag (no fault) —
         // the opponents put it away off our feed. Defensible as an opponent winner.
