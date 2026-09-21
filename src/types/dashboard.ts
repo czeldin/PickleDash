@@ -345,6 +345,11 @@ export interface CourtShotRow {
   faultOut?: boolean;              // landed out (excludes intercepted near-misses)
   faultShort?: boolean;
   isFinal?: boolean;               // was this the rally's last shot (the point-ender)
+  // Rally Impact classification of the rally-ending shot, computed with the SAME
+  // rule as the table (last shot: fault present → lost, else → won), so the
+  // clickable film for those cells matches the displayed number exactly.
+  riWinner?: boolean;              // rally-ending shot, no fault → a "Winners/g" point
+  riLost?: boolean;                // rally-ending shot, had a fault → a "Lost/g" point
   // This shot was the hitter's LAST shot before the opponents put the next ball
   // away for a winner — the "feed" that got attacked. Powers the "They hit a
   // winner" film queue (what you gave them, right before they finished it).

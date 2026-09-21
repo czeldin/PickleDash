@@ -31,6 +31,7 @@ export interface Category {
   match: (s: CourtShotRow) => boolean;
   good?: boolean; // highlight-reel (green) vs review (amber)
   wholeRally?: boolean; // play the entire point (for mid-rally clips), not just the shot
+  hidden?: boolean; // not shown as a Film Room chip; only opened from a table cell
 }
 
 // Outcome-anchored clip queues, not "verdicts". Error queues are gated on
@@ -86,6 +87,27 @@ export const CATEGORIES: Category[] = [
     blurb: 'Your last shot right before the opponents ended the rally with a winner — the ball you gave them that got attacked. The clip includes the shots leading in and plays through the put-away.',
     match: (s) => !!s.setupForOppWinner,
     wholeRally: true, // show the whole point
+  },
+  // ── Rally Impact table cells — exact-match queues so the film equals the number.
+  // Winners = you hit the rally's LAST shot with no fault. Lost = your last shot
+  // WITH a net/out/short fault. (These mirror the parser's won/lostDirect split.)
+  {
+    id: 'ri-winners', label: 'Winners', good: true, hidden: true,
+    blurb: 'Rally-ending shots you hit to win the point — the "Winners/g" column in Rally Impact. Best first.',
+    match: (s) => !!s.riWinner,
+    wholeRally: true,
+  },
+  {
+    id: 'ri-lost', label: 'Points lost (your error)', hidden: true,
+    blurb: 'Rallies you lost on your own rally-ending error — the "Lost/g" column in Rally Impact.',
+    match: (s) => !!s.riLost,
+    wholeRally: true,
+  },
+  {
+    id: 'ri-popped', label: 'Pop-ups that lost the point', hidden: true,
+    blurb: 'Your pop-ups the opponent attacked in a rally you LOST — the "Popped up (lost)/g" column in Rally Impact.',
+    match: (s) => s.popup === 'exploited' && !s.won,
+    wholeRally: true,
   },
   {
     id: 'putaway-tries', label: 'Put-away attempts',

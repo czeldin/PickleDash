@@ -1,9 +1,11 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { DashboardData, PlayerMeta, RallyImpactRow, TargetingRow, KitchenSRRow, NightTrendRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { TrendButton, MetricDef } from '@/components/TrendChart';
+import { categoryById, clipsFor, ClipModalController } from '@/components/filmClips';
 
 interface Props { data: DashboardData; }
 
@@ -109,12 +111,40 @@ export function RallyImpactSection({ data }: Props) {
   const { rallyImpact, players } = data;
   const pm = pmap(players);
   const rows = withPlayer(rallyImpact, pm).filter((r) => r.games > 0);
+
+  // Film modal state: which (player, film category) is open.
+  const [film, setFilm] = useState<{ pid: string; catId: string } | null>(null);
+  const gameNum = useMemo(() => {
+    const m = new Map<string, number>();
+    data.sessions.forEach((s, i) => m.set(s.key, i + 1));
+    return m;
+  }, [data.sessions]);
+
   if (rows.length === 0) return null;
 
+  // A value cell that opens its matching film queue (if any clips exist).
+  const filmCell = (pid: string, catId: string, value: number, cls: string) => {
+    const cat = categoryById(catId);
+    const n = cat ? clipsFor(data.courtShots, pid, cat).length : 0;
+    const label = value.toFixed(1);
+    if (!cat || n === 0 || !data.courtShots) return <span className={`tabular-nums ${cls}`}>{label}</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => setFilm({ pid, catId })}
+        className={`tabular-nums ${cls} inline-flex items-center gap-1 hover:underline decoration-dotted group`}
+        title={`Watch ${n} clip${n === 1 ? '' : 's'}`}
+      >
+        {label}
+        <span className="text-[10px] text-gray-400 group-hover:text-blue-500">▶</span>
+      </button>
+    );
+  };
+
   const columns: ColumnDef<RallyImpactRow>[] = [
-    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => <span className="tabular-nums font-semibold text-emerald-700">{per(r.won, r.games).toFixed(1)}</span> },
-    { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => num(per(r.lostDirect, r.games)) },
-    { key: 'setup', header: 'Popped up (lost)/g', getValue: (r) => per(r.setup, r.games), render: (r) => num(per(r.setup, r.games)) },
+    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-emerald-700') },
+    { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => filmCell(r.pid, 'ri-lost', per(r.lostDirect, r.games), 'text-gray-700') },
+    { key: 'setup', header: 'Popped up (lost)/g', getValue: (r) => per(r.setup, r.games), render: (r) => filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700') },
     {
       key: 'net', header: 'Net/g',
       getValue: (r) => per(r.won - r.lostDirect - r.setup, r.games),
@@ -126,8 +156,27 @@ export function RallyImpactSection({ data }: Props) {
     <SectionCard title="Rally Impact — Winners vs Points Given Away" action={<TrendButton title="Rally Impact" metrics={RALLY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your own rally-ending errors (net/out/short). <strong className="text-gray-600">Popped up (lost)</strong> = your pop-ups the opponent put away to end the rally — a different set of lost points from Lost, not double-counted. Net = winners − both.
+        {data.courtShots && <> Click a value with a <span className="text-blue-500">▶</span> to watch those points.</>}
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="net" />
+
+      {film && (() => {
+        const cat = categoryById(film.catId);
+        if (!cat) return null;
+        const clips = clipsFor(data.courtShots, film.pid, cat);
+        if (clips.length === 0) return null;
+        const name = players.find((p) => p.pid === film.pid)?.name ?? 'Player';
+        return (
+          <ClipModalController
+            clips={clips}
+            topic={`${name}: ${cat.label}`}
+            gameNum={gameNum}
+            startIndex={0}
+            wholeRally={cat.wholeRally}
+            onClose={() => setFilm(null)}
+          />
+        );
+      })()}
     </SectionCard>
   );
 }

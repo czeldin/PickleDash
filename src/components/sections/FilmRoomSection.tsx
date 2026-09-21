@@ -55,7 +55,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
     <SectionCard title="Film Room">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <FocusPlayerSelect players={data.players} focusPid={focusPid} onChange={onFocusChange} />
-        {CATEGORIES.map((c) => {
+        {CATEGORIES.filter((c) => !c.hidden).map((c) => {
           const n = courtShots.filter((s) => s.pid === focusPid && c.match(s)).length;
           return (
             <button

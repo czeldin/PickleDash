@@ -619,6 +619,11 @@ export function parseAugmentedNights(
                 faultOut: !!(sh.errors?.faults?.out && sh.errors.faults.out.outcome !== 'intercepted'),
                 faultShort: sh.errors?.faults?.short === true,
                 isFinal: si2 === shots.length - 1,
+                // Rally Impact win/loss, using the SAME check as the table
+                // (rally-ending shot: any faults object present → lost, else →
+                // won). Only meaningful on the final shot.
+                riWinner: si2 === shots.length - 1 && rally.winning_team === hitter?.team && !sh.errors?.faults,
+                riLost: si2 === shots.length - 1 && rally.winning_team !== hitter?.team && !!sh.errors?.faults,
                 // Setup shot: the losing team's last touch before the opponents'
                 // winner (i.e. the second-to-last shot, hit by the loser).
                 setupForOppWinner: oppWonWithWinner
