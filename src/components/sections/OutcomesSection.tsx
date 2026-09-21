@@ -133,6 +133,10 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
     return { pairMap, overall, activePids: active };
   }, [rows]);
 
+  // Sort state: which column (a partner pid, or 'overall') and direction.
+  const [sortCol, setSortCol] = useState<string>('overall');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
   if (!rows || rows.length === 0 || activePids.size === 0) return null;
 
   // Players that appear in at least one qualifying pairing, in dashboard order.
@@ -173,50 +177,69 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
     return `rgba(234, 88, 12, ${0.08 + 0.42 * -t})`;              // orange-600 (lower)
   };
 
+  // Sort rows by a column's delta (a partner pid, or 'overall'). Default: Overall,
+  // biggest lift first. Rows with no value for the active column sink to the end.
+  const valueForSort = (rowPid: string, key: string): number | null => {
+    if (key === 'overall') return rowTotal(rowPid)?.delta ?? null;
+    if (key === rowPid) return null; // the diagonal
+    return cell(rowPid, key)?.delta ?? null;
+  };
+  const sortedRows = [...ps].sort((a, b) => {
+    const av = valueForSort(a.pid, sortCol);
+    const bv = valueForSort(b.pid, sortCol);
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return sortDir === 'desc' ? bv - av : av - bv;
+  });
+  const onSort = (key: string) => {
+    if (sortCol === key) setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+    else { setSortCol(key); setSortDir('desc'); }
+  };
+  const arrow = (key: string) => (sortCol === key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '');
+
   return (
     <SectionCard title="Team Winners by Partner">
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Each cell shows how much a <strong>row</strong> player lifts (or lowers) a <strong>column</strong> partner&apos;s team winners per game:
         the row player&apos;s clean team winners/game <em>with</em> that partner, minus the partner&apos;s team winners/game <em>without</em> them.
         <span className="text-blue-700"> Blue ▲</span> = the row player&apos;s teams score more winners with that partner (a sign of setting them up
-        rather than finishing yourself); <span className="text-orange-700">orange ▼</span> = fewer. Read a row to see whom a player lifts. pb.vision has no
-        &quot;assist&quot; label, so this is team output, not proof of a specific feed; it doesn&apos;t adjust for opponents. Pairings under {MIN_GAMES} games are blank.
+        rather than finishing yourself); <span className="text-orange-700">orange ▼</span> = fewer. Read a row to see whom a player lifts. Click a
+        column header to sort. pb.vision has no &quot;assist&quot; label, so this is team output, not proof of a specific feed; it doesn&apos;t adjust for
+        opponents. Pairings under {MIN_GAMES} games are blank.
         The <strong>Overall</strong> column is each player&apos;s games-weighted average lift across <em>all</em> their partners — their combined impact in one number.
       </p>
-      <div className="overflow-x-auto">
-        <table className="text-sm border-separate" style={{ borderSpacing: 0 }}>
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="w-full text-sm border-separate" style={{ borderSpacing: 0 }}>
           <thead>
             <tr>
-              <th
-                className="sticky left-0 z-10 text-left px-3 py-2 font-semibold text-white"
-                style={{ backgroundColor: '#334155' }}
-              >
+              <th className="sticky left-0 z-10 text-left px-4 py-2.5 font-semibold text-white" style={{ backgroundColor: '#334155' }}>
                 <span className="text-xs opacity-80">lifts ↓ · partner →</span>
               </th>
               {ps.map((p) => (
-                <th key={p.pid} className="px-2 py-2 font-semibold text-white text-center" style={{ backgroundColor: '#334155' }}>
-                  <span className="inline-flex flex-col items-center gap-1">
-                    <PlayerAvatar player={p} size="sm" />
-                    <span className="text-[11px] leading-none">{p.name}</span>
-                  </span>
+                <th
+                  key={p.pid}
+                  onClick={() => onSort(p.pid)}
+                  className={`px-2 py-2.5 font-semibold text-center cursor-pointer select-none hover:bg-slate-600 ${sortCol === p.pid ? 'text-white' : 'text-slate-200'}`}
+                  style={{ backgroundColor: '#334155' }}
+                >
+                  {p.name}{arrow(p.pid)}
                 </th>
               ))}
-              <th className="px-3 py-2 font-semibold text-white text-center border-l-2 border-slate-500" style={{ backgroundColor: '#334155' }}>
-                <span className="text-[11px] leading-tight block">Overall<br /><span className="opacity-70 font-normal">(weighted)</span></span>
+              <th
+                onClick={() => onSort('overall')}
+                className={`px-3 py-2.5 font-semibold text-center border-l-2 border-slate-500 cursor-pointer select-none hover:bg-slate-600 ${sortCol === 'overall' ? 'text-white' : 'text-slate-200'}`}
+                style={{ backgroundColor: '#334155' }}
+              >
+                <span className="text-xs leading-tight block">Overall{arrow('overall')}<br /><span className="opacity-70 font-normal">(weighted)</span></span>
               </th>
             </tr>
           </thead>
           <tbody>
-            {ps.map((row) => (
-              <tr key={row.pid}>
-                <th
-                  className="sticky left-0 z-10 text-left px-3 py-2 font-medium bg-white border-t border-gray-100"
-                  style={{ color: row.color.text }}
-                >
-                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                    <PlayerAvatar player={row} size="sm" />
-                    {row.name}
-                  </span>
+            {sortedRows.map((row) => (
+              <tr key={row.pid} className="hover:bg-gray-50/60">
+                <th className="sticky left-0 z-10 text-left px-4 py-2.5 font-semibold bg-white border-t border-gray-100 whitespace-nowrap" style={{ color: row.color.text }}>
+                  {row.name}
                 </th>
                 {ps.map((col) => {
                   if (col.pid === row.pid) {
@@ -226,7 +249,7 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
                   return (
                     <td
                       key={col.pid}
-                      className="border-t border-l border-gray-100 text-center tabular-nums px-2 py-2"
+                      className="border-t border-l border-gray-100 text-center tabular-nums px-2 py-2.5"
                       style={c ? { backgroundColor: bg(c.delta) } : undefined}
                       title={c ? `${row.name} with ${col.name}: ${c.delta >= 0 ? '+' : ''}${c.delta.toFixed(1)} team winners/g vs ${col.name} without ${row.name} (${c.games} games)` : `${row.name} & ${col.name}: fewer than ${MIN_GAMES} games`}
                     >
@@ -244,7 +267,7 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
                   const t = rowTotal(row.pid);
                   return (
                     <td
-                      className="border-t border-l-2 border-slate-300 text-center tabular-nums px-3 py-2"
+                      className="border-t border-l-2 border-slate-300 text-center tabular-nums px-3 py-2.5"
                       style={t ? { backgroundColor: bg(t.delta) } : undefined}
                       title={t ? `${row.name}: on balance ${t.delta >= 0 ? '+' : ''}${t.delta.toFixed(1)} team winners/g across all partners (games-weighted, ${t.games} partner-games)` : undefined}
                     >
