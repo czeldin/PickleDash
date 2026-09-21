@@ -133,6 +133,39 @@ export function RallyImpactSection({ data }: Props) {
     return m;
   }, [data.courtShots]);
 
+  // Team-lift per player: games-weighted average of their per-partner deltas
+  // (extra team winners/g they bring vs each partner without them) — the same
+  // "Overall" number as the Team Winners by Partner matrix, surfaced here so you
+  // can read personal impact and combined-team impact side by side.
+  const teamLift = useMemo(() => {
+    const pw = data.partnerWinners ?? [];
+    const MIN_GAMES = 2;
+    const overall = new Map<string, { games: number; tw: number }>();
+    const pairMap = new Map<string, { games: number; tw: number; twpg: number }>();
+    for (const r of pw) {
+      pairMap.set(`${r.pid}|${r.partnerPid}`, { games: r.games, tw: r.teamWinners, twpg: r.teamWinnersPerGame });
+      const a = overall.get(r.pid) ?? { games: 0, tw: 0 };
+      a.games += r.games; a.tw += r.teamWinners; overall.set(r.pid, a);
+    }
+    const m = new Map<string, number>();
+    for (const p of players) {
+      let wSum = 0, gSum = 0;
+      for (const partner of players) {
+        if (partner.pid === p.pid) continue;
+        const pair = pairMap.get(`${p.pid}|${partner.pid}`);
+        if (!pair || pair.games < MIN_GAMES) continue;
+        const ov = overall.get(partner.pid);
+        if (!ov) continue;
+        const otherGames = ov.games - pair.games;
+        if (otherGames <= 0) continue;
+        const delta = pair.twpg - (ov.tw - pair.tw) / otherGames;
+        wSum += delta * pair.games; gSum += pair.games;
+      }
+      if (gSum > 0) m.set(p.pid, wSum / gSum);
+    }
+    return m;
+  }, [data.partnerWinners, players]);
+
   if (rows.length === 0) return null;
 
   // A value cell that opens its matching film queue (if any clips exist).
@@ -163,19 +196,29 @@ export function RallyImpactSection({ data }: Props) {
   const columns: ColumnDef<RallyImpactRow>[] = [
     { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-blue-700', suspectWinners.get(r.pid) ?? 0) },
     { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => filmCell(r.pid, 'ri-lost', per(r.lostDirect, r.games), 'text-gray-700') },
-    { key: 'setup', header: 'Popped up (lost)/g', getValue: (r) => per(r.setup, r.games), render: (r) => filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700') },
     {
       key: 'net', header: 'Net/g',
       getValue: (r) => per(r.won - r.lostDirect - r.setup, r.games),
       render: (r) => { const n = per(r.won - r.lostDirect - r.setup, r.games); return <span className={`tabular-nums font-bold ${cbDeltaText(n)}`}>{n >= 0 ? '▲ +' : '▼ '}{n.toFixed(1)}</span>; },
+    },
+    // Divider → secondary metrics on the right.
+    { key: 'setup', header: <span className="border-l border-gray-200 pl-3 -ml-3">Popped up (lost)/g</span>, getValue: (r) => per(r.setup, r.games), render: (r) => <span className="border-l border-gray-100 pl-3 -ml-3 inline-block">{filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700')}</span> },
+    {
+      key: 'teamLift', header: 'Team lift/g',
+      getValue: (r) => teamLift.get(r.pid) ?? -Infinity,
+      render: (r) => {
+        const v = teamLift.get(r.pid);
+        if (v == null) return <span className="text-gray-300">—</span>;
+        return <span className={`tabular-nums font-semibold ${cbDeltaText(v)}`}>{v >= 0 ? '▲ +' : '▼ '}{v.toFixed(1)}</span>;
+      },
     },
   ];
 
   return (
     <SectionCard title="Rally Impact — Winners vs Points Given Away" action={<TrendButton title="Rally Impact" metrics={RALLY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
-        Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your own rally-ending errors (net/out/short). <strong className="text-gray-600">Popped up (lost)</strong> = your pop-ups the opponent put away to end the rally — a different set of lost points from Lost, not double-counted. Net = winners − both.
-        {data.courtShots && <> Click a value with a <span className="text-blue-500">▶</span> to watch those points. A <span className="text-amber-500">⚠</span> means some of those winners may be mis-scored by pb.vision (a soft dink tagged a put-away when the opponent likely erred) — worth verifying.</>}
+        Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your own rally-ending errors (net/out/short); <strong className="text-gray-600">Net</strong> = winners − both. <strong className="text-gray-600">Popped up (lost)</strong> = your pop-ups the opponent put away — separate lost points, not double-counted. <strong className="text-gray-600">Team lift</strong> = extra winners your teams score with you vs your partners without you (the Partners &amp; Matchups &quot;Overall&quot;).
+        {data.courtShots && <> Click a value with a <span className="text-blue-500">▶</span> to watch those points. A <span className="text-amber-500">⚠</span> means some of those winners may be mis-scored by pb.vision — worth verifying.</>}
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="net" />
 
