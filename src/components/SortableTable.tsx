@@ -121,7 +121,7 @@ export function SortableTable<T extends { pid: string }>({
             const player = playerMap.get(row.pid);
             if (!player) return null;
             return (
-              <TableRow key={row.pid} className="hover:bg-gray-50">
+              <TableRow key={row.pid} className="group hover:bg-gray-50">
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <PlayerAvatar player={player} size="sm" />

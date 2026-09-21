@@ -183,12 +183,13 @@ export function RallyImpactSection({ data }: Props) {
       <button
         type="button"
         onClick={() => setFilm({ pid, catId })}
-        className={`tabular-nums ${cls} inline-flex items-center gap-1 hover:underline decoration-dotted group`}
+        className={`tabular-nums ${cls} inline-flex items-center gap-1 hover:underline decoration-dotted`}
         title={`Watch ${n} clip${n === 1 ? '' : 's'}${suspect > 0 ? ` · ${suspect} may be mis-scored` : ''}`}
       >
         {label}
         {warn}
-        <span className="text-xs opacity-60 group-hover:opacity-100" aria-label="watch clips">🎬</span>
+        {/* Revealed only on row hover (the row carries `group`) to keep the table clean. */}
+        <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="watch clips">🎬</span>
       </button>
     );
   };
