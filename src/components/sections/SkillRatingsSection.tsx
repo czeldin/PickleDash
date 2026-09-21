@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { DashboardData, SkillRatingsRow, SkillRatingsByGameRow, PlayerMeta } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
+import { cbText, cbDeltaText, cbBestPill, cbWorstPill } from '@/lib/cbColors';
 import { TrendButton, MetricDef, TrendRow } from '@/components/TrendChart';
 
 interface Props {
@@ -83,14 +84,14 @@ function colorPill(value: number, isMax: boolean, isMin: boolean) {
   const display = value > 0 ? value.toFixed(2) : '—';
   if (isMax) {
     return (
-      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${cbBestPill}`}>
         {display}
       </span>
     );
   }
   if (isMin && value > 0) {
     return (
-      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${cbWorstPill}`}>
         {display}
       </span>
     );
@@ -162,10 +163,10 @@ export function SkillRatingsSection({ data }: Props) {
 // ─── Players (By Game) view ────────────────────────────────────────────────────
 
 function skillColor(value: number): string {
-  if (value <= 0) return 'text-gray-400';
-  if (value >= 0.7) return 'text-green-700 font-semibold';
-  if (value >= 0.5) return 'text-gray-700';
-  return 'text-red-600';
+  if (value <= 0) return cbText('off');
+  if (value >= 0.7) return cbText('good');
+  if (value >= 0.5) return cbText('neutral');
+  return cbText('bad');
 }
 
 type SortCol = 'time' | 'overall' | SkillKey;
@@ -214,8 +215,8 @@ function Delta({ val, base }: { val: number; base: number }) {
   const d = val - base;
   if (Math.abs(d) < 0.005) return <span className="text-gray-400 text-xs ml-1">—</span>;
   return (
-    <span className={`text-xs ml-1 ${d > 0 ? 'text-green-600' : 'text-red-500'}`}>
-      {d > 0 ? '+' : ''}{d.toFixed(2)}
+    <span className={`text-xs ml-1 ${cbDeltaText(d)}`}>
+      {d > 0 ? '▲ +' : '▼ '}{d.toFixed(2)}
     </span>
   );
 }

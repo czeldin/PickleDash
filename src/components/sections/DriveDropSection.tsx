@@ -3,6 +3,7 @@
 import { DashboardData, DriveDropRow, NightTrendRow } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
+import { cbText, cbDeltaText, cbArrow } from '@/lib/cbColors';
 import { TrendButton, MetricDef } from '@/components/TrendChart';
 
 interface Props { data: DashboardData; }
@@ -20,7 +21,7 @@ const pct = (n: number, d: number) => (d > 0 ? Math.round((100 * n) / d) : null)
 function winCell(won: number, n: number, sub?: string) {
   const v = pct(won, n);
   if (v === null) return <span className="text-gray-300">—</span>;
-  const color = v >= 50 ? 'text-emerald-700' : v >= 42 ? 'text-gray-800' : 'text-red-600';
+  const color = v >= 50 ? cbText('good') : v >= 42 ? 'text-gray-800' : cbText('bad');
   return (
     <span>
       <span className={`font-semibold tabular-nums ${color}`}>{v}%</span>
@@ -49,7 +50,7 @@ export function DriveDropSection({ data }: Props) {
     { key: 'off', header: 'Drive → offense win', getValue: (r) => pct(r.offWon, r.offN) ?? -1, render: (r) => winCell(r.offWon, r.offN) },
     {
       key: 'gap', header: 'Gap (drop − D&D)', getValue: (r) => gapVal(r) ?? -999,
-      render: (r) => { const g = gapVal(r); return g === null ? <span className="text-gray-300">—</span> : <span className={`tabular-nums font-bold ${g > 0 ? 'text-red-600' : 'text-emerald-700'}`}>{g > 0 ? '+' : ''}{g} pts</span>; },
+      render: (r) => { const g = gapVal(r); return g === null ? <span className="text-gray-300">—</span> : <span className={`tabular-nums font-bold ${cbDeltaText(g, false)}`}>{cbArrow(g, false)} {g > 0 ? '+' : ''}{g} pts</span>; },
     },
   ];
 

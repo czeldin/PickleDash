@@ -8,6 +8,7 @@ import { PlayerAvatar } from '@/components/PlayerAvatar';
 import { InfoTip } from '@/components/InfoTip';
 import { qualifiedPids } from '@/lib/qualified';
 import { categoryById, clipsFor, ClipModalController } from '@/components/filmClips';
+import { cbDeltaText } from '@/lib/cbColors';
 
 interface Props {
   data: DashboardData;
@@ -50,9 +51,9 @@ export function OutcomesSection({ data }: Props) {
   const Cell = ({ w, l, lead }: { w: number; l: number; lead: boolean }) => {
     const p = pct(w, l);
     return (
-      <span className={`tabular-nums inline-flex items-center gap-1 ${lead ? 'bg-green-100 text-green-800 rounded-full px-2 py-0.5' : ''}`}>
+      <span className={`tabular-nums inline-flex items-center gap-1 ${lead ? 'bg-blue-100 text-blue-800 rounded-full px-2 py-0.5' : ''}`}>
         <span className="font-medium">{w}–{l}</span>
-        <span className={`text-xs ${lead ? 'text-green-700' : 'text-gray-400'}`}>{p == null ? '' : `${p}%`}</span>
+        <span className={`text-xs ${lead ? 'text-blue-700' : 'text-gray-400'}`}>{p == null ? '' : `${p}%`}</span>
       </span>
     );
   };
@@ -65,8 +66,8 @@ export function OutcomesSection({ data }: Props) {
       render: (o) => {
         const lead = qPids.has(o.pid) && isLead(o.netPointsPerGame, leaders.net);
         return (
-          <span className={`tabular-nums font-medium ${lead ? 'bg-green-100 text-green-800 rounded-full px-2 py-0.5' : o.netPointsPerGame >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-            {o.netPointsPerGame >= 0 ? '+' : ''}{o.netPointsPerGame.toFixed(1)}
+          <span className={`tabular-nums font-medium ${lead ? 'bg-blue-100 text-blue-800 rounded-full px-2 py-0.5' : cbDeltaText(o.netPointsPerGame)}`}>
+            {o.netPointsPerGame >= 0 ? '▲ +' : '▼ '}{o.netPointsPerGame.toFixed(1)}
           </span>
         );
       },
@@ -80,7 +81,7 @@ export function OutcomesSection({ data }: Props) {
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Three lenses on winning. A player can win <em>games</em> but lose the <em>rally</em> battle (carried by a partner),
         or vice-versa. <strong>Net Pts / G</strong> = points won − lost, per game (a points margin).
-        <span className="ml-1">The <span className="bg-green-100 text-green-800 rounded-full px-1.5">green</span> value leads each column (qualified players only).</span>
+        <span className="ml-1">The <span className="bg-blue-100 text-blue-800 rounded-full px-1.5">highlighted</span> value leads each column (qualified players only).</span>
       </p>
       <SortableTable rows={rows} columns={columns} players={data.players} defaultSortKey="games" />
     </SectionCard>
@@ -149,6 +150,20 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
     return { delta: pair.teamWinnersPerGame - otherTw / otherGames, games: pair.games };
   };
 
+  // Row summary: games-weighted average of a player's per-partner deltas — their
+  // combined lift across everyone they play with. Weighting by games together
+  // stops a 2-game pairing from swinging the summary as much as a 30-game one.
+  const rowTotal = (rowPid: string): { delta: number; games: number } | null => {
+    let wSum = 0, gSum = 0;
+    for (const col of ps) {
+      if (col.pid === rowPid) continue;
+      const c = cell(rowPid, col.pid);
+      if (!c) continue;
+      wSum += c.delta * c.games; gSum += c.games;
+    }
+    return gSum > 0 ? { delta: wSum / gSum, games: gSum } : null;
+  };
+
   // Color-blind-safe diverging scale: blue = lifts (positive), orange = lowers
   // (negative). Craig is red/green color-blind, so blue↔orange + the sign and a
   // ▲/▼ arrow carry the meaning without relying on hue. Magnitude caps at ±3.
@@ -166,6 +181,7 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
         <span className="text-blue-700"> Blue ▲</span> = the row player&apos;s teams score more winners with that partner (a sign of setting them up
         rather than finishing yourself); <span className="text-orange-700">orange ▼</span> = fewer. Read a row to see whom a player lifts. pb.vision has no
         &quot;assist&quot; label, so this is team output, not proof of a specific feed; it doesn&apos;t adjust for opponents. Pairings under {MIN_GAMES} games are blank.
+        The <strong>Overall</strong> column is each player&apos;s games-weighted average lift across <em>all</em> their partners — their combined impact in one number.
       </p>
       <div className="overflow-x-auto">
         <table className="text-sm border-separate" style={{ borderSpacing: 0 }}>
@@ -185,6 +201,9 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
                   </span>
                 </th>
               ))}
+              <th className="px-3 py-2 font-semibold text-white text-center border-l-2 border-slate-500" style={{ backgroundColor: '#334155' }}>
+                <span className="text-[11px] leading-tight block">Overall<br /><span className="opacity-70 font-normal">(weighted)</span></span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -221,6 +240,24 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
                     </td>
                   );
                 })}
+                {(() => {
+                  const t = rowTotal(row.pid);
+                  return (
+                    <td
+                      className="border-t border-l-2 border-slate-300 text-center tabular-nums px-3 py-2"
+                      style={t ? { backgroundColor: bg(t.delta) } : undefined}
+                      title={t ? `${row.name}: on balance ${t.delta >= 0 ? '+' : ''}${t.delta.toFixed(1)} team winners/g across all partners (games-weighted, ${t.games} partner-games)` : undefined}
+                    >
+                      {t ? (
+                        <span className={`font-bold ${t.delta >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                          {t.delta >= 0 ? '▲' : '▼'} {t.delta >= 0 ? '+' : ''}{t.delta.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">·</span>
+                      )}
+                    </td>
+                  );
+                })()}
               </tr>
             ))}
           </tbody>
@@ -236,8 +273,8 @@ const partnerCols: ColumnDef<PartnerAdjRow>[] = [
   {
     key: 'lift', header: 'Lift', getValue: (r) => r.lift,
     render: (r) => (
-      <span className={`tabular-nums font-medium ${r.lift >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-        {r.lift >= 0 ? '+' : ''}{r.lift.toFixed(1)}
+      <span className={`tabular-nums font-medium ${cbDeltaText(r.lift)}`}>
+        {r.lift >= 0 ? '▲ +' : '▼ '}{r.lift.toFixed(1)}
       </span>
     ),
   },
@@ -252,7 +289,7 @@ type ReasonKey = keyof Omit<LossReasonRow, 'pid' | 'ralliesLost'>;
 // clicking a player's bar opens that queue in the video modal. Causes with no
 // matching queue (opponent winners, unattributed) are not clickable.
 const REASONS: { keys: ReasonKey[]; label: string; tone: string; hint: string; filmCat?: string }[] = [
-  { keys: ['ownNet', 'ownKitchen'], label: 'We hit into net / short', tone: 'bg-red-500', filmCat: 'net-errors', hint: 'The rally-ending shot was ours and didn’t make it over — the net stopped it, or it fell short of the net on our own side. pb.vision can’t reliably tell these apart near the net (it tags many net-cords as "short"), so they’re combined here.' },
+  { keys: ['ownNet', 'ownKitchen'], label: 'We hit into net / short', tone: 'bg-sky-500', filmCat: 'net-errors', hint: 'The rally-ending shot was ours and didn’t make it over — the net stopped it, or it fell short of the net on our own side. pb.vision can’t reliably tell these apart near the net (it tags many net-cords as "short"), so they’re combined here.' },
   { keys: ['ownOut'], label: 'We hit out', tone: 'bg-orange-500', filmCat: 'out-errors', hint: 'The rally-ending shot was ours and landed out.' },
   { keys: ['popupExploited'], label: 'We popped it up', tone: 'bg-fuchsia-500', filmCat: 'popped-up', hint: 'A rally we lost where someone popped a dink/drop up and the opponents attacked it. The pop-up is treated as the root cause even if the point technically ended a shot or two later (it put us on defense). Charged to whoever popped it, not their partner. Matches Rally Impact’s "Popped up (lost)".' },
   { keys: ['oppWinner'], label: 'They hit a winner', tone: 'bg-slate-400', filmCat: 'fed-winners', hint: 'The opponents ended the rally with a clean winner or putaway — not our error. The film shows your feed right before it (the ball they attacked).' },

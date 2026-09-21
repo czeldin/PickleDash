@@ -17,9 +17,9 @@ function QualityBar({ row }: { row: ShotQualityRow }) {
   }
   return (
     <div className="flex rounded-full overflow-hidden h-3 min-w-[100px] flex-1">
-      <div className="bg-green-400" style={{ width: `${row.excellentPct}%` }} title={`Excellent: ${row.excellentPct.toFixed(1)}%`} />
+      <div className="bg-blue-500" style={{ width: `${row.excellentPct}%` }} title={`Excellent: ${row.excellentPct.toFixed(1)}%`} />
       <div className="bg-gray-200" style={{ width: `${other}%` }} title={`Other: ${other.toFixed(1)}%`} />
-      <div className="bg-red-400" style={{ width: `${row.poorPct}%` }} title={`Poor: ${row.poorPct.toFixed(1)}%`} />
+      <div className="bg-orange-400" style={{ width: `${row.poorPct}%` }} title={`Poor: ${row.poorPct.toFixed(1)}%`} />
     </div>
   );
 }
@@ -34,7 +34,7 @@ export function ShotQualitySection({ data }: Props) {
       getValue: (row) => row.qualityScore,
       render: (row) => {
         const v = row.qualityScore;
-        const color = v >= 10 ? 'text-green-700' : v >= 0 ? 'text-gray-700' : 'text-red-600';
+        const color = v >= 10 ? 'text-blue-700' : v >= 0 ? 'text-gray-700' : 'text-orange-700';
         return (
           <span className={`text-sm font-bold ${color}`}>
             {v > 0 ? '+' : ''}{v.toFixed(1)}
@@ -53,7 +53,7 @@ export function ShotQualitySection({ data }: Props) {
       header: 'Excellent %',
       getValue: (row) => row.excellentPct,
       render: (row) => (
-        <span className="text-sm text-green-700 font-semibold">
+        <span className="text-sm text-blue-700 font-semibold">
           {row.excellentPct > 0 ? `${row.excellentPct.toFixed(1)}%` : '—'}
           <span className="text-gray-400 font-normal text-xs ml-1">({row.excellentCount})</span>
         </span>
@@ -64,7 +64,7 @@ export function ShotQualitySection({ data }: Props) {
       header: 'Poor %',
       getValue: (row) => row.poorPct,
       render: (row) => (
-        <span className="text-sm text-red-600 font-semibold">
+        <span className="text-sm text-orange-700 font-semibold">
           {row.poorPct > 0 ? `${row.poorPct.toFixed(1)}%` : '—'}
           <span className="text-gray-400 font-normal text-xs ml-1">({row.poorCount})</span>
         </span>
@@ -75,9 +75,9 @@ export function ShotQualitySection({ data }: Props) {
   return (
     <SectionCard title="Shot Quality" action={<TrendButton title="Shot quality" metrics={SHOT_QUALITY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <div className="flex gap-3 text-xs mb-2">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-400 inline-block" />Excellent</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />Excellent</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gray-200 inline-block border border-gray-300" />Other</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-400 inline-block" />Poor</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-orange-400 inline-block" />Poor</span>
       </div>
       <SortableTable
         rows={shotQuality}

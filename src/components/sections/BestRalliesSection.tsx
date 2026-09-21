@@ -57,7 +57,7 @@ export function BestRalliesSection({ data }: Props) {
                   Rally <span className="font-semibold text-gray-700">#{h.rallyNum}</span>
                   &nbsp;·&nbsp;{h.shotCount} shots
                 </span>
-                <span className="text-xs font-bold text-emerald-600">
+                <span className="text-xs font-bold text-blue-700">
                   {(h.avgQuality * 100).toFixed(0)} pts
                 </span>
               </div>

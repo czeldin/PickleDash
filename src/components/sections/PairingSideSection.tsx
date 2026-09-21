@@ -34,7 +34,7 @@ type Metric = 'kitchen' | 'early' | 'won';
 const METRICS: { key: Metric; label: string; color: string }[] = [
   { key: 'kitchen', label: 'Kit', color: 'text-gray-800' },
   { key: 'early', label: 'Early', color: 'text-amber-600' },
-  { key: 'won', label: 'Win', color: 'text-emerald-700' },
+  { key: 'won', label: 'Win', color: 'text-blue-700' },
 ];
 
 // Combine a side cell's serving/receiving buckets according to the chosen scope.
@@ -200,7 +200,7 @@ export function PairingSideSection({ data }: Props) {
       {open && (<>
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-1">
         <p className="text-sm text-gray-500">
-          <strong className="text-gray-700">Kit</strong> = reached the kitchen · <strong className="text-amber-600">Early</strong> = won before the kitchen · <strong className="text-emerald-700">Win</strong> = won overall. Split by which side the first player is on.
+          <strong className="text-gray-700">Kit</strong> = reached the kitchen · <strong className="text-amber-600">Early</strong> = won before the kitchen · <strong className="text-blue-700">Win</strong> = won overall. Split by which side the first player is on.
         </p>
         <div className="flex items-center gap-1 text-xs">
           <span className="text-gray-400">Sort by</span>

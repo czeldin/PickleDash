@@ -77,7 +77,7 @@ export function ErrorSection({ data }: Props) {
       // that hit the net from one that fell just short of it (it tags many net
       // balls as "short"), so we no longer present them as distinct.
       getValue: (row) => row.net + row.kitchen,
-      render: (row) => errCell(row.net + row.kitchen, 'text-red-600'),
+      render: (row) => errCell(row.net + row.kitchen, 'text-orange-700'),
     },
     {
       key: 'out',
@@ -95,7 +95,7 @@ export function ErrorSection({ data }: Props) {
       key: 'unforced',
       header: 'Unforced / game',
       getValue: (row) => row.unforced,
-      render: (row) => errCell(row.unforced, 'text-red-500'),
+      render: (row) => errCell(row.unforced, 'text-orange-600'),
     },
     {
       key: 'forced',

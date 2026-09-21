@@ -222,8 +222,8 @@ function ClipModal({ shot, topic, detail, position, wholeRally, hasPrev, hasNext
                 <span
                   key={i}
                   className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                    tag.tone === 'good' ? 'bg-emerald-50 text-emerald-700'
-                      : tag.tone === 'bad' ? 'bg-red-50 text-red-600'
+                    tag.tone === 'good' ? 'bg-blue-50 text-blue-700'
+                      : tag.tone === 'bad' ? 'bg-orange-50 text-orange-700'
                       : 'bg-gray-100 text-gray-600'
                   }`}
                 >

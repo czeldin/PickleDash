@@ -63,7 +63,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
               onClick={() => { setCatId(c.id); setActiveIdx(null); }}
               className={`px-3 py-1.5 text-xs font-medium rounded-full border ${
                 catId === c.id
-                  ? c.good ? 'bg-green-600 text-white border-green-600' : 'bg-gray-800 text-white border-gray-800'
+                  ? c.good ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-800 text-white border-gray-800'
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -99,7 +99,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
                   Rally {s.rallyNum} · shot {s.shotNum}
                   <span className="text-gray-400 ml-2">{s.type}</span>
                   {s.endZone && s.endZone !== 'kitchen' && s.endZone !== 'deep' && s.endZone !== 'mid' && s.endZone !== 'short' && (
-                    <span className="text-red-500 ml-2">{s.endZone}</span>
+                    <span className="text-orange-600 ml-2">{s.endZone}</span>
                   )}
                 </span>
               </span>
@@ -107,7 +107,7 @@ export function FilmRoomSection({ data, focusPid, onFocusChange }: Props) {
                 {s.quality != null && (
                   <span className="text-xs text-gray-400 tabular-nums">q {Math.round(s.quality * 100)}</span>
                 )}
-                <span className={`text-xs font-medium ${s.won ? 'text-green-600' : 'text-red-500'}`}>{s.won ? 'won' : 'lost'}</span>
+                <span className={`text-xs font-medium ${s.won ? 'text-blue-700' : 'text-orange-600'}`}>{s.won ? 'won' : 'lost'}</span>
                 <span className="text-blue-600 text-sm group-hover:underline">watch →</span>
               </span>
             </button>

@@ -121,7 +121,7 @@ export function PlayerSummarySection({ data }: Props) {
                       Small sample — read with caution.
                     </p>
                   )}
-                  <Field color="text-emerald-600" icon="⭐" label="Best at">{s.best}</Field>
+                  <Field color="text-blue-700" icon="⭐" label="Best at">{s.best}</Field>
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-amber-500 uppercase tracking-wide">🎯 Work on</p>
                     {s.improve.length > 0 ? (

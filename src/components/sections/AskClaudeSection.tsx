@@ -180,7 +180,7 @@ export function AskClaudeSection({ data }: Props) {
                 <div className="bg-gray-100 text-gray-400 rounded-2xl px-4 py-2.5 text-sm">Thinking…</div>
               </div>
             )}
-            {error && <div className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{error}</div>}
+            {error && <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">⚠ {error}</div>}
           </div>
 
           <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="border-t border-gray-100 p-3 flex gap-2">

@@ -19,8 +19,8 @@ function InNetOutBar({ row }: { row: ShotAccuracyRow }) {
   return (
     <div className="flex items-center gap-1.5 min-w-[140px]">
       <div className="flex-1 flex rounded-full overflow-hidden h-3">
-        <div className="bg-green-400" style={{ width: `${inPct}%` }} title={`In: ${row.inShots}`} />
-        <div className="bg-red-400" style={{ width: `${netPct}%` }} title={`Net: ${row.netShots}`} />
+        <div className="bg-blue-500" style={{ width: `${inPct}%` }} title={`In: ${row.inShots}`} />
+        <div className="bg-purple-400" style={{ width: `${netPct}%` }} title={`Net: ${row.netShots}`} />
         <div className="bg-orange-400" style={{ width: `${outPct}%` }} title={`Out: ${row.outShots}`} />
       </div>
       <span className="text-xs text-gray-500 whitespace-nowrap">
@@ -43,13 +43,13 @@ export function ShotAccuracySection({ data }: Props) {
       key: 'inPct',
       header: 'In %',
       getValue: (row) => row.inPct,
-      render: (row) => pctCell(row.inPct, 'text-green-700 font-medium'),
+      render: (row) => pctCell(row.inPct, 'text-blue-700 font-medium'),
     },
     {
       key: 'netPct',
       header: 'Net %',
       getValue: (row) => row.netPct,
-      render: (row) => pctCell(row.netPct, 'text-red-600'),
+      render: (row) => pctCell(row.netPct, 'text-purple-600'),
     },
     {
       key: 'outPct',
@@ -74,8 +74,8 @@ export function ShotAccuracySection({ data }: Props) {
   return (
     <SectionCard title="Shot Accuracy" action={<TrendButton title="Shot accuracy" metrics={SHOT_ACCURACY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <div className="flex gap-3 text-xs mb-2">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-400 inline-block" />In</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-400 inline-block" />Net</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />In</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-400 inline-block" />Net</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-orange-400 inline-block" />Out</span>
       </div>
       <SortableTable

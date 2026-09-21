@@ -6,6 +6,7 @@ import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { TrendButton, MetricDef } from '@/components/TrendChart';
 import { categoryById, clipsFor, ClipModalController } from '@/components/filmClips';
+import { cbText, cbDeltaText } from '@/lib/cbColors';
 
 interface Props { data: DashboardData; }
 
@@ -85,7 +86,7 @@ export function CoachingSection({ data }: Props) {
               <div className="space-y-2">
                 {c.items.slice(0, 4).map((it) => {
                   const v = Math.round(it.value * 100);
-                  const color = v < 55 ? 'text-red-600' : v < 75 ? 'text-amber-600' : 'text-gray-700';
+                  const color = v < 55 ? 'text-orange-700' : v < 75 ? 'text-amber-600' : 'text-gray-700';
                   return (
                     <div key={it.kind} className="flex items-center gap-2 text-sm">
                       <span className="flex-1 text-gray-600">{label(it.kind)}</span>
@@ -160,13 +161,13 @@ export function RallyImpactSection({ data }: Props) {
   };
 
   const columns: ColumnDef<RallyImpactRow>[] = [
-    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-emerald-700', suspectWinners.get(r.pid) ?? 0) },
+    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-blue-700', suspectWinners.get(r.pid) ?? 0) },
     { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => filmCell(r.pid, 'ri-lost', per(r.lostDirect, r.games), 'text-gray-700') },
     { key: 'setup', header: 'Popped up (lost)/g', getValue: (r) => per(r.setup, r.games), render: (r) => filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700') },
     {
       key: 'net', header: 'Net/g',
       getValue: (r) => per(r.won - r.lostDirect - r.setup, r.games),
-      render: (r) => { const n = per(r.won - r.lostDirect - r.setup, r.games); return <span className={`tabular-nums font-bold ${n >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{n > 0 ? '+' : ''}{n.toFixed(1)}</span>; },
+      render: (r) => { const n = per(r.won - r.lostDirect - r.setup, r.games); return <span className={`tabular-nums font-bold ${cbDeltaText(n)}`}>{n >= 0 ? '▲ +' : '▼ '}{n.toFixed(1)}</span>; },
     },
   ];
 
@@ -209,10 +210,10 @@ export function TargetingSection({ data }: Props) {
 
   const columns: ColumnDef<TargetingRow>[] = [
     { key: 'attacks', header: 'Attacks/g', getValue: (r) => per(r.attacks, r.games), render: (r) => <span className="tabular-nums font-semibold text-gray-800">{per(r.attacks, r.games).toFixed(1)}</span> },
-    { key: 'clean', header: 'Winners/g', getValue: (r) => per(r.clean, r.games), render: (r) => <span className="tabular-nums text-emerald-700">{per(r.clean, r.games).toFixed(1)}</span> },
+    { key: 'clean', header: 'Winners/g', getValue: (r) => per(r.clean, r.games), render: (r) => <span className="tabular-nums text-blue-700">{per(r.clean, r.games).toFixed(1)}</span> },
     {
       key: 'convert', header: 'Finish win %', getValue: (r) => pct(r.clean, r.fin) ?? -1,
-      render: (r) => { const v = pct(r.clean, r.fin); if (v === null) return <span className="text-gray-300">—</span>; const c = v >= 42 ? 'text-emerald-700' : v >= 37 ? 'text-gray-800' : 'text-red-600'; return <span className={`tabular-nums font-semibold ${c}`}>{v}%</span>; },
+      render: (r) => { const v = pct(r.clean, r.fin); if (v === null) return <span className="text-gray-300">—</span>; const c = v >= 42 ? cbText('good') : v >= 37 ? cbText('neutral') : cbText('bad'); return <span className={`tabular-nums font-semibold ${c}`}>{v}%</span>; },
     },
     { key: 'pop', header: 'Pop-ups/g', getValue: (r) => per(r.pop, r.games), render: (r) => num(per(r.pop, r.games)) },
     { key: 'gotAttacked', header: 'Got attacked/g', getValue: (r) => per(r.gotAttacked, r.games), render: (r) => <span className="tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</span> },
@@ -221,7 +222,7 @@ export function TargetingSection({ data }: Props) {
   return (
     <SectionCard title="Targeting — Who Attacks, Who Gets Picked On" action={<TrendButton title="Targeting" metrics={TARGETING_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
-        Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-emerald-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups / Got attacked</strong> = how often you give the opponent a ball to put away.
+        Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-blue-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups / Got attacked</strong> = how often you give the opponent a ball to put away.
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="attacks" />
     </SectionCard>
@@ -239,7 +240,7 @@ export function KitchenServeReceiveSection({ data }: Props) {
   const cell = (n: number, d: number) => {
     const v = pct(n, d);
     if (v === null) return <span className="text-gray-300">—</span>;
-    const color = v >= 90 ? 'text-emerald-700' : v >= 70 ? 'text-gray-800' : 'text-amber-600';
+    const color = v >= 90 ? 'text-blue-700' : v >= 70 ? 'text-gray-800' : 'text-amber-600';
     return <span><span className={`font-semibold tabular-nums ${color}`}>{v}%</span><span className="text-gray-400 text-xs ml-1">({n}/{d})</span></span>;
   };
 

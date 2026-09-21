@@ -95,13 +95,13 @@ function StatRow({ label, a, b, higherIsBetter = true, fmt }: {
   return (
     <tr className="border-t border-gray-50">
       <td className="py-2 pr-4 text-sm text-gray-500 whitespace-nowrap">{label}</td>
-      <td className={`py-2 px-3 text-sm font-semibold text-center ${aWins && significant ? 'text-green-600' : 'text-gray-800'}`}>
+      <td className={`py-2 px-3 text-sm font-semibold text-center ${aWins && significant ? 'text-blue-700' : 'text-gray-800'}`}>
         {a != null ? fmt(a) : '—'}
-        {aWins && significant && <span className="ml-1 text-green-500 text-xs">▲</span>}
+        {aWins && significant && <span className="ml-1 text-blue-600 text-xs">▲</span>}
       </td>
-      <td className={`py-2 px-3 text-sm font-semibold text-center ${bWins && significant ? 'text-green-600' : 'text-gray-800'}`}>
+      <td className={`py-2 px-3 text-sm font-semibold text-center ${bWins && significant ? 'text-blue-700' : 'text-gray-800'}`}>
         {b != null ? fmt(b) : '—'}
-        {bWins && significant && <span className="ml-1 text-green-500 text-xs">▲</span>}
+        {bWins && significant && <span className="ml-1 text-blue-600 text-xs">▲</span>}
       </td>
     </tr>
   );

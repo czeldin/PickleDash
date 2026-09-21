@@ -24,7 +24,7 @@ function pctCell(pct: number, total: number, isMax: boolean, isMin: boolean) {
   return (
     <div className="inline-flex items-center gap-1">
       <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${
-        isMax ? 'bg-green-100 text-green-800' : isMin ? 'bg-red-100 text-red-700' : 'text-gray-800'
+        isMax ? 'bg-blue-100 text-blue-800' : isMin ? 'bg-orange-100 text-orange-800' : 'text-gray-800'
       }`}>
         {pct.toFixed(0)}%
       </span>
@@ -37,7 +37,7 @@ function numCell(val: number, isMax: boolean, isMin: boolean, decimals = 0) {
   if (val === 0) return <span className="text-gray-400 text-sm">—</span>;
   return (
     <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${
-      isMax ? 'bg-green-100 text-green-800' : isMin ? 'bg-red-100 text-red-700' : 'text-gray-800'
+      isMax ? 'bg-blue-100 text-blue-800' : isMin ? 'bg-orange-100 text-orange-800' : 'text-gray-800'
     }`}>
       {val.toFixed(decimals)}
     </span>
