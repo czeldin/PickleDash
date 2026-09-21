@@ -193,18 +193,19 @@ export function RallyImpactSection({ data }: Props) {
     );
   };
 
+  const COL_W = 130;
   const columns: ColumnDef<RallyImpactRow>[] = [
-    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-blue-700', suspectWinners.get(r.pid) ?? 0) },
-    { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => filmCell(r.pid, 'ri-lost', per(r.lostDirect, r.games), 'text-gray-700') },
+    { key: 'won', header: 'Winners/g', width: COL_W, getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-blue-700', suspectWinners.get(r.pid) ?? 0) },
+    { key: 'lost', header: 'Lost/g', width: COL_W, getValue: (r) => per(r.lostDirect, r.games), render: (r) => filmCell(r.pid, 'ri-lost', per(r.lostDirect, r.games), 'text-gray-700') },
     {
-      key: 'net', header: 'Net/g',
+      key: 'net', header: 'Net/g', width: COL_W,
       getValue: (r) => per(r.won - r.lostDirect - r.setup, r.games),
       render: (r) => { const n = per(r.won - r.lostDirect - r.setup, r.games); return <span className={`tabular-nums font-bold ${cbDeltaText(n)}`}>{n >= 0 ? '▲ +' : '▼ '}{n.toFixed(1)}</span>; },
     },
     // Divider → secondary metrics on the right.
-    { key: 'setup', header: <span className="border-l border-gray-200 pl-3 -ml-3">Popped up (lost)/g</span>, getValue: (r) => per(r.setup, r.games), render: (r) => <span className="border-l border-gray-100 pl-3 -ml-3 inline-block">{filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700')}</span> },
+    { key: 'setup', header: 'Popped up (lost)/g', width: COL_W, dividerBefore: true, getValue: (r) => per(r.setup, r.games), render: (r) => filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700') },
     {
-      key: 'teamLift', header: 'Team lift/g',
+      key: 'teamLift', header: 'Team lift/g', width: COL_W,
       getValue: (r) => teamLift.get(r.pid) ?? -Infinity,
       render: (r) => {
         const v = teamLift.get(r.pid);

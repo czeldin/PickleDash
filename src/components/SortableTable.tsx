@@ -16,6 +16,12 @@ export interface ColumnDef<T> {
   sortable?: boolean;
   render: (row: T, player: PlayerMeta) => ReactNode;
   getValue?: (row: T) => number;
+  // Fixed column width in px. When ANY column sets this, the table switches to a
+  // fixed layout so metric columns can share one uniform width.
+  width?: number;
+  // Draw a full-height vertical divider on this column's LEFT edge (header +
+  // every body cell) to separate metric groups.
+  dividerBefore?: boolean;
 }
 
 interface Props<T extends { pid: string }> {
@@ -72,9 +78,14 @@ export function SortableTable<T extends { pid: string }>({
     return <span style={{ color: 'white', marginLeft: 4 }}>{sortDir === 'desc' ? '↓' : '↑'}</span>;
   }
 
+  // When any column requests a fixed width, lay the table out fixed so the metric
+  // columns can share one uniform width instead of auto-sizing to content.
+  const fixed = columns.some((c) => c.width != null);
+  const divider = '2px solid #cbd5e1'; // slate-300, full-height column separator
+
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-      <Table>
+      <Table style={fixed ? { tableLayout: 'fixed', width: '100%' } : undefined}>
         <thead>
           <tr>
             <th style={{ ...thBase, width: 160 }}>Player</th>
@@ -89,6 +100,8 @@ export function SortableTable<T extends { pid: string }>({
                     backgroundColor: isHovered ? '#475569' : '#334155',
                     cursor: sortable ? 'pointer' : 'default',
                     userSelect: sortable ? 'none' : undefined,
+                    width: col.width,
+                    borderLeft: col.dividerBefore ? divider : undefined,
                   }}
                   onClick={() => sortable && handleSort(col.key)}
                   onMouseEnter={() => sortable && setHoverKey(col.key)}
@@ -116,7 +129,9 @@ export function SortableTable<T extends { pid: string }>({
                   </div>
                 </TableCell>
                 {columns.map((col) => (
-                  <TableCell key={col.key}>{col.render(row, player)}</TableCell>
+                  <TableCell key={col.key} style={col.dividerBefore ? { borderLeft: divider } : undefined}>
+                    {col.render(row, player)}
+                  </TableCell>
                 ))}
               </TableRow>
             );
