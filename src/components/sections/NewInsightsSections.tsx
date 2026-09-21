@@ -188,7 +188,7 @@ export function RallyImpactSection({ data }: Props) {
       >
         {label}
         {warn}
-        <span className="text-[10px] text-gray-400 group-hover:text-blue-500">▶</span>
+        <span className="text-xs opacity-60 group-hover:opacity-100" aria-label="watch clips">🎬</span>
       </button>
     );
   };
@@ -200,7 +200,7 @@ export function RallyImpactSection({ data }: Props) {
     {
       key: 'net', header: 'Net/g', width: COL_W,
       getValue: (r) => per(r.won - r.lostDirect - r.setup, r.games),
-      render: (r) => { const n = per(r.won - r.lostDirect - r.setup, r.games); return <span className={`tabular-nums font-bold ${cbDeltaText(n)}`}>{n >= 0 ? '▲ +' : '▼ '}{n.toFixed(1)}</span>; },
+      render: (r) => { const n = per(r.won - r.lostDirect - r.setup, r.games); return <span className={`tabular-nums font-bold ${cbDeltaText(n)}`}>{n >= 0 ? '+' : '−'}{Math.abs(n).toFixed(1)}</span>; },
     },
     // Divider → secondary metrics on the right.
     { key: 'setup', header: 'Popped up (lost)/g', width: COL_W, dividerBefore: true, getValue: (r) => per(r.setup, r.games), render: (r) => filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700') },
@@ -210,7 +210,7 @@ export function RallyImpactSection({ data }: Props) {
       render: (r) => {
         const v = teamLift.get(r.pid);
         if (v == null) return <span className="text-gray-300">—</span>;
-        return <span className={`tabular-nums font-semibold ${cbDeltaText(v)}`}>{v >= 0 ? '▲ +' : '▼ '}{v.toFixed(1)}</span>;
+        return <span className={`tabular-nums font-semibold ${cbDeltaText(v)}`}>{v >= 0 ? '+' : '−'}{Math.abs(v).toFixed(1)}</span>;
       },
     },
   ];
