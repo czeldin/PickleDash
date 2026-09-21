@@ -220,7 +220,7 @@ export function RallyImpactSection({ data }: Props) {
     <SectionCard title="Rally Impact — Winners vs Points Given Away" action={<TrendButton title="Rally Impact" metrics={RALLY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your own rally-ending errors (net/out/short); <strong className="text-gray-600">Net</strong> = winners − both. <strong className="text-gray-600">Popped up (lost)</strong> = your pop-ups the opponent put away — separate lost points, not double-counted. <strong className="text-gray-600">Team lift</strong> = extra winners your teams score with you vs your partners without you (the Partners &amp; Matchups &quot;Overall&quot;).
-        {data.courtShots && <> Click a value with a <span className="text-blue-500">▶</span> to watch those points. A <span className="text-amber-500">⚠</span> means some of those winners may be mis-scored by pb.vision — worth verifying.</>}
+        {data.courtShots && <> Hover a row and click a value with a <span aria-hidden>🎬</span> to watch those points. A <span className="text-amber-500">⚠</span> means some of those winners may be mis-scored by pb.vision — worth verifying.</>}
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="net" />
 
