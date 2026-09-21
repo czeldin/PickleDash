@@ -149,11 +149,13 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
     return { delta: pair.teamWinnersPerGame - otherTw / otherGames, games: pair.games };
   };
 
-  // Green→red background by delta magnitude (cap at ±3 team winners/g).
+  // Color-blind-safe diverging scale: blue = lifts (positive), orange = lowers
+  // (negative). Craig is red/green color-blind, so blue↔orange + the sign and a
+  // ▲/▼ arrow carry the meaning without relying on hue. Magnitude caps at ±3.
   const bg = (d: number) => {
     const t = Math.max(-1, Math.min(1, d / 3));
-    if (t >= 0) return `rgba(22, 163, 74, ${0.10 + 0.45 * t})`;   // green-600
-    return `rgba(220, 38, 38, ${0.10 + 0.45 * -t})`;              // red-600
+    if (t >= 0) return `rgba(37, 99, 235, ${0.08 + 0.42 * t})`;   // blue-600 (lift)
+    return `rgba(234, 88, 12, ${0.08 + 0.42 * -t})`;              // orange-600 (lower)
   };
 
   return (
@@ -161,8 +163,8 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
         Each cell shows how much a <strong>row</strong> player lifts (or lowers) a <strong>column</strong> partner&apos;s team winners per game:
         the row player&apos;s clean team winners/game <em>with</em> that partner, minus the partner&apos;s team winners/game <em>without</em> them.
-        <span className="text-green-700"> Green</span> = the row player&apos;s teams score more winners with that partner (a sign of setting them up
-        rather than finishing yourself); <span className="text-red-600">red</span> = fewer. Read a row to see whom a player lifts. pb.vision has no
+        <span className="text-blue-700"> Blue ▲</span> = the row player&apos;s teams score more winners with that partner (a sign of setting them up
+        rather than finishing yourself); <span className="text-orange-700">orange ▼</span> = fewer. Read a row to see whom a player lifts. pb.vision has no
         &quot;assist&quot; label, so this is team output, not proof of a specific feed; it doesn&apos;t adjust for opponents. Pairings under {MIN_GAMES} games are blank.
       </p>
       <div className="overflow-x-auto">
@@ -210,8 +212,8 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
                       title={c ? `${row.name} with ${col.name}: ${c.delta >= 0 ? '+' : ''}${c.delta.toFixed(1)} team winners/g vs ${col.name} without ${row.name} (${c.games} games)` : `${row.name} & ${col.name}: fewer than ${MIN_GAMES} games`}
                     >
                       {c ? (
-                        <span className={`font-semibold ${c.delta >= 0 ? 'text-green-800' : 'text-red-800'}`}>
-                          {c.delta >= 0 ? '+' : ''}{c.delta.toFixed(1)}
+                        <span className={`font-semibold ${c.delta >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                          {c.delta >= 0 ? '▲' : '▼'} {c.delta >= 0 ? '+' : ''}{c.delta.toFixed(1)}
                         </span>
                       ) : (
                         <span className="text-gray-300">·</span>
