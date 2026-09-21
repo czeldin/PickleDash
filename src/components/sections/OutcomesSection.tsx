@@ -106,106 +106,121 @@ export function PartnerAdjSection({ data }: Props) {
   );
 }
 
-// ─── Team Winners by Partner ────────────────────────────────────────────────
+// ─── Team Winners by Partner (matrix) ───────────────────────────────────────
 // Answers: "my personal winners/game is lower, but if I seed my partner, does
-// our TEAM hit as many winners?" For each focal player we show, per partner,
-// the team winners/game the pair produced together — vs how many that partner's
-// teams hit WITHOUT the focal player. A positive delta = the focal player's
-// teams score as many/more winners despite a lower personal count (seeded wins).
-export function TeamWinnersByPartnerSection({ data, focusPid }: Props) {
+// our TEAM hit as many winners?" — for EVERY player, not just one focal player.
+// Cell [row R, col C] = R's team winners/game when paired with C, MINUS C's team
+// winners/game WITHOUT R. Positive (green) = R's presence lifts a C-partnered
+// team's winner output; negative (red) = it lowers it. The matrix is asymmetric
+// on purpose: [R,C] is "does R lift C" and [C,R] is "does C lift R" — different
+// questions. Diagonal and unplayed / thin (<MIN_GAMES) pairings are blank.
+export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
   const rows = data.partnerWinners;
   const MIN_GAMES = 2; // ignore one-off pairings — too noisy to compare
 
-  // partner → their team winners/game across ALL their pairings (the baseline).
-  const partnerOverall = useMemo(() => {
-    const agg = new Map<string, { games: number; tw: number }>();
+  // Lookups: pair (r.pid,r.partnerPid) row, and each player's overall baseline.
+  const { pairMap, overall, activePids } = useMemo(() => {
+    const pairMap = new Map<string, PartnerWinnersRow>();
+    const overall = new Map<string, { games: number; tw: number }>();
+    const active = new Set<string>();
     for (const r of rows ?? []) {
-      const a = agg.get(r.partnerPid) ?? { games: 0, tw: 0 };
-      a.games += r.games; a.tw += r.teamWinners; agg.set(r.partnerPid, a);
+      pairMap.set(`${r.pid}|${r.partnerPid}`, r);
+      const a = overall.get(r.pid) ?? { games: 0, tw: 0 };
+      a.games += r.games; a.tw += r.teamWinners; overall.set(r.pid, a);
+      if (r.games >= MIN_GAMES) { active.add(r.pid); active.add(r.partnerPid); }
     }
-    return agg;
+    return { pairMap, overall, activePids: active };
   }, [rows]);
 
-  // focal player → their pairings (rows where pid === focal).
-  const byFocal = useMemo(() => {
-    const m = new Map<string, PartnerWinnersRow[]>();
-    for (const r of rows ?? []) {
-      if (r.games < MIN_GAMES) continue;
-      if (!m.has(r.pid)) m.set(r.pid, []);
-      m.get(r.pid)!.push(r);
-    }
-    return m;
-  }, [rows]);
+  if (!rows || rows.length === 0 || activePids.size === 0) return null;
 
-  const focalOrder = data.players.filter((p) => byFocal.has(p.pid));
-  const initial = (focusPid && byFocal.has(focusPid)) ? focusPid : focalOrder[0]?.pid ?? null;
-  const [sel, setSel] = useState<string | null>(null);
-  const focal = (sel && byFocal.has(sel)) ? sel : initial;
+  // Players that appear in at least one qualifying pairing, in dashboard order.
+  const ps = data.players.filter((p) => activePids.has(p.pid));
 
-  if (!rows || rows.length === 0 || !focal) return null;
+  // delta(row lifter, col partner): row's team-wins/g WITH col, minus col's
+  // team-wins/g WITHOUT row. null when they never played >=MIN_GAMES together.
+  const cell = (rowPid: string, colPid: string): { delta: number; games: number } | null => {
+    const pair = pairMap.get(`${rowPid}|${colPid}`);
+    if (!pair || pair.games < MIN_GAMES) return null;
+    const ov = overall.get(colPid) ?? { games: 0, tw: 0 };
+    const otherGames = ov.games - pair.games;
+    const otherTw = ov.tw - pair.teamWinners;
+    if (otherGames <= 0) return null; // col only ever played with row → no baseline
+    return { delta: pair.teamWinnersPerGame - otherTw / otherGames, games: pair.games };
+  };
 
-  const pairs = [...(byFocal.get(focal) ?? [])].sort((a, b) => b.teamWinnersPerGame - a.teamWinnersPerGame);
-  const focalName = playerById(data.players, focal)?.name ?? focal;
+  // Green→red background by delta magnitude (cap at ±3 team winners/g).
+  const bg = (d: number) => {
+    const t = Math.max(-1, Math.min(1, d / 3));
+    if (t >= 0) return `rgba(22, 163, 74, ${0.10 + 0.45 * t})`;   // green-600
+    return `rgba(220, 38, 38, ${0.10 + 0.45 * -t})`;              // red-600
+  };
 
   return (
-    <SectionCard
-      title="Team Winners by Partner"
-      action={
-        <select
-          value={focal}
-          onChange={(e) => setSel(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700"
-        >
-          {focalOrder.map((p) => (
-            <option key={p.pid} value={p.pid}>{p.name}</option>
-          ))}
-        </select>
-      }
-    >
+    <SectionCard title="Team Winners by Partner">
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        Clean winners the <strong>team</strong> hit per game — <em>with {focalName}</em> vs how that partner&apos;s teams did <em>without</em> them.
-        A positive <span className="text-green-700">delta</span> means {focalName}&apos;s teams score as many or more winners even when {focalName}&apos;s
-        own winners/game is lower — the mark of setting a partner up rather than finishing yourself. pb.vision doesn&apos;t label &quot;assists,&quot; so
-        this is the team-outcome view, not proof of a specific feed. Pairings under {MIN_GAMES} games are hidden.
+        Each cell shows how much a <strong>row</strong> player lifts (or lowers) a <strong>column</strong> partner&apos;s team winners per game:
+        the row player&apos;s clean team winners/game <em>with</em> that partner, minus the partner&apos;s team winners/game <em>without</em> them.
+        <span className="text-green-700"> Green</span> = the row player&apos;s teams score more winners with that partner (a sign of setting them up
+        rather than finishing yourself); <span className="text-red-600">red</span> = fewer. Read a row to see whom a player lifts. pb.vision has no
+        &quot;assist&quot; label, so this is team output, not proof of a specific feed; it doesn&apos;t adjust for opponents. Pairings under {MIN_GAMES} games are blank.
       </p>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="text-sm border-separate" style={{ borderSpacing: 0 }}>
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-100 text-gray-500">
-              <th className="text-left px-4 py-2 font-medium">Partner</th>
-              <th className="text-right px-3 py-2 font-medium">Games</th>
-              <th className="text-right px-3 py-2 font-medium">With {focalName}</th>
-              <th className="text-right px-3 py-2 font-medium">Without {focalName}</th>
-              <th className="text-right px-4 py-2 font-medium">Delta</th>
+            <tr>
+              <th
+                className="sticky left-0 z-10 text-left px-3 py-2 font-semibold text-white"
+                style={{ backgroundColor: '#334155' }}
+              >
+                <span className="text-xs opacity-80">lifts ↓ · partner →</span>
+              </th>
+              {ps.map((p) => (
+                <th key={p.pid} className="px-2 py-2 font-semibold text-white text-center" style={{ backgroundColor: '#334155' }}>
+                  <span className="inline-flex flex-col items-center gap-1">
+                    <PlayerAvatar player={p} size="sm" />
+                    <span className="text-[11px] leading-none">{p.name}</span>
+                  </span>
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
-            {pairs.map((r) => {
-              const partner = playerById(data.players, r.partnerPid);
-              const ov = partnerOverall.get(r.partnerPid) ?? { games: 0, tw: 0 };
-              const otherGames = ov.games - r.games;
-              const otherTw = ov.tw - r.teamWinners;
-              const withoutPerG = otherGames > 0 ? otherTw / otherGames : null;
-              const delta = withoutPerG != null ? r.teamWinnersPerGame - withoutPerG : null;
-              return (
-                <tr key={r.partnerPid} className="hover:bg-gray-50">
-                  <td className="px-4 py-2">
-                    <span className="inline-flex items-center gap-2">
-                      {partner && <PlayerAvatar player={partner} size="sm" />}
-                      <span className="font-medium" style={{ color: partner?.color.text }}>{partner?.name ?? r.partnerPid}</span>
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">{r.games}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-800">{r.teamWinnersPerGame.toFixed(1)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">{withoutPerG != null ? withoutPerG.toFixed(1) : '—'}</td>
-                  <td className="px-4 py-2 text-right tabular-nums font-medium">
-                    {delta != null ? (
-                      <span className={delta >= 0 ? 'text-green-700' : 'text-red-600'}>{delta >= 0 ? '+' : ''}{delta.toFixed(1)}</span>
-                    ) : <span className="text-gray-400">—</span>}
-                  </td>
-                </tr>
-              );
-            })}
+          <tbody>
+            {ps.map((row) => (
+              <tr key={row.pid}>
+                <th
+                  className="sticky left-0 z-10 text-left px-3 py-2 font-medium bg-white border-t border-gray-100"
+                  style={{ color: row.color.text }}
+                >
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <PlayerAvatar player={row} size="sm" />
+                    {row.name}
+                  </span>
+                </th>
+                {ps.map((col) => {
+                  if (col.pid === row.pid) {
+                    return <td key={col.pid} className="border-t border-l border-gray-100 bg-gray-50" />;
+                  }
+                  const c = cell(row.pid, col.pid);
+                  return (
+                    <td
+                      key={col.pid}
+                      className="border-t border-l border-gray-100 text-center tabular-nums px-2 py-2"
+                      style={c ? { backgroundColor: bg(c.delta) } : undefined}
+                      title={c ? `${row.name} with ${col.name}: ${c.delta >= 0 ? '+' : ''}${c.delta.toFixed(1)} team winners/g vs ${col.name} without ${row.name} (${c.games} games)` : `${row.name} & ${col.name}: fewer than ${MIN_GAMES} games`}
+                    >
+                      {c ? (
+                        <span className={`font-semibold ${c.delta >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                          {c.delta >= 0 ? '+' : ''}{c.delta.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">·</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

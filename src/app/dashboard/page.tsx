@@ -343,7 +343,7 @@ export default function DashboardPage() {
 
           {tab === 'partners' && (
             <>
-              <TeamWinnersByPartnerSection data={visibleData} focusPid={focusPid} />
+              <TeamWinnersByPartnerSection data={visibleData} />
               <PartnerAdjSection data={visibleData} focusPid={focusPid} />
               <PairingSideSection data={visibleData} />
             </>
