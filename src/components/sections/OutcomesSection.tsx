@@ -201,13 +201,8 @@ export function TeamWinnersByPartnerSection({ data }: { data: DashboardData }) {
   return (
     <SectionCard title="Team Winners by Partner">
       <p className="text-xs text-gray-400 -mt-1.5 mb-3">
-        Each cell shows how much a <strong>row</strong> player lifts (or lowers) a <strong>column</strong> partner&apos;s team winners per game:
-        the row player&apos;s clean team winners/game <em>with</em> that partner, minus the partner&apos;s team winners/game <em>without</em> them.
-        <span className="text-blue-700"> Blue ▲</span> = the row player&apos;s teams score more winners with that partner (a sign of setting them up
-        rather than finishing yourself); <span className="text-orange-700">orange ▼</span> = fewer. Read a row to see whom a player lifts. Click a
-        column header to sort. pb.vision has no &quot;assist&quot; label, so this is team output, not proof of a specific feed; it doesn&apos;t adjust for
-        opponents. Pairings under {MIN_GAMES} games are blank.
-        The <strong>Overall</strong> column is each player&apos;s games-weighted average lift across <em>all</em> their partners — their combined impact in one number.
+        Extra team winners/game a <strong>row</strong> player brings to each <strong>column</strong> partner, vs that partner without them.
+        <span className="text-blue-700"> Blue ▲</span> lifts, <span className="text-orange-700">orange ▼</span> lowers. <strong>Overall</strong> = their average across all partners. Click a header to sort.
       </p>
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm border-separate" style={{ borderSpacing: 0 }}>
