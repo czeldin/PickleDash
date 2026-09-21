@@ -251,25 +251,73 @@ export function TargetingSection({ data }: Props) {
   const { targeting, players } = data;
   const pm = pmap(players);
   const rows = withPlayer(targeting, pm).filter((r) => r.games > 0);
+
+  const [film, setFilm] = useState<{ pid: string; catId: string } | null>(null);
+  const gameNum = useMemo(() => {
+    const m = new Map<string, number>();
+    data.sessions.forEach((s, i) => m.set(s.key, i + 1));
+    return m;
+  }, [data.sessions]);
+
   if (rows.length === 0) return null;
 
+  // A value cell that opens a matching film queue on row hover (🎬). `cls` styles
+  // the number. The clip count is the actual number of clips in that queue and is
+  // shown in the tooltip — it is a representative queue for the metric, watched
+  // best-first, not a promise that it equals the per-game figure.
+  const filmCell = (pid: string, catId: string | null, node: React.ReactNode) => {
+    const cat = catId ? categoryById(catId) : null;
+    const n = cat ? clipsFor(data.courtShots, pid, cat).length : 0;
+    if (!cat || n === 0 || !data.courtShots) return node;
+    return (
+      <button
+        type="button"
+        onClick={() => setFilm({ pid, catId: cat.id })}
+        className="inline-flex items-center gap-1 hover:underline decoration-dotted"
+        title={`Watch ${n} clip${n === 1 ? '' : 's'}`}
+      >
+        {node}
+        <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="watch clips">🎬</span>
+      </button>
+    );
+  };
+
   const columns: ColumnDef<TargetingRow>[] = [
-    { key: 'attacks', header: 'Attacks/g', getValue: (r) => per(r.attacks, r.games), render: (r) => <span className="tabular-nums font-semibold text-gray-800">{per(r.attacks, r.games).toFixed(1)}</span> },
-    { key: 'clean', header: 'Winners/g', getValue: (r) => per(r.clean, r.games), render: (r) => <span className="tabular-nums text-blue-700">{per(r.clean, r.games).toFixed(1)}</span> },
+    { key: 'attacks', header: 'Attacks/g', getValue: (r) => per(r.attacks, r.games), render: (r) => filmCell(r.pid, 'attacks-won', <span className="tabular-nums font-semibold text-gray-800">{per(r.attacks, r.games).toFixed(1)}</span>) },
+    { key: 'clean', header: 'Winners/g', getValue: (r) => per(r.clean, r.games), render: (r) => filmCell(r.pid, 'clean-winners', <span className="tabular-nums text-blue-700">{per(r.clean, r.games).toFixed(1)}</span>) },
     {
       key: 'convert', header: 'Finish win %', getValue: (r) => pct(r.clean, r.fin) ?? -1,
-      render: (r) => { const v = pct(r.clean, r.fin); if (v === null) return <span className="text-gray-300">—</span>; const c = v >= 42 ? cbText('good') : v >= 37 ? cbText('neutral') : cbText('bad'); return <span className={`tabular-nums font-semibold ${c}`}>{v}%</span>; },
+      render: (r) => { const v = pct(r.clean, r.fin); if (v === null) return <span className="text-gray-300">—</span>; const c = v >= 42 ? cbText('good') : v >= 37 ? cbText('neutral') : cbText('bad'); return filmCell(r.pid, 'putaway-tries', <span className={`tabular-nums font-semibold ${c}`}>{v}%</span>); },
     },
-    { key: 'pop', header: 'Pop-ups hit/g', getValue: (r) => per(r.pop, r.games), render: (r) => num(per(r.pop, r.games)) },
-    { key: 'gotAttacked', header: 'Attacked/g', getValue: (r) => per(r.gotAttacked, r.games), render: (r) => <span className="tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</span> },
+    { key: 'pop', header: 'Pop-ups hit/g', getValue: (r) => per(r.pop, r.games), render: (r) => filmCell(r.pid, 'popped-up', num(per(r.pop, r.games))) },
+    { key: 'gotAttacked', header: 'Attacked/g', getValue: (r) => per(r.gotAttacked, r.games), render: (r) => filmCell(r.pid, 'popped-up', <span className="tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</span>) },
   ];
 
   return (
     <SectionCard title="Targeting — Who Attacks, Who Gets Picked On" action={<TrendButton title="Targeting" metrics={TARGETING_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-blue-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups hit</strong> = every ball you popped up; <strong className="text-gray-600">Attacked</strong> = the subset the opponent put away. (Rally Impact&apos;s &quot;Popped up (lost)&quot; is the narrower subset that actually cost you the point.)
+        {data.courtShots && <> Hover a row and click a value with a <span aria-hidden>🎬</span> to watch clips.</>}
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="attacks" />
+
+      {film && (() => {
+        const cat = categoryById(film.catId);
+        if (!cat) return null;
+        const clips = clipsFor(data.courtShots, film.pid, cat);
+        if (clips.length === 0) return null;
+        const name = players.find((p) => p.pid === film.pid)?.name ?? 'Player';
+        return (
+          <ClipModalController
+            clips={clips}
+            topic={`${name}: ${cat.label}`}
+            gameNum={gameNum}
+            startIndex={0}
+            wholeRally={cat.wholeRally}
+            onClose={() => setFilm(null)}
+          />
+        );
+      })()}
     </SectionCard>
   );
 }
