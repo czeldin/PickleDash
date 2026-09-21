@@ -140,6 +140,7 @@ export function shotTags(s: CourtShotRow): { text: string; tone: 'good' | 'bad' 
   } else if (s.popup === 'potential') {
     t.push({ text: 'popped up (not attacked)', tone: 'neutral' });
   }
+  if (s.suspectWinner) t.push({ text: '⚠ winner unverified — pb.vision may have missed the real ending', tone: 'bad' });
   if (s.setupForOppWinner) t.push({ text: 'feed before their winner', tone: 'bad' });
   if (s.faultNet) t.push({ text: 'into the net', tone: 'bad' });
   if (s.faultOut) t.push({ text: 'landed out', tone: 'bad' });
@@ -265,6 +266,11 @@ function ClipModal({ shot, topic, detail, position, wholeRally, hasPrev, hasNext
             </button>
           </div>
         </div>
+        {shot.suspectWinner && (
+          <p className="text-[11px] text-amber-800 px-4 py-1.5 border-b border-amber-200 bg-amber-50">
+            ⚠ <strong>Possible mis-scored winner.</strong> pb.vision tagged this soft dink as a clean put-away, but its data often means the opponent actually made the error (or the ball rolled dead) and pb.vision missed it. Watch to confirm who really won the point.
+          </p>
+        )}
         {wholeRally && (
           <p className="text-[11px] text-gray-400 px-4 py-1 border-b border-gray-100 bg-gray-50">
             Tip: pb.vision’s <strong>Auto skip</strong> (top-right of the player) stops a beat after the last shot — toggle it off to watch the ball land and the point finish.

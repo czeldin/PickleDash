@@ -59,6 +59,26 @@ function shotSpeedMph(sh: AugShot): number | null {
   return typeof s === 'number' && s > 0 ? s : null;
 }
 
+// ── Suspect (mis-scored) dink-winner detector ──────────────────────────────
+// pb.vision sometimes ends a rally wrong: it drops the opponent's real error
+// shot, or cuts off before the ball lands, and tags the last soft shot it saw
+// as a "clean put-away winner". Verified fingerprint (spot-checked on video —
+// ~60% of matches were genuinely mis-scored, e.g. an opponent net error or a
+// ball that just rolled dead): a rally-ending DINK marked winner_type='clean',
+// whose ball lands in the `short` zone (hitter's own side / at the net) at
+// ground level (z < 1ft), hit softly (< 25 mph). A real put-away lands IN the
+// opponents' court; a soft dink dying short is pb.vision papering over a shot it
+// lost. We flag (never delete) — the ~40% that are real soft winners are
+// indistinguishable in the data, because the shot that would tell them apart is
+// the one pb.vision dropped. Returns true for such a rally-ending shot `sh`.
+function isSuspectDinkWinner(sh: AugShot): boolean {
+  if (sh.shot_type !== 'dink' || sh.winner_type !== 'clean') return false;
+  const t = sh.resulting_ball_movement?.trajectory;
+  if (t?.end?.zone !== 'short') return false;
+  if ((t?.end?.location?.z ?? 9) >= 1) return false;
+  return (sh.resulting_ball_movement?.speed ?? 0) < 25;
+}
+
 // A player reached the kitchen this rally if pb.vision recorded a kitchen
 // arrival window for them. `rally.players[playerIndex].kitchen_arrivals` is a
 // non-empty array when they got to the NVZ line — authoritative, no shot-type
@@ -624,6 +644,9 @@ export function parseAugmentedNights(
                 // won). Only meaningful on the final shot.
                 riWinner: si2 === shots.length - 1 && rally.winning_team === hitter?.team && !sh.errors?.faults,
                 riLost: si2 === shots.length - 1 && rally.winning_team !== hitter?.team && !!sh.errors?.faults,
+                // Informational only (does NOT change any Winners count): pb.vision
+                // may have mis-scored this rally-ending "winner".
+                suspectWinner: si2 === shots.length - 1 && isSuspectDinkWinner(sh),
                 // Setup shot: the losing team's last touch before the opponents'
                 // winner (i.e. the second-to-last shot, hit by the loser).
                 setupForOppWinner: oppWonWithWinner

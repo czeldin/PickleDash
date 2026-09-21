@@ -350,6 +350,15 @@ export interface CourtShotRow {
   // clickable film for those cells matches the displayed number exactly.
   riWinner?: boolean;              // rally-ending shot, no fault → a "Winners/g" point
   riLost?: boolean;                // rally-ending shot, had a fault → a "Lost/g" point
+  // pb.vision sometimes mis-scores the rally end: it drops the opponent's actual
+  // error shot (or cuts off before the ball lands) and tags the last soft shot
+  // it saw as a "clean put-away winner". Fingerprint (verified on video, ~60%
+  // of matches are truly mis-scored): a rally-ending DINK marked clean winner
+  // whose ball lands SHORT (own side / at the net) at ground level, hit softly
+  // (<25 mph). We DON'T delete it (the other ~40% are real soft winners we can't
+  // tell apart — the disambiguating shot is the one pb.vision dropped), we just
+  // flag it so the film/cell warns you to verify it rather than trusting it.
+  suspectWinner?: boolean;
   // This shot was the hitter's LAST shot before the opponents put the next ball
   // away for a winner — the "feed" that got attacked. Powers the "They hit a
   // winner" film queue (what you gave them, right before they finished it).

@@ -120,29 +120,47 @@ export function RallyImpactSection({ data }: Props) {
     return m;
   }, [data.sessions]);
 
+  // How many of each player's counted winners are pb.vision-suspect (mis-scored
+  // soft dinks). Informational: the number is unchanged, but we badge the cell
+  // so you know some of these winners need a look. (Kept above the early return
+  // so hooks run unconditionally.)
+  const suspectWinners = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of data.courtShots ?? []) {
+      if (s.riWinner && s.suspectWinner) m.set(s.pid, (m.get(s.pid) ?? 0) + 1);
+    }
+    return m;
+  }, [data.courtShots]);
+
   if (rows.length === 0) return null;
 
   // A value cell that opens its matching film queue (if any clips exist).
-  const filmCell = (pid: string, catId: string, value: number, cls: string) => {
+  // `suspect` (winners column only) badges the cell when some winners may be
+  // mis-scored by pb.vision.
+  const filmCell = (pid: string, catId: string, value: number, cls: string, suspect = 0) => {
     const cat = categoryById(catId);
     const n = cat ? clipsFor(data.courtShots, pid, cat).length : 0;
     const label = value.toFixed(1);
-    if (!cat || n === 0 || !data.courtShots) return <span className={`tabular-nums ${cls}`}>{label}</span>;
+    const warn = suspect > 0
+      ? <span className="text-[10px] text-amber-500" title={`${suspect} of these winners may be mis-scored by pb.vision — click to verify`}>⚠</span>
+      : null;
+    if (!cat || n === 0 || !data.courtShots) return <span className={`tabular-nums ${cls} inline-flex items-center gap-1`}>{label}{warn}</span>;
     return (
       <button
         type="button"
         onClick={() => setFilm({ pid, catId })}
         className={`tabular-nums ${cls} inline-flex items-center gap-1 hover:underline decoration-dotted group`}
-        title={`Watch ${n} clip${n === 1 ? '' : 's'}`}
+        title={`Watch ${n} clip${n === 1 ? '' : 's'}${suspect > 0 ? ` · ${suspect} may be mis-scored` : ''}`}
       >
         {label}
+        {warn}
         <span className="text-[10px] text-gray-400 group-hover:text-blue-500">▶</span>
       </button>
     );
   };
 
   const columns: ColumnDef<RallyImpactRow>[] = [
-    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-emerald-700') },
+    { key: 'won', header: 'Winners/g', getValue: (r) => per(r.won, r.games), render: (r) => filmCell(r.pid, 'ri-winners', per(r.won, r.games), 'font-semibold text-emerald-700', suspectWinners.get(r.pid) ?? 0) },
     { key: 'lost', header: 'Lost/g', getValue: (r) => per(r.lostDirect, r.games), render: (r) => filmCell(r.pid, 'ri-lost', per(r.lostDirect, r.games), 'text-gray-700') },
     { key: 'setup', header: 'Popped up (lost)/g', getValue: (r) => per(r.setup, r.games), render: (r) => filmCell(r.pid, 'ri-popped', per(r.setup, r.games), 'text-gray-700') },
     {
@@ -156,7 +174,7 @@ export function RallyImpactSection({ data }: Props) {
     <SectionCard title="Rally Impact — Winners vs Points Given Away" action={<TrendButton title="Rally Impact" metrics={RALLY_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
         Per game: clean winners you hit, vs points you gave away. <strong className="text-gray-600">Lost</strong> = your own rally-ending errors (net/out/short). <strong className="text-gray-600">Popped up (lost)</strong> = your pop-ups the opponent put away to end the rally — a different set of lost points from Lost, not double-counted. Net = winners − both.
-        {data.courtShots && <> Click a value with a <span className="text-blue-500">▶</span> to watch those points.</>}
+        {data.courtShots && <> Click a value with a <span className="text-blue-500">▶</span> to watch those points. A <span className="text-amber-500">⚠</span> means some of those winners may be mis-scored by pb.vision (a soft dink tagged a put-away when the opponent likely erred) — worth verifying.</>}
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="net" />
 
