@@ -23,8 +23,8 @@ const TARGETING_METRICS: MetricDef<NightTrendRow>[] = [
   { key: 'attacks', label: 'Attacks/g', value: (r) => g(r.attacks, r), pct: false },
   { key: 'winners', label: 'Winners/g', value: (r) => g(r.finClean, r), pct: false },
   { key: 'finish', label: 'Finish win %', value: (r) => rt(r.finClean, r.finAtt), pct: true },
-  { key: 'pop', label: 'Pop-ups/g', value: (r) => g(r.pop, r), pct: false },
-  { key: 'got', label: 'Got attacked/g', value: (r) => g(r.gotAttacked, r), pct: false },
+  { key: 'pop', label: 'Pop-ups hit/g', value: (r) => g(r.pop, r), pct: false },
+  { key: 'got', label: 'Attacked/g', value: (r) => g(r.gotAttacked, r), pct: false },
 ];
 const KITCHEN_SR_METRICS: MetricDef<NightTrendRow>[] = [
   { key: 'serve', label: 'Serving %', value: (r) => rt(r.kServeNum, r.kServeDen), pct: true },
@@ -260,14 +260,14 @@ export function TargetingSection({ data }: Props) {
       key: 'convert', header: 'Finish win %', getValue: (r) => pct(r.clean, r.fin) ?? -1,
       render: (r) => { const v = pct(r.clean, r.fin); if (v === null) return <span className="text-gray-300">—</span>; const c = v >= 42 ? cbText('good') : v >= 37 ? cbText('neutral') : cbText('bad'); return <span className={`tabular-nums font-semibold ${c}`}>{v}%</span>; },
     },
-    { key: 'pop', header: 'Pop-ups/g', getValue: (r) => per(r.pop, r.games), render: (r) => num(per(r.pop, r.games)) },
-    { key: 'gotAttacked', header: 'Got attacked/g', getValue: (r) => per(r.gotAttacked, r.games), render: (r) => <span className="tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</span> },
+    { key: 'pop', header: 'Pop-ups hit/g', getValue: (r) => per(r.pop, r.games), render: (r) => num(per(r.pop, r.games)) },
+    { key: 'gotAttacked', header: 'Attacked/g', getValue: (r) => per(r.gotAttacked, r.games), render: (r) => <span className="tabular-nums text-amber-700">{per(r.gotAttacked, r.games).toFixed(1)}</span> },
   ];
 
   return (
     <SectionCard title="Targeting — Who Attacks, Who Gets Picked On" action={<TrendButton title="Targeting" metrics={TARGETING_METRICS} rows={data.nightTrends} players={data.players} />}>
       <p className="text-sm text-gray-500 -mt-1.5 mb-3">
-        Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-blue-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups / Got attacked</strong> = how often you give the opponent a ball to put away.
+        Per game. <strong className="text-gray-600">Attacks</strong> = how much you go on offense; <strong className="text-blue-700">Winners</strong> = clean put-aways; <strong className="text-gray-600">Finish win %</strong> = of your put-away attempts, how many you convert (skill, not volume). <strong className="text-gray-600">Pop-ups hit</strong> = every ball you popped up; <strong className="text-gray-600">Attacked</strong> = the subset the opponent put away. (Rally Impact&apos;s &quot;Popped up (lost)&quot; is the narrower subset that actually cost you the point.)
       </p>
       <SortableTable rows={rows} columns={columns} players={players} defaultSortKey="attacks" />
     </SectionCard>
