@@ -2,7 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const maxDuration = 45;
+// Give the model call headroom before Vercel kills the function. The client
+// aborts at 55s and retries once, so keep the server just above that per call.
+export const maxDuration = 60;
 
 interface ChatMsg { role: 'user' | 'assistant'; content: string }
 

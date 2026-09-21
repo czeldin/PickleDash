@@ -40,6 +40,41 @@ export function AskClaudeSection({ data }: Props) {
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // One attempt: POST with an abort-based timeout. Returns the assistant text on
+  // success, or throws a tagged Error the caller turns into a message. We split
+  // the failure modes so a timeout, an offline browser, a server error, and a
+  // bad/HTML body no longer all read as the same opaque "Network error".
+  async function askOnce(body: string, timeoutMs = 55000): Promise<string> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      // AbortError = our timeout fired; anything else = the connection failed.
+      throw new Error((e as Error)?.name === 'AbortError' ? 'timeout' : 'offline');
+    } finally {
+      clearTimeout(timer);
+    }
+    // Read as text first so a non-JSON body (e.g. a Vercel error/HTML page) is a
+    // clear "server" failure instead of a JSON.parse crash.
+    const raw = await res.text();
+    let json: { text?: string; error?: string } | null = null;
+    try { json = raw ? JSON.parse(raw) : null; } catch { json = null; }
+    if (!res.ok) {
+      const err = new Error(json?.error || 'server');
+      (err as Error & { status?: number }).status = res.status;
+      throw err;
+    }
+    if (!json || typeof json.text !== 'string') throw new Error('server');
+    return json.text;
+  }
+
   async function send(question: string) {
     const q = question.trim();
     if (!q || loading) return;
@@ -48,17 +83,41 @@ export function AskClaudeSection({ data }: Props) {
     setMessages(next);
     setInput('');
     setLoading(true);
+
+    let body: string;
     try {
-      const res = await fetch('/api/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: buildStatsContext(data), messages: next }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error || 'Request failed.'); }
-      else { setMessages((m) => [...m, { role: 'assistant', content: json.text }]); }
+      body = JSON.stringify({ context: buildStatsContext(data), messages: next });
     } catch {
-      setError('Network error — please try again.');
+      setError('Couldn’t read the current stats — try reloading the page.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      let text: string;
+      try {
+        text = await askOnce(body);
+      } catch (e) {
+        // Auto-retry ONCE on a transient failure (timeout / dropped connection /
+        // a 5xx, which on Vercel is usually a cold-start or momentary blip).
+        const tag = (e as Error)?.message;
+        const status = (e as Error & { status?: number })?.status;
+        const transient = tag === 'timeout' || tag === 'offline' || (status != null && status >= 500);
+        if (!transient) throw e;
+        text = await askOnce(body);
+      }
+      setMessages((m) => [...m, { role: 'assistant', content: text }]);
+    } catch (e) {
+      const tag = (e as Error)?.message;
+      const status = (e as Error & { status?: number })?.status;
+      setError(
+        tag === 'timeout' ? 'That took too long to answer — please try again.'
+          : tag === 'offline' ? 'Can’t reach the server — check your connection and try again.'
+          : status === 401 ? 'The Anthropic API key is invalid — the server needs it fixed.'
+          : status === 503 ? (tag !== 'server' ? tag : 'Chat isn’t configured on the server yet.')
+          : tag && tag !== 'server' ? tag
+          : 'Something went wrong on the server — please try again.',
+      );
     } finally {
       setLoading(false);
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }));
