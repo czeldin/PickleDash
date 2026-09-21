@@ -184,16 +184,18 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
   // its own G1..). Number games WITHIN their night and show the night label.
   const multiNight = new Set(mvps.map((r) => r.nightLabel)).size > 1;
   const perNightIdx = new Map<string, number>();
+  // Drop a trailing "/YY" year to keep the date short (e.g. "8/5" not "8/5/26").
+  const shortDate = (label: string) => label.replace(/\/\d{2,4}$/, '');
   const gameLabel = (r: (typeof mvps)[number]) => {
     const n = (perNightIdx.get(r.nightLabel) ?? 0) + 1;
     perNightIdx.set(r.nightLabel, n);
-    return multiNight ? `${r.nightLabel} G${n}` : `G${n}`;
+    return multiNight ? `${shortDate(r.nightLabel)} G${n}` : `G${n}`;
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-60 md:flex-shrink-0">
       <div className="flex items-baseline justify-between mb-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">MVP by Game 👑</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">MVP by Game</p>
         <span className="text-[11px] text-gray-400 tabular-nums">{mvps.length} {mvps.length === 1 ? 'game' : 'games'}</span>
       </div>
       {/* Show a generous number of games before scrolling. The old ~200px cap hid
@@ -205,8 +207,7 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
           const p = playerMap.get(r.pid);
           return (
             <div key={r.sessionKey + i} className="relative group flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-gray-50 cursor-default">
-              <span className={`text-xs text-gray-400 tabular-nums shrink-0 ${multiNight ? 'w-20' : 'w-6'}`}>{gameLabel(r)}</span>
-              <span className="text-xs" aria-hidden>👑</span>
+              <span className={`text-xs text-gray-400 tabular-nums shrink-0 ${multiNight ? 'w-14' : 'w-6'}`}>{gameLabel(r)}</span>
               <span className="text-sm font-semibold truncate flex-1" style={{ color: p?.color.text }}>{p?.name ?? r.pid}</span>
               <span className="text-xs text-gray-400 tabular-nums shrink-0">{r.overall.toFixed(2)}</span>
               {r.sessionName && (
