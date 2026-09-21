@@ -265,6 +265,11 @@ function ClipModal({ shot, topic, detail, position, wholeRally, hasPrev, hasNext
             </button>
           </div>
         </div>
+        {wholeRally && (
+          <p className="text-[11px] text-gray-400 px-4 py-1 border-b border-gray-100 bg-gray-50">
+            Tip: pb.vision’s <strong>Auto skip</strong> (top-right of the player) stops a beat after the last shot — toggle it off to watch the ball land and the point finish.
+          </p>
+        )}
         <div className="relative flex-1 bg-black min-h-[50vh]">
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
             <p className="text-sm text-gray-300 max-w-md">
