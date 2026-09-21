@@ -180,17 +180,32 @@ function MvpByGameTile({ data, playerMap }: { data: DashboardData; playerMap: Ma
     .filter((r) => r.overall > 0)
     .sort((a, b) => a.timestamp - b.timestamp || a.sessionKey.localeCompare(b.sessionKey));
   if (mvps.length === 0) return null;
+  // Across multiple nights a single global "G1..GN" is confusing (each night has
+  // its own G1..). Number games WITHIN their night and show the night label.
+  const multiNight = new Set(mvps.map((r) => r.nightLabel)).size > 1;
+  const perNightIdx = new Map<string, number>();
+  const gameLabel = (r: (typeof mvps)[number]) => {
+    const n = (perNightIdx.get(r.nightLabel) ?? 0) + 1;
+    perNightIdx.set(r.nightLabel, n);
+    return multiNight ? `${r.nightLabel} G${n}` : `G${n}`;
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-6 w-full md:w-60 md:flex-shrink-0">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">MVP by Game 👑</p>
-      {/* Cap to ~6 rows tall; scroll the rest so the tile doesn't tower over Record. */}
-      <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+      <div className="flex items-baseline justify-between mb-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">MVP by Game 👑</p>
+        <span className="text-[11px] text-gray-400 tabular-nums">{mvps.length} {mvps.length === 1 ? 'game' : 'games'}</span>
+      </div>
+      {/* Show a generous number of games before scrolling. The old ~200px cap hid
+          games (e.g. a 2-night, 16-game selection showed only the first ~7), which
+          read as "a whole night is missing". ~14 rows fit before we scroll, and the
+          count above makes it clear when there are more. */}
+      <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1">
         {mvps.map((r, i) => {
           const p = playerMap.get(r.pid);
           return (
             <div key={r.sessionKey + i} className="relative group flex items-center gap-2 rounded-md px-1 -mx-1 hover:bg-gray-50 cursor-default">
-              <span className="text-xs text-gray-400 tabular-nums w-6 shrink-0">G{i + 1}</span>
+              <span className={`text-xs text-gray-400 tabular-nums shrink-0 ${multiNight ? 'w-20' : 'w-6'}`}>{gameLabel(r)}</span>
               <span className="text-xs" aria-hidden>👑</span>
               <span className="text-sm font-semibold truncate flex-1" style={{ color: p?.color.text }}>{p?.name ?? r.pid}</span>
               <span className="text-xs text-gray-400 tabular-nums shrink-0">{r.overall.toFixed(2)}</span>
