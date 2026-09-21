@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DashboardData, SkillRatingsRow, SkillRatingsByGameRow } from '@/types/dashboard';
+import { DashboardData, SkillRatingsRow, SkillRatingsByGameRow, PlayerMeta } from '@/types/dashboard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { SectionCard } from '@/components/SectionCard';
 import { TrendButton, MetricDef, TrendRow } from '@/components/TrendChart';
@@ -475,8 +475,106 @@ function PartnerEffectSection({ data, sessionTeams }: {
   );
 }
 
+// ─── Group-by-Game: one card per game, a row per player in it ───────────────────
+
+function GameCard({ title, subtitle, rows, playerMeta }: {
+  title: string;
+  subtitle?: string;
+  rows: SkillRatingsByGameRow[];
+  playerMeta: Map<string, PlayerMeta>;
+}) {
+  const visible = visibleSkillsFor(rows);
+  // Best player first, so the game's standout is at the top.
+  const sorted = [...rows].sort((a, b) => getOverall(b) - getOverall(a));
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="flex items-baseline gap-2 px-4 md:px-5 py-3 border-b border-gray-100">
+        <span className="font-semibold text-gray-900">{title}</span>
+        {subtitle && <span className="text-xs text-gray-400">{subtitle}</span>}
+        <span className="text-xs text-gray-400 ml-auto">{rows.length} {rows.length === 1 ? 'player' : 'players'}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs md:text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              <th className="py-2 text-left px-4 md:px-5 text-gray-500 font-medium">Player</th>
+              <th className="py-2 text-right px-3 text-gray-500 font-medium">Overall</th>
+              {visible.map((s) => (
+                <th key={s} className="py-2 text-right px-3 text-gray-500 font-medium">{SKILL_LABELS[s]}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {sorted.map((row, i) => {
+              const p = playerMeta.get(row.pid);
+              const ov = getOverall(row);
+              return (
+                <tr key={row.pid} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 md:px-5 py-2 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-2">
+                      {i === 0 && ov > 0 && <span aria-hidden>👑</span>}
+                      <span className="font-medium" style={{ color: p?.color.text }}>{p?.name ?? row.pid}</span>
+                    </span>
+                  </td>
+                  <td className={`px-3 py-2 text-right tabular-nums font-semibold ${skillColor(ov)}`}>
+                    {ov > 0 ? ov.toFixed(2) : '—'}
+                  </td>
+                  {visible.map((skill) => {
+                    const v = row[skill as keyof SkillRatingsByGameRow] as number;
+                    return (
+                      <td key={skill} className={`px-3 py-2 text-right tabular-nums ${skillColor(v)}`}>
+                        {v > 0 ? v.toFixed(2) : '—'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function GamesView({ data }: Props) {
+  const { players, skillRatingsByGame } = data;
+  const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
+  const playerMeta = useMemo(() => new Map(players.map((p) => [p.pid, p])), [players]);
+
+  // Group rows by game (sessionKey), preserving a stable chronological order.
+  const games = useMemo(() => {
+    const bySession = new Map<string, SkillRatingsByGameRow[]>();
+    for (const r of skillRatingsByGame) {
+      if (!bySession.has(r.sessionKey)) bySession.set(r.sessionKey, []);
+      bySession.get(r.sessionKey)!.push(r);
+    }
+    return [...bySession.values()]
+      .sort((a, b) => a[0].timestamp - b[0].timestamp || a[0].sessionKey.localeCompare(b[0].sessionKey));
+  }, [skillRatingsByGame]);
+
+  if (games.length === 0) {
+    return <p className="text-sm text-gray-400 py-6 text-center">No per-game ratings for this selection.</p>;
+  }
+
+  return (
+    <div className="space-y-8">
+      {games.map((rows, i) => (
+        <GameCard
+          key={rows[0].sessionKey}
+          title={`G${i + 1} · ${rows[0].sessionName}`}
+          subtitle={multiNight ? rows[0].nightLabel : undefined}
+          rows={rows}
+          playerMeta={playerMeta}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function PlayerSkillsByGame({ data }: Props) {
   const { players, skillRatingsByGame } = data;
+  const [groupBy, setGroupBy] = useState<'player' | 'game'>('player');
   const multiNight = new Set(skillRatingsByGame.map((r) => r.nightLabel)).size > 1;
 
   // Build sessionKey → Map<pid, team> for partner detection
@@ -488,17 +586,38 @@ export function PlayerSkillsByGame({ data }: Props) {
 
   return (
     <div className="max-w-7xl mx-auto px-3 md:px-4 py-6 md:py-8 space-y-12">
-      {/* Per-game breakdown tables */}
-      <div className="space-y-8">
-        {players.map((player) => {
-          const rows = skillRatingsByGame.filter((r) => r.pid === player.pid);
-          if (rows.length === 0) return null;
-          return <PlayerTable key={player.pid} player={player} rows={rows} multiNight={multiNight} />;
-        })}
+      {/* Sub-tabs: group the same per-game ratings by player or by game. */}
+      <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+        {([['player', 'Group by Player'], ['game', 'Group by Game']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setGroupBy(key)}
+            className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+              groupBy === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* "Playing with X" comparison section */}
-      <PartnerEffectSection data={data} sessionTeams={sessionTeams} />
+      {groupBy === 'player' ? (
+        <>
+          {/* Per-player breakdown tables (one card per player, rows = their games) */}
+          <div className="space-y-8">
+            {players.map((player) => {
+              const rows = skillRatingsByGame.filter((r) => r.pid === player.pid);
+              if (rows.length === 0) return null;
+              return <PlayerTable key={player.pid} player={player} rows={rows} multiNight={multiNight} />;
+            })}
+          </div>
+
+          {/* "Playing with X" comparison section */}
+          <PartnerEffectSection data={data} sessionTeams={sessionTeams} />
+        </>
+      ) : (
+        <GamesView data={data} />
+      )}
     </div>
   );
 }
