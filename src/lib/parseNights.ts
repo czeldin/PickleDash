@@ -109,5 +109,6 @@ function mergeDashboards(a: DashboardData, c: DashboardData): DashboardData {
     outcomeStats: a.outcomeStats,
     lossReasons: a.lossReasons,
     partnerAdj: a.partnerAdj,
+    partnerWinners: a.partnerWinners,
   };
 }

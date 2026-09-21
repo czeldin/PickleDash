@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DashboardData, OutcomeStatsRow, LossReasonRow, PartnerAdjRow, PlayerMeta } from '@/types/dashboard';
+import { DashboardData, OutcomeStatsRow, LossReasonRow, PartnerAdjRow, PartnerWinnersRow, PlayerMeta } from '@/types/dashboard';
 import { SectionCard } from '@/components/SectionCard';
 import { SortableTable, ColumnDef } from '@/components/SortableTable';
 import { PlayerAvatar } from '@/components/PlayerAvatar';
@@ -102,6 +102,113 @@ export function PartnerAdjSection({ data }: Props) {
         control for partner quality, not opponents — not the full adjusted model.
       </p>
       <SortableTable rows={sorted} columns={partnerCols} players={data.players} defaultSortKey="lift" />
+    </SectionCard>
+  );
+}
+
+// ─── Team Winners by Partner ────────────────────────────────────────────────
+// Answers: "my personal winners/game is lower, but if I seed my partner, does
+// our TEAM hit as many winners?" For each focal player we show, per partner,
+// the team winners/game the pair produced together — vs how many that partner's
+// teams hit WITHOUT the focal player. A positive delta = the focal player's
+// teams score as many/more winners despite a lower personal count (seeded wins).
+export function TeamWinnersByPartnerSection({ data, focusPid }: Props) {
+  const rows = data.partnerWinners;
+  const MIN_GAMES = 2; // ignore one-off pairings — too noisy to compare
+
+  // partner → their team winners/game across ALL their pairings (the baseline).
+  const partnerOverall = useMemo(() => {
+    const agg = new Map<string, { games: number; tw: number }>();
+    for (const r of rows ?? []) {
+      const a = agg.get(r.partnerPid) ?? { games: 0, tw: 0 };
+      a.games += r.games; a.tw += r.teamWinners; agg.set(r.partnerPid, a);
+    }
+    return agg;
+  }, [rows]);
+
+  // focal player → their pairings (rows where pid === focal).
+  const byFocal = useMemo(() => {
+    const m = new Map<string, PartnerWinnersRow[]>();
+    for (const r of rows ?? []) {
+      if (r.games < MIN_GAMES) continue;
+      if (!m.has(r.pid)) m.set(r.pid, []);
+      m.get(r.pid)!.push(r);
+    }
+    return m;
+  }, [rows]);
+
+  const focalOrder = data.players.filter((p) => byFocal.has(p.pid));
+  const initial = (focusPid && byFocal.has(focusPid)) ? focusPid : focalOrder[0]?.pid ?? null;
+  const [sel, setSel] = useState<string | null>(null);
+  const focal = (sel && byFocal.has(sel)) ? sel : initial;
+
+  if (!rows || rows.length === 0 || !focal) return null;
+
+  const pairs = [...(byFocal.get(focal) ?? [])].sort((a, b) => b.teamWinnersPerGame - a.teamWinnersPerGame);
+  const focalName = playerById(data.players, focal)?.name ?? focal;
+
+  return (
+    <SectionCard
+      title="Team Winners by Partner"
+      action={
+        <select
+          value={focal}
+          onChange={(e) => setSel(e.target.value)}
+          className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700"
+        >
+          {focalOrder.map((p) => (
+            <option key={p.pid} value={p.pid}>{p.name}</option>
+          ))}
+        </select>
+      }
+    >
+      <p className="text-xs text-gray-400 -mt-1.5 mb-3">
+        Clean winners the <strong>team</strong> hit per game — <em>with {focalName}</em> vs how that partner&apos;s teams did <em>without</em> them.
+        A positive <span className="text-green-700">delta</span> means {focalName}&apos;s teams score as many or more winners even when {focalName}&apos;s
+        own winners/game is lower — the mark of setting a partner up rather than finishing yourself. pb.vision doesn&apos;t label &quot;assists,&quot; so
+        this is the team-outcome view, not proof of a specific feed. Pairings under {MIN_GAMES} games are hidden.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100 text-gray-500">
+              <th className="text-left px-4 py-2 font-medium">Partner</th>
+              <th className="text-right px-3 py-2 font-medium">Games</th>
+              <th className="text-right px-3 py-2 font-medium">With {focalName}</th>
+              <th className="text-right px-3 py-2 font-medium">Without {focalName}</th>
+              <th className="text-right px-4 py-2 font-medium">Delta</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {pairs.map((r) => {
+              const partner = playerById(data.players, r.partnerPid);
+              const ov = partnerOverall.get(r.partnerPid) ?? { games: 0, tw: 0 };
+              const otherGames = ov.games - r.games;
+              const otherTw = ov.tw - r.teamWinners;
+              const withoutPerG = otherGames > 0 ? otherTw / otherGames : null;
+              const delta = withoutPerG != null ? r.teamWinnersPerGame - withoutPerG : null;
+              return (
+                <tr key={r.partnerPid} className="hover:bg-gray-50">
+                  <td className="px-4 py-2">
+                    <span className="inline-flex items-center gap-2">
+                      {partner && <PlayerAvatar player={partner} size="sm" />}
+                      <span className="font-medium" style={{ color: partner?.color.text }}>{partner?.name ?? r.partnerPid}</span>
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">{r.games}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-800">{r.teamWinnersPerGame.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">{withoutPerG != null ? withoutPerG.toFixed(1) : '—'}</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-medium">
+                    {delta != null ? (
+                      <span className={delta >= 0 ? 'text-green-700' : 'text-red-600'}>{delta >= 0 ? '+' : ''}{delta.toFixed(1)}</span>
+                    ) : <span className="text-gray-400">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </SectionCard>
   );
 }

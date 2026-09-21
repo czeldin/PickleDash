@@ -300,6 +300,18 @@ export interface PartnerAdjRow {
   lift: number;            // actual − expected (percentage points)
 }
 
+// Team winners a specific PAIRING produced, per game together. Lets us see
+// whether a player's team hits as many winners with a given partner as that
+// partner does with others — surfacing seeded/assisted winners that a personal
+// winners/game count hides. One row per (pid, partnerPid) direction.
+export interface PartnerWinnersRow {
+  pid: string;             // the focal player
+  partnerPid: string;      // who they were paired with
+  games: number;           // games this exact pair played together
+  teamWinners: number;     // clean team-winning put-aways the pair hit
+  teamWinnersPerGame: number;
+}
+
 // Why a player's team lost rallies — attribution by cause. Each lost rally is
 // charged to exactly one cause based on its final shot. Outcome-anchored.
 export interface LossReasonRow {
@@ -397,4 +409,5 @@ export interface DashboardData {
   outcomeStats?: OutcomeStatsRow[];
   lossReasons?: LossReasonRow[];
   partnerAdj?: PartnerAdjRow[];
+  partnerWinners?: PartnerWinnersRow[]; // augmented-only (needs clean-winner detection)
 }

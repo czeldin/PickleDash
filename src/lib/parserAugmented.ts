@@ -8,7 +8,7 @@ import {
   KitchenArrivalRow, ShotBreakdownRow, ShotQualityRow, DepthRow, ErrorRow, SessionInfo, HighlightRally,
   AttackRow, DinkRow, KitchenByGameRow, ServingRallyRow, RallySideRow,
   CoachingRow, RallyImpactRow, TargetingRow, KitchenSRRow, DriveDropRow, NightTrendRow,
-  CourtShotRow, OutcomeStatsRow, LossReasonRow, PartnerAdjRow,
+  CourtShotRow, OutcomeStatsRow, LossReasonRow, PartnerAdjRow, PartnerWinnersRow,
 } from '@/types/dashboard';
 
 /**
@@ -435,6 +435,13 @@ export function parseAugmentedNights(
   // Partner-pair rally tallies: key `${player}|${partner}` → rallies together.
   const pairMap = new Map<string, number>();
   const pair = (a: string, b: string) => { const k = a + '|' + b; pairMap.set(k, (pairMap.get(k) ?? 0) + 1); };
+  // Team-winners-by-partner: key `${player}|${partner}` → { games, teamWinners }.
+  // teamWinners = clean rally-ending winners the PAIR hit while playing together.
+  // Lets us ask "does a Craig-partnered team hit as many winners as the partner
+  // does with others?" — surfacing seeded/assisted winners a personal count hides.
+  // Directional (both `a|b` and `b|a` stored) so each player has their own row.
+  const pwMap = new Map<string, { games: number; teamWinners: number }>();
+  const pw = (a: string, b: string) => { const k = a + '|' + b; let v = pwMap.get(k); if (!v) { v = { games: 0, teamWinners: 0 }; pwMap.set(k, v); } return v; };
   const tgt = (f: string) => { let v = tgtMap.get(f); if (!v) { v = { games: 0, attacks: 0, fin: 0, clean: 0, pop: 0, gotAttacked: 0 }; tgtMap.set(f, v); } return v; };
   const ks = (f: string) => { let v = ksMap.get(f); if (!v) { v = { serveNum: 0, serveDen: 0, recvNum: 0, recvDen: 0 }; ksMap.set(f, v); } return v; };
 
@@ -468,6 +475,29 @@ export function parseAugmentedNights(
         const f = p?.name?.trim()?.toLowerCase();
         if (f && (p!.team === 0 || p!.team === 1)) teamPlayers[p!.team].push(f);
       }
+      // Team winners (clean rally-ending put-aways) per team this game, for the
+      // Team-Winners-by-Partner view. Count once per game, then charge to each
+      // team's pairing so both partners get the pair's team-winner total.
+      {
+        const teamWins: Record<number, number> = { 0: 0, 1: 0 };
+        for (const rally of ral) {
+          const shots = rally.shots ?? []; if (!shots.length) continue;
+          const last = shots[shots.length - 1];
+          if (last.is_putaway && last.winner_type === 'clean') {
+            const wteam = last.player_id != null ? pd[last.player_id]?.team : undefined;
+            if (wteam === 0 || wteam === 1) teamWins[wteam]++;
+          }
+        }
+        for (const t of [0, 1] as const) {
+          const tp = teamPlayers[t];
+          if (tp.length === 2) {
+            for (const [me, partner] of [[tp[0], tp[1]], [tp[1], tp[0]]] as const) {
+              const v = pw(me, partner); v.games++; v.teamWinners += teamWins[t];
+            }
+          }
+        }
+      }
+
       // Game result from game_data.game_outcome ([team0, team1] final scores).
       const outcome = ins.game_data?.game_outcome;
       let gameWinner: number | undefined;
@@ -944,7 +974,22 @@ export function parseAugmentedNights(
     return { pid: p.pid, rallies: n, actualWinPct: actual, expectedWinPct: expected, lift: actual - expected };
   });
 
-  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends, courtShots, outcomeStats, lossReasons, partnerAdj };
+  // Team-winners-by-partner rows: one per (player, partner) pairing they played.
+  // teamWinnersPerGame = clean team winners the pair hit per game together. Only
+  // pairs among known (visible) players, so the section stays in-scope.
+  const knownPidSet = new Set(data.players.map((p) => p.pid));
+  const partnerWinners: PartnerWinnersRow[] = [];
+  for (const [k, v] of pwMap) {
+    const [pid, partnerPid] = k.split('|');
+    if (!knownPidSet.has(pid) || !knownPidSet.has(partnerPid) || v.games === 0) continue;
+    partnerWinners.push({
+      pid, partnerPid, games: v.games,
+      teamWinners: v.teamWinners,
+      teamWinnersPerGame: v.teamWinners / v.games,
+    });
+  }
+
+  return { ...data, highlights, skillRatingsByGame, kitchenByGame, servingRallies, rallySides, coaching, rallyImpact, targeting, kitchenSR, driveDrop, nightTrends, courtShots, outcomeStats, lossReasons, partnerAdj, partnerWinners };
 }
 
 // Convenience wrapper for a single augmented game.

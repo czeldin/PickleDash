@@ -27,7 +27,7 @@ import { CoachingSection, RallyImpactSection, TargetingSection, KitchenServeRece
 import { AskClaudeSection } from '@/components/sections/AskClaudeSection';
 import { DriveDropSection } from '@/components/sections/DriveDropSection';
 import { CourtMapsSection } from '@/components/sections/CourtMapsSection';
-import { OutcomesSection, LossReasonsSection, PartnerAdjSection } from '@/components/sections/OutcomesSection';
+import { OutcomesSection, LossReasonsSection, PartnerAdjSection, TeamWinnersByPartnerSection } from '@/components/sections/OutcomesSection';
 import { FilmRoomSection } from '@/components/sections/FilmRoomSection';
 import { TrendsSection } from '@/components/sections/TrendsSection';
 import { anonymizeData } from '@/lib/anonymize';
@@ -96,6 +96,8 @@ function filterDataByPlayers(data: DashboardData, pids: Set<string>): DashboardD
     outcomeStats: data.outcomeStats?.filter((r) => pids.has(r.pid)),
     lossReasons: data.lossReasons?.filter((r) => pids.has(r.pid)),
     partnerAdj: data.partnerAdj?.filter((r) => pids.has(r.pid)),
+    // Keep pairings where BOTH players are visible.
+    partnerWinners: data.partnerWinners?.filter((r) => pids.has(r.pid) && pids.has(r.partnerPid)),
   };
 }
 
@@ -341,6 +343,7 @@ export default function DashboardPage() {
 
           {tab === 'partners' && (
             <>
+              <TeamWinnersByPartnerSection data={visibleData} focusPid={focusPid} />
               <PartnerAdjSection data={visibleData} focusPid={focusPid} />
               <PairingSideSection data={visibleData} />
             </>
