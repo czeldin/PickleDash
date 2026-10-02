@@ -721,8 +721,15 @@ export function parseAugmentedNights(
           if (rr) { const kk = ks(f); kk.recvDen += rr.total ?? 0; kk.recvNum += rr.kitchen_arrival ?? 0; }
           const adv = ins.coach_advice?.[pi]?.advice;
           if (Array.isArray(adv)) {
+            // Weight each game's coach value by that game's shot_count — a plain
+            // mean over-weights low-sample games (a 7-serve 17% game counting the
+            // same as a 13-serve 86% one). The coach JSON only gives a per-game
+            // percentage (no raw numerator/denominator), so shot_count is the best
+            // available proxy for pooling by sample size. relevance weighted the
+            // same way. Falls back to weight 1 if shot_count is missing.
+            const w = (p.shot_count ?? 0) > 0 ? (p.shot_count as number) : 1;
             let m = coachMap.get(f); if (!m) { m = new Map(); coachMap.set(f, m); }
-            for (const a of adv) { let e = m.get(a.kind); if (!e) { e = { vs: 0, rs: 0, n: 0 }; m.set(a.kind, e); } e.vs += a.value; e.rs += a.relevance; e.n++; }
+            for (const a of adv) { let e = m.get(a.kind); if (!e) { e = { vs: 0, rs: 0, n: 0 }; m.set(a.kind, e); } e.vs += a.value * w; e.rs += a.relevance * w; e.n += w; }
           }
         }
         if (Array.isArray(ral)) {
