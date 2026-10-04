@@ -15,6 +15,12 @@ export interface AugRoleSide {
   kitchen_arrival?: number;
 }
 
+// Explicit kitchen-arrival counts (pb.vision's kitchen_arrival_percentage).
+export interface AugArrivalCount {
+  numerator?: number;
+  denominator?: number;
+}
+
 export interface AugRatings {
   // Current augmented schema.
   kitchen_game?: number;
@@ -66,7 +72,14 @@ export interface AugPlayerData {
     serving?: { oneself?: AugRoleSide; partner?: AugRoleSide };
     receiving?: { oneself?: AugRoleSide; partner?: AugRoleSide };
   };
-  kitchen_arrival_percentage?: unknown;
+  // Canonical kitchen-arrival rates with explicit counts (preferred over
+  // role_data). denominator = rallies whose first four shots were non-fault
+  // (fair chance to advance); numerator = those where the player reached the
+  // kitchen. serving/returning × oneself (this player's role) / partner.
+  kitchen_arrival_percentage?: {
+    serving?: { oneself?: AugArrivalCount; partner?: AugArrivalCount };
+    returning?: { oneself?: AugArrivalCount; partner?: AugArrivalCount };
+  };
   team_kitchen_arrival?: {
     serving?: { numerator?: number; denominator?: number };
     returning?: { numerator?: number; denominator?: number };

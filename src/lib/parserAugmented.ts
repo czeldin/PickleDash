@@ -716,9 +716,22 @@ export function parseAugmentedNights(
         for (let pi = 0; pi < pd.length; pi++) {
           const p = pd[pi]; const f = p?.name?.trim()?.toLowerCase(); if (!p || !f) continue;
           ri(f).games++; tgt(f).games++;
+          // Kitchen arrival on serve / return — use pb.vision's canonical
+          // `kitchen_arrival_percentage` field (explicit numerator/denominator),
+          // per the pb.vision dev: denominator = rallies whose first four shots
+          // were non-fault (a fair chance to advance), numerator = those where the
+          // player reached the kitchen. Pool counts across games (sum num & den,
+          // divide once) — never average percentages. Fall back to the older
+          // role_data.{serving,receiving}.oneself (≥4-shot total/kitchen_arrival)
+          // for nights whose export predates kitchen_arrival_percentage.
+          const kap = p.kitchen_arrival_percentage;
+          const kapServe = kap?.serving?.oneself;
+          const kapRecv = kap?.returning?.oneself;
           const rs = p.role_data?.serving?.oneself; const rr = p.role_data?.receiving?.oneself;
-          if (rs) { const kk = ks(f); kk.serveDen += rs.total ?? 0; kk.serveNum += rs.kitchen_arrival ?? 0; }
-          if (rr) { const kk = ks(f); kk.recvDen += rr.total ?? 0; kk.recvNum += rr.kitchen_arrival ?? 0; }
+          if (kapServe) { const kk = ks(f); kk.serveDen += kapServe.denominator ?? 0; kk.serveNum += kapServe.numerator ?? 0; }
+          else if (rs) { const kk = ks(f); kk.serveDen += rs.total ?? 0; kk.serveNum += rs.kitchen_arrival ?? 0; }
+          if (kapRecv) { const kk = ks(f); kk.recvDen += kapRecv.denominator ?? 0; kk.recvNum += kapRecv.numerator ?? 0; }
+          else if (rr) { const kk = ks(f); kk.recvDen += rr.total ?? 0; kk.recvNum += rr.kitchen_arrival ?? 0; }
           const adv = ins.coach_advice?.[pi]?.advice;
           if (Array.isArray(adv)) {
             // Weight each game's coach value by that game's shot_count — a plain
@@ -796,8 +809,15 @@ export function parseAugmentedNights(
           v.gp++; if (p!.trends?.flags?.won_game) v.gw++;
           const sc = p!.shot_count ?? 0; const ov = p!.trends?.ratings?.overall;
           if (ov != null && sc > 0) { v.rS += ov * sc; v.rW += sc; }
-          const rs = p!.role_data?.serving?.oneself; if (rs) { v.ksD += rs.total ?? 0; v.ksN += rs.kitchen_arrival ?? 0; }
-          const rr = p!.role_data?.receiving?.oneself; if (rr) { v.krD += rr.total ?? 0; v.krN += rr.kitchen_arrival ?? 0; }
+          // Kitchen arrival — canonical kitchen_arrival_percentage counts, with
+          // role_data fallback for older exports (see the serve/receive block above).
+          const kapS = p!.kitchen_arrival_percentage?.serving?.oneself;
+          const kapR = p!.kitchen_arrival_percentage?.returning?.oneself;
+          const rs = p!.role_data?.serving?.oneself; const rr = p!.role_data?.receiving?.oneself;
+          if (kapS) { v.ksD += kapS.denominator ?? 0; v.ksN += kapS.numerator ?? 0; }
+          else if (rs) { v.ksD += rs.total ?? 0; v.ksN += rs.kitchen_arrival ?? 0; }
+          if (kapR) { v.krD += kapR.denominator ?? 0; v.krN += kapR.numerator ?? 0; }
+          else if (rr) { v.krD += rr.total ?? 0; v.krN += rr.kitchen_arrival ?? 0; }
           const ac = p!.trends?.shot_accuracy; if (ac && sc > 0) { v.accW += sc; v.accIn += (ac.in ?? 0) * sc; v.accNet += (ac.net ?? 0) * sc; v.accOut += (ac.out ?? 0) * sc; }
           const sq = p!.trends?.shot_quality; if (sq && sc > 0) { v.sqW += sc; v.sqEx += (sq.excellent ?? 0) * sc; v.sqPoor += (sq.poor ?? 0) * sc; }
           const sd = p!.trends?.serve_depth; if (sd && sc > 0) { v.sdW += sc; v.sdDeep += (sd.deep ?? 0) * sc; }
@@ -909,8 +929,20 @@ export function parseAugmentedNights(
 
   const coaching: CoachingRow[] = data.players.map((p) => {
     const m = coachMap.get(p.pid);
+    // Override the kitchen-arrival-on-serve coaching value with our pooled
+    // kitchen_arrival_percentage.serving.oneself (num/den summed across games) so
+    // this card agrees with the Kitchen Arrival table instead of showing the
+    // coach_advice metric's different (≥6-shot, confidence-weighted) number.
+    const kv = ksMap.get(p.pid);
+    const kitchenServePct = kv && kv.serveDen > 0 ? kv.serveNum / kv.serveDen : null;
     const items = m
-      ? [...m.entries()].map(([kind, e]) => ({ kind, value: e.vs / e.n, relevance: e.rs / e.n })).sort((a, b) => a.value - b.value)
+      ? [...m.entries()].map(([kind, e]) => ({
+          kind,
+          value: (kind === 'kitchen_arrival_percentage_on_serve' && kitchenServePct != null)
+            ? kitchenServePct
+            : e.vs / e.n,
+          relevance: e.rs / e.n,
+        })).sort((a, b) => a.value - b.value)
       : [];
     return { pid: p.pid, items };
   });
